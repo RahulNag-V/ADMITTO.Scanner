@@ -1,0 +1,8 @@
+{
+  "name": "ADMITTO - Digital Event Access & Token Scanning Platform",
+  "description": "Production-ready digital event access and token validation platform with real-time multi-admin check-in, QR/barcode scanning, and offline synchronization.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": []
+}
