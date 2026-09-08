@@ -398,7 +398,7 @@ export default function App() {
         saveSession(authSession);
         localStorage.setItem('admitto_visited', 'true');
       } else if (event === 'PASSWORD_RECOVERY') {
-        navigate('/reset-password');
+        navigate('/forgot-password');
       }
     });
 
@@ -556,10 +556,11 @@ export default function App() {
     );
   }
 
-  // ─── ROUTE: /reset-password ────────────────────────────────────────
+  // ─── ROUTE: /reset-password (Redirect to unified /forgot-password) ──
   if (currentPath === '/reset-password') {
+    navigate('/forgot-password');
     return (
-      <ResetPasswordPage
+      <ForgotPasswordPage
         onNavigateLogin={() => navigate('/login')}
         onNavigateHome={() => navigate('/')}
       />

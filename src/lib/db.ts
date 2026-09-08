@@ -1,5 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import fs from 'fs';
+import path from 'path';
 import {
   Profile,
   EventItem,
@@ -15,6 +17,7 @@ import {
   ScannerAccessRequest,
   EventScanConfig,
   UniquenessValidationResult,
+  PasswordResetCode,
 } from '../types';
 import { getServerSupabase, getServerSupabaseAdmin } from './supabase/server';
 
@@ -42,6 +45,7 @@ export interface DatabaseSchema {
   activity_logs: ActivityLog[];
   scanner_referral_codes: ScannerReferralCode[];
   scanner_access_requests: ScannerAccessRequest[];
+  password_reset_codes: PasswordResetCode[];
   passwords: Record<string, string>; // userId/email -> password_hash or direct pass
 }
 
@@ -61,6 +65,7 @@ const initialDB: DatabaseSchema = {
   activity_logs: [],
   scanner_referral_codes: [],
   scanner_access_requests: [],
+  password_reset_codes: [],
 };
 
 class DatabaseService {
@@ -301,6 +306,145 @@ class DatabaseService {
         console.warn('[Supabase DB] Warning updating profile password_hash:', err?.message);
       }
     }
+    return true;
+  }
+
+  // --- PASSWORD RESET CODES (Supabase PostgreSQL Persistence) ---
+  async createPasswordResetCode(
+    userId: string,
+    email: string,
+    codeHash: string,
+    expiresAt: string
+  ): Promise<PasswordResetCode> {
+    const cleanEmail = email.toLowerCase().trim();
+    const newRecord: PasswordResetCode = {
+      id: generateId(),
+      user_id: userId,
+      email: cleanEmail,
+      code_hash: codeHash,
+      expires_at: expiresAt,
+      attempts: 0,
+      used: false,
+      created_at: new Date().toISOString(),
+    };
+
+    const supabase = this.getClient();
+    if (!supabase) {
+      throw new Error('[DatabaseService] Supabase client is not available for persistent password reset.');
+    }
+
+    // Invalidate previous active/unused codes for this account
+    const { error: updateError } = await supabase
+      .from('password_reset_codes')
+      .update({ used: true })
+      .eq('email', cleanEmail)
+      .eq('used', false);
+
+    if (updateError) {
+      console.error('[Supabase DB] Error invalidating previous reset codes:', updateError);
+      throw new Error(`Database error invalidating prior reset codes: ${updateError.message}`);
+    }
+
+    const { data, error } = await supabase
+      .from('password_reset_codes')
+      .insert({
+        id: newRecord.id,
+        user_id: newRecord.user_id,
+        email: newRecord.email,
+        code_hash: newRecord.code_hash,
+        expires_at: newRecord.expires_at,
+        attempts: 0,
+        used: false,
+        created_at: newRecord.created_at,
+      })
+      .select('*')
+      .single();
+
+    if (error || !data) {
+      console.error('[Supabase DB] Error inserting reset code:', error);
+      throw new Error(`Database error persisting reset code: ${error?.message || 'Insert failed'}`);
+    }
+
+    return data as PasswordResetCode;
+  }
+
+  async getActivePasswordResetCode(email: string): Promise<PasswordResetCode | null> {
+    const cleanEmail = email.toLowerCase().trim();
+    const supabase = this.getClient();
+
+    if (!supabase) {
+      throw new Error('[DatabaseService] Supabase client is not available for persistent password reset.');
+    }
+
+    const { data, error } = await supabase
+      .from('password_reset_codes')
+      .select('*')
+      .eq('email', cleanEmail)
+      .eq('used', false)
+      .gt('expires_at', new Date().toISOString())
+      .lt('attempts', 5)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[Supabase DB] Error fetching active reset code:', error);
+      throw new Error(`Database error fetching reset code: ${error.message}`);
+    }
+
+    return (data as PasswordResetCode) || null;
+  }
+
+  async incrementPasswordResetAttempts(id: string): Promise<number> {
+    const supabase = this.getClient();
+    if (!supabase) {
+      throw new Error('[DatabaseService] Supabase client is not available for persistent password reset.');
+    }
+
+    const { data, error } = await supabase
+      .from('password_reset_codes')
+      .select('attempts')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) {
+      console.error('[Supabase DB] Error reading reset code attempts:', error);
+      throw new Error(`Database error reading attempts: ${error?.message || 'Record not found'}`);
+    }
+
+    const updatedAttempts = (data.attempts || 0) + 1;
+    const { error: updateError } = await supabase
+      .from('password_reset_codes')
+      .update({
+        attempts: updatedAttempts,
+        used: updatedAttempts >= 5,
+      })
+      .eq('id', id);
+
+    if (updateError) {
+      console.error('[Supabase DB] Error updating reset code attempts:', updateError);
+      throw new Error(`Database error updating attempts: ${updateError.message}`);
+    }
+
+    return updatedAttempts;
+  }
+
+  async markPasswordResetCodeUsed(id: string): Promise<boolean> {
+    const supabase = this.getClient();
+    if (!supabase) {
+      throw new Error('[DatabaseService] Supabase client is not available for persistent password reset.');
+    }
+
+    const { error } = await supabase
+      .from('password_reset_codes')
+      .update({ used: true })
+      .eq('id', id);
+
+    if (error) {
+      console.error('[Supabase DB] Error marking reset code used:', error);
+      throw new Error(`Database error marking code as used: ${error.message}`);
+    }
+
     return true;
   }
 

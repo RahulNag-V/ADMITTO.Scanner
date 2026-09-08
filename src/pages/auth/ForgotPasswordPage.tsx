@@ -65,15 +65,15 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
     e.preventDefault();
     setError(null);
 
-    const cleanCode = code.trim().toUpperCase();
-    if (!cleanCode.startsWith('ADMITTO')) {
-      setError('Verification code must start with "ADMITTO" (e.g. ADMITTO9879).');
+    const cleanCode = code.trim();
+    if (!/^\d{6}$/.test(cleanCode)) {
+      setError('Please enter the 6-digit verification code sent to your email.');
       playFeedbackSound('error');
       return;
     }
 
-    if (newPassword.length < 6) {
-      setError('New password must be at least 6 characters long.');
+    if (newPassword.length < 8) {
+      setError('New password must be at least 8 characters long.');
       playFeedbackSound('error');
       return;
     }
@@ -135,8 +135,8 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
             </h1>
             <p className="text-xs sm:text-sm text-slate-400">
               {step === 'verify_code'
-                ? `Enter the code like ADMITTO9879 sent to ${email}`
-                : 'Enter your email to receive a secure ADMITTO verification code'}
+                ? `Enter the 6-digit verification code sent to ${email}`
+                : 'Enter your email to receive a secure 6-digit verification code'}
             </p>
           </div>
         </div>
@@ -193,7 +193,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
                     </span>
                   </p>
                   <p className="text-slate-300 text-[11px] leading-relaxed">
-                    A confidential code starting with <strong className="text-white font-mono">ADMITTO</strong> has been sent to <strong className="text-white">{email}</strong>. For your privacy and security, this code is strictly confidential and is only accessible in your email.
+                    A confidential 6-digit code has been sent to <strong className="text-white">{email}</strong>. For your security, this code expires in 15 minutes.
                   </p>
                 </div>
               </div>
@@ -202,7 +202,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-slate-300 block">Verification Code</label>
-                  <span className="text-[10px] text-indigo-300 font-mono">Format: ADMITTO + digits</span>
+                  <span className="text-[10px] text-indigo-300 font-mono">6-digit code</span>
                 </div>
                 <div className="relative">
                   <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -210,10 +210,11 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
                     id="forgot-code-input"
                     type="text"
                     required
-                    placeholder="e.g. ADMITTO9879"
+                    maxLength={6}
+                    placeholder="e.g. 592817"
                     value={code}
-                    onChange={(e) => setCode(e.target.value.toUpperCase())}
-                    className="w-full glass-input rounded-xl pl-10 pr-4 py-3 text-xs sm:text-sm text-white font-mono tracking-wider placeholder-slate-500 focus:outline-none focus:border-indigo-400 transition-colors uppercase"
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="w-full glass-input rounded-xl pl-10 pr-4 py-3 text-sm text-white font-mono tracking-widest placeholder-slate-500 focus:outline-none focus:border-indigo-400 transition-colors"
                   />
                 </div>
               </div>
@@ -227,7 +228,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
                     id="forgot-new-password-input"
                     type={showNewPass ? 'text' : 'password'}
                     required
-                    placeholder="At least 6 characters"
+                    placeholder="At least 8 characters"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full glass-input rounded-xl pl-10 pr-10 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 transition-colors"

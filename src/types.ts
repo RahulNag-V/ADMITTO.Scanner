@@ -334,3 +334,14 @@ export interface ImportSummary {
   imported_rows: number;
   errors: string[];
 }
+
+export interface PasswordResetCode {
+  id: string;
+  user_id: string;
+  email: string;
+  code_hash: string;
+  expires_at: string;
+  attempts: number;
+  used: boolean;
+  created_at: string;
+}

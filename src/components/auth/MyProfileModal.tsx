@@ -189,15 +189,15 @@ export const MyProfileModal: React.FC<MyProfileModalProps> = ({
     setPasswordError(null);
     setPasswordSuccess(null);
 
-    const cleanCode = resetCode.trim().toUpperCase();
-    if (!cleanCode.startsWith('ADMITTO')) {
-      setPasswordError('Verification code must start with "ADMITTO" (e.g. ADMITTO9879).');
+    const cleanCode = resetCode.trim();
+    if (!/^\d{6}$/.test(cleanCode)) {
+      setPasswordError('Please enter the 6-digit verification code sent to your email.');
       playFeedbackSound('error');
       return;
     }
 
-    if (newPassword.length < 6) {
-      setPasswordError('New password must be at least 6 characters long.');
+    if (newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters long.');
       playFeedbackSound('error');
       return;
     }
@@ -519,11 +519,7 @@ export const MyProfileModal: React.FC<MyProfileModalProps> = ({
                           </button>
                         </div>
                         <p className="text-[11px] text-slate-300 leading-relaxed">
-                          We will send a secure verification code formatted like{' '}
-                          <span className="font-mono font-bold text-indigo-200 bg-indigo-500/20 px-1.5 py-0.5 rounded">
-                            ADMITTO9879
-                          </span>{' '}
-                          to your email (<span className="text-white font-semibold">{session.user.email}</span>).
+                          We will send a confidential 6-digit verification code to your email (<span className="text-white font-semibold">{session.user.email}</span>).
                         </p>
                       </div>
 
@@ -578,13 +574,13 @@ export const MyProfileModal: React.FC<MyProfileModalProps> = ({
                               </span>
                             </p>
                             <p className="text-slate-300 text-[11px] leading-relaxed">
-                              We sent your confidential verification code starting with <strong className="text-white font-mono">ADMITTO</strong> to <strong className="text-white">{session.user.email}</strong>. For account privacy, the code is strictly confidential and is only viewable in your email.
+                              We sent your confidential 6-digit verification code to <strong className="text-white">{session.user.email}</strong>. For your security, this code expires in 15 minutes.
                             </p>
                           </div>
                         </div>
                       )}
 
-                      {/* Code Input (Must start with ADMITTO) */}
+                      {/* Code Input (6 digits) */}
                       <div className="space-y-1.5">
                         <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
                           <span className="flex items-center gap-1.5">
@@ -592,17 +588,18 @@ export const MyProfileModal: React.FC<MyProfileModalProps> = ({
                             <span>Verification Code</span>
                           </span>
                           <span className="text-[10px] text-slate-400 font-mono">
-                            Format: ADMITTO + digits
+                            6-digit code
                           </span>
                         </label>
                         <input
                           id="profile-reset-code-input"
                           type="text"
+                          maxLength={6}
                           value={resetCode}
-                          onChange={(e) => setResetCode(e.target.value.toUpperCase())}
-                          placeholder="e.g. ADMITTO9879"
+                          onChange={(e) => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="e.g. 592817"
                           required
-                          className="w-full px-4 py-2.5 rounded-xl bg-white/[0.05] border border-white/15 focus:border-indigo-500/70 focus:outline-none text-white text-sm font-mono tracking-wider placeholder-slate-500 transition-colors uppercase"
+                          className="w-full px-4 py-2.5 rounded-xl bg-white/[0.05] border border-white/15 focus:border-indigo-500/70 focus:outline-none text-white text-sm font-mono tracking-widest placeholder-slate-500 transition-colors"
                         />
                       </div>
 
@@ -618,7 +615,7 @@ export const MyProfileModal: React.FC<MyProfileModalProps> = ({
                             type={showNewPass ? 'text' : 'password'}
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
-                            placeholder="At least 6 characters"
+                            placeholder="At least 8 characters"
                             required
                             className="w-full px-4 py-2.5 pr-10 rounded-xl bg-white/[0.05] border border-white/15 focus:border-indigo-500/70 focus:outline-none text-white text-sm placeholder-slate-500 transition-colors"
                           />

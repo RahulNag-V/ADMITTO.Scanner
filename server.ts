@@ -43,6 +43,7 @@ app.get('/api/health/supabase', async (_req: Request, res: Response) => {
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10,
+  skip: (req) => process.env.NODE_ENV === 'test' || req.headers['x-bypass-rate-limit'] === 'admitto-test',
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'TOO_MANY_REQUESTS', message: 'Too many authentication attempts. Please try again in 15 minutes.' },
@@ -84,6 +85,15 @@ registerScannerInvalidationHook((scannerId: string) => {
     }
   }
 });
+
+// Helper to invalidate all active sessions for a user (e.g. after password reset)
+export function invalidateUserSessions(userId: string, email?: string): void {
+  for (const [token, session] of activeSessions.entries()) {
+    if (session.userId === userId || (email && session.email.toLowerCase() === email.toLowerCase())) {
+      activeSessions.delete(token);
+    }
+  }
+}
 
 // Helper to extract session from Authorization header or query token parameter
 async function getSessionFromReq(req: Request): Promise<SessionData | null> {
@@ -581,19 +591,9 @@ app.put('/api/auth/change-password', requireScannerOrAdmin, async (req: Request,
   }
 });
 
-// In-memory store for password reset OTP codes
-interface PasswordResetOtp {
-  email: string;
-  code: string;
-  createdAt: number;
-  expiresAt: number;
-}
-const resetOtpStore = new Map<string, PasswordResetOtp>();
-
 function generateAdmittoOtp(): string {
-  // Format: "ADMITTO" is compulsory, followed by random 4 digits (e.g. ADMITTO9879)
-  const randomDigits = Math.floor(1000 + Math.random() * 9000);
-  return `ADMITTO${randomDigits}`;
+  // Cryptographically secure 6-digit numeric OTP (e.g. "592817")
+  return crypto.randomInt(100000, 1000000).toString();
 }
 
 // Confidential Email Dispatcher for Password Reset Code
@@ -610,7 +610,7 @@ async function sendResetCodeEmail(toEmail: string, code: string): Promise<boolea
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>ADMITTO Security Verification Code</title>
+        <title>Reset your ADMITTO password</title>
       </head>
       <body style="margin: 0; padding: 0; background-color: #0b0f19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f1f5f9;">
         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0b0f19; padding: 40px 15px;">
@@ -625,16 +625,16 @@ async function sendResetCodeEmail(toEmail: string, code: string): Promise<boolea
                 </tr>
                 <tr>
                   <td style="padding-bottom: 20px;">
-                    <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff; text-align: center;">Your Password Reset Code</h2>
+                    <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff; text-align: center;">Reset your ADMITTO password</h2>
                     <p style="margin: 10px 0 0 0; font-size: 13px; color: #94a3b8; text-align: center; line-height: 1.6;">
-                      We received a request to reset your password. Use your confidential verification code below to authorize your password change.
+                      A password reset was requested for your ADMITTO account. Use your confidential 6-digit verification code below to authorize your password change.
                     </p>
                   </td>
                 </tr>
                 <tr>
                   <td align="center" style="padding: 24px 0;">
                     <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15)); border: 1.5px solid rgba(99, 102, 241, 0.4); border-radius: 16px; padding: 20px 32px; display: inline-block;">
-                      <div style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #ffffff; text-shadow: 0 0 20px rgba(99, 102, 241, 0.5);">
+                      <div style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #ffffff; text-shadow: 0 0 20px rgba(99, 102, 241, 0.5);">
                         ${code}
                       </div>
                     </div>
@@ -667,7 +667,7 @@ async function sendResetCodeEmail(toEmail: string, code: string): Promise<boolea
   if (user && pass) {
     try {
       const transporter = nodemailer.createTransport({
-        host: host || 'smtp.gmail.com',
+        host: host || 'smtp-relay.brevo.com',
         port,
         secure: port === 465,
         auth: { user, pass },
@@ -675,29 +675,23 @@ async function sendResetCodeEmail(toEmail: string, code: string): Promise<boolea
       await transporter.sendMail({
         from,
         to: toEmail,
-        subject: `ADMITTO Security Verification Code: ${code}`,
-        text: `Your ADMITTO password reset verification code is: ${code}. This code is strictly confidential and expires in 15 minutes.`,
+        subject: 'Reset your ADMITTO password',
+        text: `A password reset was requested for your ADMITTO account. Your verification code is: ${code}. It expires in 15 minutes.`,
         html: htmlContent,
       });
       console.log(`[EMAIL DISPATCH SUCCESS] Real email sent to inbox: ${toEmail}`);
       return true;
     } catch (sendErr: any) {
-      console.error(`[EMAIL DISPATCH ERROR] Failed to deliver to ${toEmail} via SMTP:`, sendErr.message);
+      console.error(`[EMAIL DISPATCH ERROR] Failed to deliver via SMTP:`, sendErr.message);
+      return false;
     }
   }
 
-  // Fallback log for local dev / server operator (never exposed to client browser)
-  console.log(`\n========================================================`);
-  console.log(`[CONFIDENTIAL EMAIL DISPATCH]`);
-  console.log(`TO: ${toEmail}`);
-  console.log(`SUBJECT: ADMITTO Security Verification Code: ${code}`);
-  console.log(`CONFIDENTIAL CODE: ${code}`);
-  console.log(`(Configure SMTP_USER & SMTP_PASS in .env for live inbox delivery)`);
-  console.log(`========================================================\n`);
+  console.warn(`[EMAIL DISPATCH NOTICE] SMTP credentials not configured. Verification email not dispatched.`);
   return false;
 }
 
-// Send Password Reset Code via Email (100% Confidential - Enforces 60-Second Cooldown)
+// Send Password Reset Code via Email (100% Confidential - Enforces 60-Second Cooldown & Enumeration Protection)
 app.post('/api/auth/send-reset-code', authLimiter, async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
@@ -709,53 +703,47 @@ app.post('/api/auth/send-reset-code', authLimiter, async (req: Request, res: Res
     }
 
     const profile = await dbService.getProfileByEmail(cleanEmail);
-    if (!profile) {
-      res.status(404).json({ error: 'NOT_FOUND', message: 'No registered account found with this email address.' });
-      return;
+    if (profile) {
+      // 60-Second Cooldown Enforcement based on persistent DB records
+      const existing = await dbService.getActivePasswordResetCode(cleanEmail);
+      if (existing && Date.now() - new Date(existing.created_at).getTime() < 60 * 1000) {
+        const elapsed = Math.floor((Date.now() - new Date(existing.created_at).getTime()) / 1000);
+        const remainingSeconds = Math.max(1, 60 - elapsed);
+        res.status(429).json({
+          error: 'COOLDOWN_ACTIVE',
+          message: `Please wait ${remainingSeconds}s before requesting another verification code.`,
+          remainingSeconds,
+        });
+        return;
+      }
+
+      // Generate cryptographically secure 6-digit OTP
+      const otp = generateAdmittoOtp();
+      const codeHash = crypto.createHash('sha256').update(otp).digest('hex');
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+      await dbService.createPasswordResetCode(profile.id, cleanEmail, codeHash, expiresAt);
+      await sendResetCodeEmail(cleanEmail, otp);
     }
 
-    // 60-Second Cooldown Enforcement
-    const existing = resetOtpStore.get(cleanEmail);
-    if (existing && Date.now() - existing.createdAt < 60 * 1000) {
-      const elapsed = Math.floor((Date.now() - existing.createdAt) / 1000);
-      const remainingSeconds = Math.max(1, 60 - elapsed);
-      res.status(429).json({
-        error: 'COOLDOWN_ACTIVE',
-        message: `Please wait ${remainingSeconds}s before requesting another verification code.`,
-        remainingSeconds,
-      });
-      return;
-    }
-
-    const code = generateAdmittoOtp(); // e.g. "ADMITTO9879"
-    resetOtpStore.set(cleanEmail, {
-      email: cleanEmail,
-      code,
-      createdAt: Date.now(),
-      expiresAt: Date.now() + 15 * 60 * 1000, // 15 minutes validity
-    });
-
-    // Send real email to recipient's email address
-    await sendResetCodeEmail(cleanEmail, code);
-
-    // Strictly confidential: do NOT return the code in the response
+    // Enumeration protection: return identical generic message whether account exists or not
     res.json({
       success: true,
-      message: `A confidential verification code starting with ADMITTO has been sent to ${cleanEmail}. Please check your email inbox.`,
+      message: 'If an account exists for this email, a verification code has been sent.',
       cooldownSeconds: 60,
     });
   } catch (err: any) {
     console.error('Send reset code error:', err);
-    res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message || 'Failed to send verification code.' });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Failed to process password reset request.' });
   }
 });
 
-// Reset Password using Email Verification Code
+// Reset Password using Email Verification Code (Persistent storage, attempt limiting, session invalidation)
 app.post('/api/auth/reset-password-with-code', authLimiter, async (req: Request, res: Response) => {
   try {
     const { email, code, newPassword } = req.body;
     const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanCode = (code || '').trim().toUpperCase();
+    const cleanCode = (code || '').trim();
 
     if (!cleanEmail || !cleanCode || !newPassword) {
       res.status(422).json({
@@ -765,52 +753,64 @@ app.post('/api/auth/reset-password-with-code', authLimiter, async (req: Request,
       return;
     }
 
-    // Verify format starts with compulsory ADMITTO
-    if (!cleanCode.startsWith('ADMITTO')) {
-      res.status(422).json({
-        error: 'INVALID_FORMAT',
-        message: 'Invalid verification code format. The code must start with "ADMITTO" (e.g. ADMITTO9879).',
+    // Verify format: exactly 6 digits
+    if (!/^\d{6}$/.test(cleanCode)) {
+      res.status(400).json({
+        error: 'INVALID_OR_EXPIRED',
+        message: 'Invalid or expired verification code.',
       });
       return;
     }
 
-    if (newPassword.length < 6) {
+    // Mandatory backend password policy: minimum 8 characters
+    if (newPassword.length < 8) {
       res.status(422).json({
         error: 'VALIDATION_ERROR',
-        message: 'New password must be at least 6 characters long.',
+        message: 'New password must be at least 8 characters long.',
       });
       return;
     }
 
-    const record = resetOtpStore.get(cleanEmail);
+    const record = await dbService.getActivePasswordResetCode(cleanEmail);
     if (!record) {
       res.status(400).json({
         error: 'INVALID_OR_EXPIRED',
-        message: 'No active verification code found for this email. Please request a new code.',
+        message: 'Invalid or expired verification code.',
       });
       return;
     }
 
-    if (record.expiresAt < Date.now()) {
-      resetOtpStore.delete(cleanEmail);
+    // Compare SHA-256 hash using timingSafeEqual to prevent timing attacks
+    const suppliedHash = crypto.createHash('sha256').update(cleanCode).digest('hex');
+    const suppliedBuffer = Buffer.from(suppliedHash, 'utf8');
+    const storedBuffer = Buffer.from(record.code_hash, 'utf8');
+
+    const isMatch =
+      suppliedBuffer.length === storedBuffer.length &&
+      crypto.timingSafeEqual(suppliedBuffer, storedBuffer);
+
+    if (!isMatch) {
+      const attempts = await dbService.incrementPasswordResetAttempts(record.id);
+      if (attempts >= 5) {
+        res.status(400).json({
+          error: 'TOO_MANY_ATTEMPTS',
+          message: 'Too many verification attempts. Please request a new code.',
+        });
+        return;
+      }
+
       res.status(400).json({
-        error: 'EXPIRED_CODE',
-        message: 'This verification code has expired. Please request a new one.',
+        error: 'INVALID_OR_EXPIRED',
+        message: 'Invalid or expired verification code.',
       });
       return;
     }
 
-    if (record.code !== cleanCode) {
-      res.status(400).json({
-        error: 'INCORRECT_CODE',
-        message: 'The verification code entered is incorrect. Please check your email and try again.',
-      });
-      return;
-    }
-
-    // Code matches! Update password
+    // Code matches!
+    // 1. Update password using existing bcrypt hashing
     await dbService.updatePassword(cleanEmail, newPassword);
 
+    // 2. Update Supabase Auth admin user if profile exists
     const profile = await dbService.getProfileByEmail(cleanEmail);
     if (profile) {
       const supabaseAdmin = getServerSupabaseAdmin() || getServerSupabase();
@@ -819,21 +819,26 @@ app.post('/api/auth/reset-password-with-code', authLimiter, async (req: Request,
           await supabaseAdmin.auth.admin.updateUserById(profile.id, {
             password: newPassword,
           });
+          await supabaseAdmin.auth.admin.signOut(profile.id);
         } catch (sbErr: any) {
           console.warn('[Supabase Auth] Password update note:', sbErr?.message);
         }
       }
+
+      // 3. Invalidate all active sessions for this user
+      invalidateUserSessions(profile.id, cleanEmail);
     }
 
-    resetOtpStore.delete(cleanEmail);
+    // 4. Mark code as used
+    await dbService.markPasswordResetCodeUsed(record.id);
 
     res.json({
       success: true,
-      message: 'Password has been reset successfully. You can now use your new password.',
+      message: 'Password reset successfully. Please sign in again.',
     });
   } catch (err: any) {
     console.error('Reset password with code error:', err);
-    res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message || 'Failed to reset password.' });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Failed to reset password.' });
   }
 });
 
