@@ -245,3 +245,13 @@ export async function clearAllOfflineData(): Promise<void> {
 
   await tx.done;
 }
+
+/**
+ * Retrieve all cached attendees for an event (useful for offline search and roster display)
+ */
+export async function getCachedAttendees(eventId: string): Promise<CachedAttendee[]> {
+  const db = await getAdmittoDB();
+  const tx = db.transaction('cached_attendees', 'readonly');
+  const index = tx.objectStore('cached_attendees').index('by_event_id');
+  return await index.getAll(eventId);
+}

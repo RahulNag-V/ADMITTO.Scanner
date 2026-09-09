@@ -42,7 +42,7 @@ import { scanRepository } from '../../lib/offline/scanRepository';
 import { syncEngine, SyncEngineStatus } from '../../lib/offline/syncEngine';
 import { eventBundleService } from '../../lib/offline/eventBundle';
 import { saveOfflineAuthContext, getOrCreateDeviceUuid } from '../../lib/offline/security';
-import { purgeEventOfflineData } from '../../lib/offline/idb';
+import { purgeEventOfflineData, getCachedAttendees } from '../../lib/offline/idb';
 
 // Dock and Tab subcomponents
 import { AppleDock, ScannerDockTab } from '../../components/scanner/AppleDock';
@@ -294,6 +294,28 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
 
       if (studentsRes.status === 'fulfilled' && studentsRes.value) {
         setStudents(studentsRes.value.students || []);
+      } else {
+        try {
+          const cached = await getCachedAttendees(eventId);
+          if (cached && cached.length > 0) {
+            setStudents(
+              cached.map((c) => ({
+                id: c.id,
+                event_id: c.event_id,
+                usn: c.usn,
+                name: c.name,
+                branch: c.branch,
+                qr_code: c.qr_code,
+                barcode: c.barcode,
+                is_checked_in: c.is_checked_in,
+                checked_in: c.is_checked_in,
+                checked_in_at: c.checked_in_at,
+              }))
+            );
+          }
+        } catch (cErr) {
+          console.warn('[ScannerPage] Could not load offline cached attendees:', cErr);
+        }
       }
       if (logsRes.status === 'fulfilled' && logsRes.value) {
         setLogs(logsRes.value.scans || []);
@@ -937,6 +959,13 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
     setManualInput('');
   };
 
+  // Quick verify/check-in attendee selected directly from live search dropdown
+  const handleSelectStudentFromSearch = (student: Student) => {
+    const value = student.qr_code || student.usn || student.barcode || student.name;
+    handleTokenScanned(value);
+    setManualInput('');
+  };
+
   // Toggle check-in from Home student list
   const handleToggleCheckInFromHome = async (studentId: string, currentStatus: boolean) => {
     try {
@@ -1160,6 +1189,9 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
                     onDoneNextScan={handleDoneNextScan}
                     primaryScanField={event?.primary_scan_field || 'usn'}
                     secondaryScanField={event?.secondary_scan_field || undefined}
+                    students={students}
+                    eventId={eventId}
+                    onSelectStudent={handleSelectStudentFromSearch}
                   />
                 )}
 

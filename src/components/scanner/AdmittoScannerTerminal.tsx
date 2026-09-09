@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   QrCode,
@@ -22,9 +22,13 @@ import {
   ArrowRight,
   PauseCircle,
   Key,
+  Check,
+  X,
+  User,
 } from 'lucide-react';
-import { ScanType, ScanValidationResult } from '../../types';
+import { ScanType, ScanValidationResult, Student } from '../../types';
 import { ScannerPreferences } from './ScannerSettingsTab';
+import { getCachedAttendees } from '../../lib/offline/idb';
 
 interface AdmittoScannerTerminalProps {
   scanType: ScanType;
@@ -52,6 +56,9 @@ interface AdmittoScannerTerminalProps {
   onDoneNextScan?: () => void;
   primaryScanField?: string;
   secondaryScanField?: string;
+  students?: Student[];
+  eventId?: string;
+  onSelectStudent?: (student: Student) => void;
 }
 
 export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
@@ -80,7 +87,109 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
   onDoneNextScan,
   primaryScanField,
   secondaryScanField,
+  students = [],
+  eventId,
+  onSelectStudent,
 }) => {
+  // Live Search State
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [offlineStudents, setOfflineStudents] = useState<Student[]>([]);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Load offline attendees from IndexedDB if in-memory roster is empty (e.g. offline cold-start)
+  useEffect(() => {
+    if ((!students || students.length === 0) && eventId) {
+      getCachedAttendees(eventId)
+        .then((cached) => {
+          if (cached && cached.length > 0) {
+            setOfflineStudents(
+              cached.map((c) => ({
+                id: c.id,
+                event_id: c.event_id,
+                usn: c.usn,
+                name: c.name,
+                branch: c.branch,
+                qr_code: c.qr_code,
+                barcode: c.barcode,
+                is_checked_in: c.is_checked_in,
+                checked_in: c.is_checked_in,
+                checked_in_at: c.checked_in_at,
+              }))
+            );
+          }
+        })
+        .catch(() => {});
+    }
+  }, [students, eventId]);
+
+  // Combined attendees dataset (online live roster prioritized, falling back to cached offline roster)
+  const allAttendees = useMemo(() => {
+    if (students && students.length > 0) return students;
+    return offlineStudents;
+  }, [students, offlineStudents]);
+
+  // Live real-time search results updated on every single character keystroke
+  const searchResults = useMemo(() => {
+    const query = (manualInput || '').trim().toLowerCase();
+    if (!query) return [];
+
+    return allAttendees
+      .filter((s) => {
+        const nameMatch = s.name?.toLowerCase().includes(query);
+        const usnMatch = s.usn?.toLowerCase().includes(query);
+        const emailMatch = s.email?.toLowerCase().includes(query);
+        const qrMatch = s.qr_code?.toLowerCase().includes(query);
+        const barcodeMatch = s.barcode?.toLowerCase().includes(query);
+        const branchMatch = s.branch?.toLowerCase().includes(query);
+        return nameMatch || usnMatch || emailMatch || qrMatch || barcodeMatch || branchMatch;
+      })
+      .slice(0, 8); // Top 8 most relevant matches for ultra-fast UX
+  }, [allAttendees, manualInput]);
+
+  // Dismiss dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Selection Handler: immediately validates & checks in the chosen attendee
+  const handleSelectAttendee = (student: Student) => {
+    setIsDropdownOpen(false);
+    if (onSelectStudent) {
+      onSelectStudent(student);
+    } else {
+      const scanVal = student.qr_code || student.usn || student.barcode || student.name;
+      onManualInputChange(scanVal);
+      onManualSubmit({ preventDefault: () => {} } as React.FormEvent);
+    }
+  };
+
+  // Keyboard navigation through dropdown results
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isDropdownOpen || searchResults.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev < searchResults.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : searchResults.length - 1));
+    } else if (e.key === 'Enter') {
+      if (selectedIndex >= 0 && selectedIndex < searchResults.length) {
+        e.preventDefault();
+        handleSelectAttendee(searchResults[selectedIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setIsDropdownOpen(false);
+    }
+  };
+
   // Determine current active visual state
   const isOfflineSuccess = lastResult && lastResult.status === 'SUCCESS_OFFLINE';
   const isQueuedOffline = lastResult && (lastResult.status === 'QUEUED_OFFLINE' || isOfflineSuccess);
@@ -797,18 +906,41 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
         </AnimatePresence>
       </div>
 
-      {/* 5. Manual Input / Laser Barcode Gun Field */}
-      <form onSubmit={onManualSubmit} className="space-y-1 shrink-0">
-        <div className="flex gap-2">
+      {/* 5. Manual Input / Laser Barcode Gun Field with Real-Time Keystroke Search */}
+      <div className="relative space-y-1 shrink-0" ref={searchContainerRef}>
+        <form onSubmit={onManualSubmit} className="flex gap-2">
           <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               id="scanner-manual-input"
               type="text"
               placeholder="Search through any credentials"
               value={manualInput}
-              onChange={(e) => onManualInputChange(e.target.value)}
-              className="w-full glass-input rounded-2xl pl-4 pr-3 py-2.5 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              onChange={(e) => {
+                onManualInputChange(e.target.value);
+                setIsDropdownOpen(true);
+                setSelectedIndex(-1);
+              }}
+              onFocus={() => {
+                if (manualInput.trim().length > 0) setIsDropdownOpen(true);
+              }}
+              onKeyDown={handleKeyDown}
+              autoComplete="off"
+              className="w-full glass-input rounded-2xl pl-9 pr-9 py-2.5 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             />
+            {manualInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  onManualInputChange('');
+                  setIsDropdownOpen(false);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 rounded-full hover:bg-white/10 transition cursor-pointer"
+                title="Clear input"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
           <button
             id="scanner-manual-submit-btn"
@@ -819,8 +951,98 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
             <Send className="w-3.5 h-3.5 text-slate-900" />
             <span>Verify</span>
           </button>
-        </div>
-      </form>
+        </form>
+
+        {/* Real-time Keystroke Search Results Dropdown */}
+        <AnimatePresence>
+          {isDropdownOpen && manualInput.trim().length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -6, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.98 }}
+              transition={{ duration: 0.15 }}
+              className="absolute left-0 right-0 bottom-full mb-2 bg-zinc-950/95 backdrop-blur-2xl border border-indigo-500/40 rounded-2xl shadow-2xl shadow-black/90 overflow-hidden z-50 divide-y divide-zinc-800/80 max-h-72 flex flex-col"
+            >
+              {/* Dropdown Header */}
+              <div className="px-3.5 py-2 bg-indigo-950/50 flex items-center justify-between text-[11px] font-mono text-indigo-300">
+                <span className="flex items-center gap-1.5 font-bold">
+                  <Search className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>
+                    {searchResults.length} matching attendee{searchResults.length === 1 ? '' : 's'}
+                  </span>
+                </span>
+                <span className="text-zinc-400 text-[10px]">Click or Enter to check in</span>
+              </div>
+
+              {/* Matching Results List */}
+              <div className="overflow-y-auto divide-y divide-zinc-900/90 flex-1">
+                {searchResults.length === 0 ? (
+                  <div className="p-4 text-center space-y-1">
+                    <p className="text-xs font-bold text-zinc-300">No matching attendee for "{manualInput}"</p>
+                    <p className="text-[10px] text-zinc-500">
+                      Press "Verify" to validate unlisted barcode or external ticket
+                    </p>
+                  </div>
+                ) : (
+                  searchResults.map((student, idx) => {
+                    const isCheckedIn = !!student.is_checked_in || !!student.checked_in;
+                    const isSelected = idx === selectedIndex;
+                    return (
+                      <button
+                        key={student.id || idx}
+                        type="button"
+                        onClick={() => handleSelectAttendee(student)}
+                        onMouseEnter={() => setSelectedIndex(idx)}
+                        className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between gap-3 transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-indigo-600/25 text-white'
+                            : 'hover:bg-zinc-900/90 text-zinc-200'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1 space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-white truncate">
+                              {student.name}
+                            </span>
+                            {student.branch && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 font-mono shrink-0">
+                                {student.branch}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400 truncate">
+                            <span className="text-orange-400 font-semibold">{student.usn}</span>
+                            {student.email && <span className="text-zinc-500 truncate">• {student.email}</span>}
+                            {student.qr_code && student.qr_code !== student.usn && (
+                              <span className="text-indigo-400 truncate">• QR: {student.qr_code}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Status Badge & Check-in Action */}
+                        <div className="shrink-0 flex items-center gap-2">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold flex items-center gap-1 shrink-0 ${
+                              isCheckedIn
+                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            }`}
+                          >
+                            {isCheckedIn ? 'Checked In' : 'Admit'}
+                          </span>
+                          <span className="p-1 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500 hover:text-white transition shrink-0">
+                            <Check className="w-3 h-3" />
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* 6. Done / Next Scan Action Button (Prominent below Search Bar) */}
       {(lastResult || isScannerPaused) && onDoneNextScan && (
