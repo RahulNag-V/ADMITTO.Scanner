@@ -4,8 +4,12 @@ import path from 'path';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig(() => {
+export default defineConfig(({ command, mode }) => {
+  const isProduction = mode === 'production' || process.env.NODE_ENV === 'production';
+  const base = process.env.VITE_BASE || (command === 'build' || isProduction ? '/ADMITTO.Scanner/' : '/');
+
   return {
+    base,
     plugins: [
       react(),
       tailwindcss(),
@@ -22,12 +26,12 @@ export default defineConfig(() => {
           orientation: 'portrait',
           icons: [
             {
-              src: '/logo.png',
+              src: 'logo.png',
               sizes: '192x192',
               type: 'image/png',
             },
             {
-              src: '/logo.png',
+              src: 'logo.png',
               sizes: '512x512',
               type: 'image/png',
             },

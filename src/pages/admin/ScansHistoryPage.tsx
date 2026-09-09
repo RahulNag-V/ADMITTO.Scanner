@@ -449,7 +449,7 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
                           </p>
                         </div>
                         <a
-                          href="/scan"
+                          href={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/scan`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"

@@ -805,13 +805,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                         if (onNavigateHome) {
                           onNavigateHome();
                         } else {
-                          window.location.href = '/';
+                          window.location.href = import.meta.env.BASE_URL || '/';
                         }
                       } else if (path.startsWith('/admin')) {
                         const tab = path.replace('/admin', '').replace('/', '') || 'dashboard';
                         onSelectTab(tab);
                       } else {
-                        window.location.href = path;
+                        const baseNoTrailing = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+                        window.location.href = `${baseNoTrailing}${path.startsWith('/') ? path : `/${path}`}`;
                       }
                     }}
                   />

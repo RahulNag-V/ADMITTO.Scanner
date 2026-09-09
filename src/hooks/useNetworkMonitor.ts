@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { eventsApi } from '../lib/api';
+import { getApiUrl } from '../lib/api';
 
 interface NetworkMonitorOptions {
   initialDelayMs?: number; // 250ms for snappy, smooth boot skeleton
@@ -36,7 +36,7 @@ export function useNetworkMonitor(options: NetworkMonitorOptions = {}) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6000);
-      const res = await fetch('/api/health', {
+      const res = await fetch(getApiUrl('/api/health'), {
         method: 'GET',
         signal: controller.signal,
         cache: 'no-store',

@@ -45,10 +45,12 @@ import { ActivityLogsPage } from './pages/admin/ActivityLogsPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { PublicPageSkeletonView, ScannerPageSkeletonView } from './components/common/Skeleton';
 
+import { getAppPath, toBrowserPath } from './lib/router';
+
 export default function App() {
   // Navigation Path
   const [currentPath, setCurrentPath] = useState<string>(() => {
-    return window.location.pathname || '/';
+    return getAppPath(window.location.pathname);
   });
 
   // Page Transition Skeleton Delay State (0.5s)
@@ -56,7 +58,7 @@ export default function App() {
 
   // Blog Sub-routing
   const [selectedBlogSlug, setSelectedBlogSlug] = useState<string | null>(() => {
-    const path = window.location.pathname || '';
+    const path = getAppPath(window.location.pathname);
     if (path.startsWith('/blog/')) {
       const slug = path.replace(/^\/blog\//, '').trim();
       return slug || null;
@@ -108,7 +110,8 @@ export default function App() {
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab');
       if (tabParam && validAdminTabs.includes(tabParam)) return tabParam;
-      const pathParts = (window.location.pathname || '').split('/').filter(Boolean);
+      const appPath = getAppPath(window.location.pathname);
+      const pathParts = appPath.split('/').filter(Boolean);
       if (pathParts[0] === 'admin' && pathParts[1] && validAdminTabs.includes(pathParts[1])) {
         return pathParts[1];
       }
@@ -257,7 +260,7 @@ export default function App() {
   // Sync browser back/forward history
   useEffect(() => {
     const handlePopState = () => {
-      const path = window.location.pathname || '/';
+      const path = getAppPath(window.location.pathname);
       setCurrentPath(path);
 
       if (path.startsWith('/admin')) {
@@ -336,7 +339,7 @@ export default function App() {
         } else if (!stored) {
           // If no session and first-time visitor opening the root page, route to login
           const hasVisited = localStorage.getItem('admitto_visited');
-          if (!hasVisited && window.location.pathname === '/') {
+          if (!hasVisited && getAppPath(window.location.pathname) === '/') {
             if (isMounted) {
               navigate('/login');
             }
@@ -409,11 +412,12 @@ export default function App() {
   }, []);
 
   const navigate = (path: string) => {
-    const basePath = path.split('?')[0].split('#')[0] || '/';
-    if (path !== window.location.pathname + window.location.search) {
-      window.history.pushState({}, '', path);
+    const appRoute = getAppPath(path.split('?')[0].split('#')[0] || '/');
+    const browserUrl = toBrowserPath(path);
+    if (browserUrl !== window.location.pathname + window.location.search) {
+      window.history.pushState({}, '', browserUrl);
     }
-    setCurrentPath(basePath);
+    setCurrentPath(appRoute);
     const mainEl = document.getElementById('app-main-viewport');
     if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
     window.scrollTo({ top: 0, behavior: 'smooth' });

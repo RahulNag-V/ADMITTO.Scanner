@@ -6,13 +6,29 @@ import './index.css';
 import { setupPWA } from './pwa';
 import { getOrCreateDeviceUuid } from './lib/offline/security';
 
-setupPWA();
-getOrCreateDeviceUuid().catch(() => {});
+try {
+  setupPWA();
+} catch (err) {
+  console.warn('[PWA] Service worker setup bypassed:', err);
+}
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </StrictMode>,
-);
+try {
+  getOrCreateDeviceUuid().catch((err) => {
+    console.warn('[Device UUID] Init caught:', err);
+  });
+} catch (err) {
+  console.warn('[Device UUID] Sync init bypassed:', err);
+}
+
+const rootEl = document.getElementById('root');
+if (rootEl) {
+  createRoot(rootEl).render(
+    <StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </StrictMode>,
+  );
+} else {
+  console.error('[ADMITTO] Root element #root not found in document.');
+}

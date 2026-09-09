@@ -24,7 +24,7 @@ export const AppLogo: React.FC<AppLogoProps> = ({
       className={`relative flex items-center justify-center bg-white border border-white/30 overflow-hidden shrink-0 transition-transform ${sizeMap[size]} ${className}`}
     >
       <img
-        src="/logo.png"
+        src={`${import.meta.env.BASE_URL}logo.png`}
         alt="ADMITTO Logo"
         className={`w-full h-full object-contain pointer-events-none select-none ${imgClassName}`}
         loading="eager"

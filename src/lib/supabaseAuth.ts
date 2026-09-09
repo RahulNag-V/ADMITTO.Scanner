@@ -49,6 +49,19 @@ export function mapAuthError(error: any): string {
   return msg || 'Authentication failed. Please try again.';
 }
 
+export function getAuthCallbackUrl(returnTo?: string): string {
+  if (typeof window === 'undefined') {
+    return '/auth/callback';
+  }
+  const origin = window.location.origin;
+  const baseNoTrailing = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+  const callbackUrl = new URL(`${origin}${baseNoTrailing}/auth/callback`);
+  if (returnTo) {
+    callbackUrl.searchParams.set('returnTo', returnTo);
+  }
+  return callbackUrl.toString();
+}
+
 // ─── Return Types ─────────────────────────────────────────────────
 export interface AuthResult {
   user: User | null;
@@ -80,20 +93,18 @@ export async function signInWithEmail(email: string, password: string): Promise<
 }
 
 /**
- * Sign up with email, password, and full name.
- * Respects Supabase email confirmation settings.
+ * Sign up with Email and Password via Supabase Auth.
  */
 export async function signUpWithEmail(
+  fullName: string,
   email: string,
-  password: string,
-  fullName: string
+  password: string
 ): Promise<AuthResult & { needsEmailVerification: boolean }> {
   const supabase = getSupabaseClient();
   if (!supabase) {
     throw new Error('Supabase is not configured. Please check your environment variables.');
   }
 
-  const origin = window.location.origin;
   const { data, error } = await supabase.auth.signUp({
     email: email.trim().toLowerCase(),
     password,
@@ -102,7 +113,7 @@ export async function signUpWithEmail(
         full_name: fullName.trim(),
         name: fullName.trim(),
       },
-      emailRedirectTo: `${origin}/auth/callback`,
+      emailRedirectTo: getAuthCallbackUrl(),
     },
   });
 
@@ -134,9 +145,9 @@ export async function signInWithGoogle(returnTo?: string): Promise<void> {
   // Pre-flight check: Verify if Google provider is enabled in Supabase project
   // to avoid redirecting the user to a raw JSON 400 error page
   try {
-    const origin = window.location.origin;
+    const callbackUrlString = getAuthCallbackUrl(returnTo);
     const checkRes = await fetch(
-      `${(supabase as any).supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(`${origin}/auth/callback`)}`,
+      `${(supabase as any).supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(callbackUrlString)}`,
       {
         method: 'GET',
         headers: {
@@ -163,16 +174,10 @@ export async function signInWithGoogle(returnTo?: string): Promise<void> {
     // Network or other non-blocking errors fall through to regular OAuth attempt
   }
 
-  const origin = window.location.origin;
-  const callbackUrl = new URL(`${origin}/auth/callback`);
-  if (returnTo) {
-    callbackUrl.searchParams.set('returnTo', returnTo);
-  }
-
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: callbackUrl.toString(),
+      redirectTo: getAuthCallbackUrl(returnTo),
       queryParams: {
         access_type: 'offline',
         prompt: 'consent',
@@ -194,12 +199,11 @@ export async function resendVerificationEmail(email: string): Promise<void> {
     throw new Error('Supabase is not configured.');
   }
 
-  const origin = window.location.origin;
   const { error } = await supabase.auth.resend({
     type: 'signup',
     email: email.trim().toLowerCase(),
     options: {
-      emailRedirectTo: `${origin}/auth/callback`,
+      emailRedirectTo: getAuthCallbackUrl(),
     },
   });
 

@@ -41,7 +41,37 @@ export function removeSession(): void {
   saveSession(null);
 }
 
+export function getApiBaseUrl(): string {
+  let url = '';
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
+    url = (import.meta.env.VITE_API_URL as string).trim();
+  }
+  return url.replace(/\/+$/, '');
+}
+
+export function isStaticDeploymentWithoutBackend(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hasConfiguredApi = Boolean(getApiBaseUrl());
+  if (hasConfiguredApi) return false;
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  return !isLocal;
+}
+
+export function getApiUrl(endpoint: string): string {
+  const base = getApiBaseUrl();
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  if (!base) {
+    return cleanEndpoint;
+  }
+  return `${base}${cleanEndpoint}`;
+}
+
 export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  if (isStaticDeploymentWithoutBackend()) {
+    throw new Error(
+      'Backend API is not configured (missing VITE_API_URL). Please set VITE_API_URL in your deployment configuration.'
+    );
+  }
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
@@ -82,7 +112,8 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
     }
   }
 
-  const res = await fetch(endpoint, {
+  const targetUrl = getApiUrl(endpoint);
+  const res = await fetch(targetUrl, {
     ...options,
     headers,
   });
@@ -372,14 +403,15 @@ export const scanApi = {
     const { token } = await apiFetch<{ token: string; expiresIn: number }>(`/api/events/${eventId}/export-token`, {
       method: 'POST',
     });
-    return `/api/events/${eventId}/export?token=${encodeURIComponent(token)}`;
+    return getApiUrl(`/api/events/${eventId}/export?token=${encodeURIComponent(token)}`);
   },
 
   downloadCSV: async (eventId: string, customFilename?: string) => {
     const { token } = await apiFetch<{ token: string; expiresIn: number }>(`/api/events/${eventId}/export-token`, {
       method: 'POST',
     });
-    const res = await fetch(`/api/events/${eventId}/export?token=${encodeURIComponent(token)}`);
+    const exportUrl = getApiUrl(`/api/events/${eventId}/export?token=${encodeURIComponent(token)}`);
+    const res = await fetch(exportUrl);
     if (!res.ok) {
       throw new Error(`Failed to export CSV: ${res.statusText}`);
     }
