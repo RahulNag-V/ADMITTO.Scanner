@@ -82,10 +82,15 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
   secondaryScanField,
 }) => {
   // Determine current active visual state
-  const isQueuedOffline = lastResult && lastResult.status === 'QUEUED_OFFLINE';
+  const isOfflineSuccess = lastResult && lastResult.status === 'SUCCESS_OFFLINE';
+  const isQueuedOffline = lastResult && (lastResult.status === 'QUEUED_OFFLINE' || isOfflineSuccess);
+  const isConflict = lastResult && lastResult.status === 'POST_SYNC_DUPLICATE_CONFLICT';
+  const isExpired = lastResult && lastResult.status === 'EXPIRED_OFFLINE_DATA';
   const isSuccess =
     lastResult &&
     !isQueuedOffline &&
+    !isConflict &&
+    !isExpired &&
     (lastResult.status === 'SUCCESS' || lastResult.status === 'IDEMPOTENT_SUCCESS');
   const isDuplicate = lastResult && lastResult.status === 'DUPLICATE_CHECKIN';
   const isInvalid =
@@ -93,6 +98,8 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
     !isSuccess &&
     !isDuplicate &&
     !isQueuedOffline &&
+    !isConflict &&
+    !isExpired &&
     lastResult.status !== undefined;
 
   return (
@@ -517,8 +524,118 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
             </motion.div>
           )}
 
-          {/* STATE: QUEUED FOR SYNC (Offline Honesty) */}
-          {isQueuedOffline && lastResult && (
+          {/* STATE: CHECK-IN GRANTED — OFFLINE */}
+          {isOfflineSuccess && lastResult && (
+            <motion.div
+              key="offline-granted-result"
+              initial={{ opacity: 0, scale: 0.96, y: 4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              role="status"
+              aria-live="polite"
+              className="w-full rounded-2xl p-3 sm:p-3.5 border border-sky-500/50 bg-sky-950/80 text-sky-300 shadow-xl flex flex-col gap-2 backdrop-blur-md relative overflow-hidden"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center shrink-0 shadow-sm">
+                  <Clock className="w-5 h-5 text-sky-400" />
+                </div>
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider text-sky-400">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>✓ CHECK-IN GRANTED — OFFLINE</span>
+                  </div>
+                  {lastResult.student ? (
+                    <>
+                      <div className="text-sm sm:text-base font-extrabold text-white truncate leading-tight">
+                        {lastResult.student.name}
+                      </div>
+                      <div className="text-[11px] font-mono text-sky-200/90 truncate">
+                        USN: {lastResult.student.usn} • {lastResult.student.branch || 'General'} (Pending Sync)
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-xs text-sky-200 truncate">{lastResult.message}</div>
+                  )}
+                </div>
+              </div>
+              <div className="w-full bg-sky-950/50 h-1 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: '100%' }}
+                  animate={{ width: '0%' }}
+                  transition={{ duration: 10, ease: 'linear' }}
+                  className="h-full bg-sky-400 rounded-full"
+                />
+              </div>
+            </motion.div>
+          )}
+
+          {/* STATE: POST-SYNC CONFLICT */}
+          {isConflict && lastResult && (
+            <motion.div
+              key="conflict-result"
+              initial={{ opacity: 0, scale: 0.96, y: 4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              role="alert"
+              className="w-full rounded-2xl p-3 sm:p-3.5 border border-purple-500/50 bg-purple-950/80 text-purple-300 shadow-xl flex flex-col gap-2 backdrop-blur-md relative overflow-hidden"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center shrink-0 shadow-sm">
+                  <AlertTriangle className="w-5 h-5 text-purple-400" />
+                </div>
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider text-purple-400">
+                    <span>⚠ POST-SYNC CONFLICT</span>
+                  </div>
+                  <div className="text-xs text-purple-200 font-medium">
+                    {lastResult.message || 'Attendee was already checked in on the cloud by another terminal.'}
+                  </div>
+                  {lastResult.student && (
+                    <div className="text-[11px] font-mono text-purple-300/80 truncate">
+                      {lastResult.student.name} ({lastResult.student.usn})
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="w-full bg-purple-950/50 h-1 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: '100%' }}
+                  animate={{ width: '0%' }}
+                  transition={{ duration: 10, ease: 'linear' }}
+                  className="h-full bg-purple-400 rounded-full"
+                />
+              </div>
+            </motion.div>
+          )}
+
+          {/* STATE: EXPIRED OFFLINE DATA */}
+          {isExpired && lastResult && (
+            <motion.div
+              key="expired-result"
+              initial={{ opacity: 0, scale: 0.96, y: 4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              role="alert"
+              className="w-full rounded-2xl p-3 sm:p-3.5 border border-rose-500/50 bg-rose-950/80 text-rose-300 shadow-xl flex flex-col gap-2 backdrop-blur-md relative overflow-hidden"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-400/40 flex items-center justify-center shrink-0 shadow-sm">
+                  <XCircle className="w-5 h-5 text-rose-400" />
+                </div>
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider text-rose-400">
+                    <span>OFFLINE ACCESS EXPIRED</span>
+                  </div>
+                  <div className="text-xs text-rose-200 font-medium">
+                    {lastResult.message || 'Offline data expired. Please reconnect to the internet.'}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* STATE: QUEUED FOR SYNC (Standard) */}
+          {!isOfflineSuccess && isQueuedOffline && lastResult && (
             <motion.div
               key="offline-queued-result"
               initial={{ opacity: 0, scale: 0.96, y: 4 }}
@@ -568,7 +685,7 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
                 </div>
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider text-amber-400">
-                    <span>Already Scanned</span>
+                    <span>ALREADY CHECKED IN</span>
                   </div>
                   {lastResult.student ? (
                     <>
@@ -576,7 +693,7 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
                         {lastResult.student.name}
                       </div>
                       <div className="text-[11px] font-mono text-amber-200/90 truncate">
-                        USN: {lastResult.student.usn} • Already verified earlier
+                        USN: {lastResult.student.usn} • {lastResult.message || 'Already verified on this terminal'}
                       </div>
                     </>
                   ) : (
@@ -611,7 +728,7 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
                 </div>
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider text-rose-400">
-                    <span>Invalid Token</span>
+                    <span>INVALID TICKET</span>
                   </div>
                   <div className="text-xs text-rose-200 font-medium truncate">
                     {lastResult.message || 'Pass not recognized for this event'}

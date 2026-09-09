@@ -10,3 +10,4 @@ coverage/
 cloudflared.exe
 .temp/
 supabase/.temp/
+scratch/

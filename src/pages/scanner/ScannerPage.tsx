@@ -38,6 +38,11 @@ import {
 } from '../../types';
 import { scanApi, offlineQueue, eventsApi, studentsApi } from '../../lib/api';
 import { playFeedbackSound } from '../../lib/sound';
+import { scanRepository } from '../../lib/offline/scanRepository';
+import { syncEngine, SyncEngineStatus } from '../../lib/offline/syncEngine';
+import { eventBundleService } from '../../lib/offline/eventBundle';
+import { saveOfflineAuthContext, getOrCreateDeviceUuid } from '../../lib/offline/security';
+import { purgeEventOfflineData } from '../../lib/offline/idb';
 
 // Dock and Tab subcomponents
 import { AppleDock, ScannerDockTab } from '../../components/scanner/AppleDock';
@@ -223,10 +228,18 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isScannerPaused, setIsScannerPaused] = useState(false);
 
-  // 5. Connectivity & Offline Sync
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [queuedScans, setQueuedScans] = useState<OfflineQueuedScan[]>([]);
-  const [isSyncing, setIsSyncing] = useState(false);
+  // 5. Connectivity & Offline Sync Engine
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [syncStatus, setSyncStatus] = useState<SyncEngineStatus>({
+    isSyncing: false,
+    pendingCount: 0,
+    syncedCount: 0,
+    conflictCount: 0,
+    lastSyncAt: null,
+    lastError: null,
+  });
+  const [isBundleReady, setIsBundleReady] = useState(false);
+  const [bundleExpiry, setBundleExpiry] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // 6. Scan Outcome Banner & Ambiguous Match Resolution
@@ -266,7 +279,7 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
       if (eventRes.status === 'fulfilled' && eventRes.value?.event) {
         if (eventRes.value.event.status === 'DELETED') {
           alert('This event has been deleted by the administrator. Please enter a referral code to connect to an active event.');
-          onLogout();
+          handleSafeLogout();
           return;
         }
         setEvent(eventRes.value.event);
@@ -274,7 +287,7 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
         const errMsg = (eventRes.reason?.message || '').toLowerCase();
         if (errMsg.includes('not found') || errMsg.includes('deleted') || errMsg.includes('forbidden') || errMsg.includes('unauthorized')) {
           alert('This event is no longer active or was deleted by the administrator.');
-          onLogout();
+          handleSafeLogout();
           return;
         }
       }
@@ -295,14 +308,21 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
     }
   };
 
-  // Manual Refresh Handler
+  // Manual Refresh Handler: Reconciles live data and offline bundle
   const handleManualRefresh = async () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
     try {
       playFeedbackSound('click');
-      if (isOnline && offlineQueue.get().length > 0) {
-        await autoSyncOfflineQueue();
+      if (navigator.onLine) {
+        await syncEngine.triggerSync(eventId);
+        try {
+          const bundle = await eventBundleService.downloadBundle(eventId);
+          setIsBundleReady(true);
+          setBundleExpiry(bundle.expires_at);
+        } catch (bErr) {
+          console.warn('[ScannerPage] Offline bundle refresh failed:', bErr);
+        }
       }
       await loadTerminalData();
     } catch (err) {
@@ -316,7 +336,7 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
     loadTerminalData();
   }, [eventId]);
 
-  // Periodic event liveness check: If admin deletes event, immediately return to referral code section
+  // Periodic event liveness check: If admin deletes event, safely terminate
   useEffect(() => {
     if (!eventId) return;
     const checkTimer = setInterval(async () => {
@@ -324,28 +344,82 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
         const res = await eventsApi.get(eventId);
         if (!res.event || res.event.status === 'DELETED') {
           alert('This event has been deleted by the administrator. Returning to referral code section.');
-          onLogout();
+          handleSafeLogout();
         }
       } catch (err: any) {
         const errMsg = (err.message || '').toLowerCase();
         if (errMsg.includes('not found') || errMsg.includes('deleted') || errMsg.includes('forbidden') || errMsg.includes('unauthorized')) {
           alert('This event has been deleted by the administrator. Returning to referral code section.');
-          onLogout();
+          handleSafeLogout();
         }
       }
     }, 8000);
 
     return () => clearInterval(checkTimer);
-  }, [eventId, onLogout]);
+  }, [eventId]);
 
-  // Sync offline queue on mount & listen to connectivity
+  // Offline Engine Initialization & Sync Engine Listeners
   useEffect(() => {
     mountedRef.current = true;
-    setQueuedScans(offlineQueue.get());
+    if (!eventId) return;
+
+    let isSubscribed = true;
+
+    async function initOfflineEngine() {
+      try {
+        const deviceUuid = await getOrCreateDeviceUuid();
+        await saveOfflineAuthContext({
+          scannerId: session.user.id,
+          scannerName,
+          scannerEmail: session.user.email,
+          eventId,
+          role: session.user.role as 'SCANNER' | 'ADMIN',
+          token: session.token,
+          expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+          deviceUuid,
+        });
+
+        // Set active event for periodic sync engine
+        syncEngine.setActiveEvent(eventId);
+
+        // Verify offline bundle readiness
+        const bundleCheck = await eventBundleService.isBundleReady(eventId);
+        if (bundleCheck.ready) {
+          if (isSubscribed) {
+            setIsBundleReady(true);
+            setBundleExpiry(bundleCheck.expiresAt || null);
+          }
+        } else if (navigator.onLine) {
+          // Auto-download bundle snapshot if online
+          try {
+            const bundle = await eventBundleService.downloadBundle(eventId);
+            if (isSubscribed) {
+              setIsBundleReady(true);
+              setBundleExpiry(bundle.expires_at);
+            }
+          } catch (bErr) {
+            console.warn('[ScannerPage] Offline bundle download notice:', bErr);
+          }
+        }
+      } catch (err) {
+        console.error('[ScannerPage] Offline engine init error:', err);
+      }
+    }
+
+    initOfflineEngine();
+
+    const unsubscribeSync = syncEngine.subscribe((status) => {
+      if (isSubscribed) setSyncStatus(status);
+    });
+
+    const unsubscribeRevocation = syncEngine.onRevocation(async () => {
+      alert('Your scanner access has been revoked or expired by the administrator.');
+      handleSafeLogout();
+    });
 
     const handleOnline = () => {
       setIsOnline(true);
-      autoSyncOfflineQueue();
+      syncEngine.triggerSync(eventId);
     };
     const handleOffline = () => setIsOnline(false);
 
@@ -353,11 +427,15 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
     window.addEventListener('offline', handleOffline);
 
     return () => {
+      isSubscribed = false;
       mountedRef.current = false;
+      unsubscribeSync();
+      unsubscribeRevocation();
+      syncEngine.stopPeriodicSync();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [eventId, session]);
 
   // Initialize camera scanner instantly when on Scanner tab
   useEffect(() => {
@@ -577,97 +655,104 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
       }
     }
 
-    if (navigator.onLine) {
-      try {
-        const [result] = await Promise.all([
-          scanApi.validate(eventId, token, scanType),
-          new Promise((r) => setTimeout(r, 400)), // Deliberate processing pause for visual scanning effect
-        ]);
-        setLastResult(result);
+    try {
+      const [result] = await Promise.all([
+        scanRepository.validate({
+          eventId,
+          scannedValue: token,
+          scanType,
+          scannerId: session.user.id,
+          scannerName,
+        }),
+        new Promise((r) => setTimeout(r, 350)),
+      ]);
+      setLastResult(result);
 
-        // Sound Feedback
-        if (prefs.audioEnabled) {
-          if (result.status === 'SUCCESS' || result.status === 'IDEMPOTENT_SUCCESS') {
-            playFeedbackSound('success');
-          } else if (result.status === 'DUPLICATE_CHECKIN') {
-            playFeedbackSound('duplicate');
-          } else {
-            playFeedbackSound('error');
-          }
+      // Sound Feedback
+      if (prefs.audioEnabled) {
+        if (result.status === 'SUCCESS' || result.status === 'IDEMPOTENT_SUCCESS' || result.status === 'SUCCESS_OFFLINE') {
+          playFeedbackSound('success');
+        } else if (result.status === 'DUPLICATE_CHECKIN' || result.status === 'POST_SYNC_DUPLICATE_CONFLICT') {
+          playFeedbackSound('duplicate');
+        } else {
+          playFeedbackSound('error');
         }
-
-        // Add to local logs array immediately
-        const newLogEntry: ScanAttempt = {
-          id: 'log-' + Date.now(),
-          event_id: eventId,
-          student_id: result.student?.id || null,
-          scanned_value: token,
-          scan_type: scanType,
-          result:
-            result.status === 'SUCCESS' || result.status === 'IDEMPOTENT_SUCCESS'
-              ? 'success'
-              : result.status === 'DUPLICATE_CHECKIN'
-              ? 'duplicate'
-              : 'invalid',
-          reason: result.message,
-          timestamp: new Date().toISOString(),
-          student: result.student,
-          scanner: {
-            id: session.user.id,
-            name: scannerName,
-            event_id: eventId,
-            email: session.user.email,
-            access_code: session.user.id.substring(0, 8),
-            role: 'SCANNER',
-            is_active: true,
-            expires_at: null,
-            last_login_at: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        };
-
-        setLogs((prev) => [newLogEntry, ...prev]);
-
-        // Refresh stats and students roster
-        if (result.status === 'SUCCESS' || result.status === 'IDEMPOTENT_SUCCESS') {
-          if (result.student) {
-            setStudents((prev) =>
-              prev.map((s) =>
-                s.id === result.student!.id
-                  ? { ...s, is_checked_in: true, checked_in: true, checked_in_at: new Date().toISOString() }
-                  : s
-              )
-            );
-          }
-          setStats((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  total_checked_in: prev.total_checked_in + 1,
-                  total_remaining: Math.max(0, prev.total_remaining - 1),
-                  qr_scans: scanType === 'QR' ? prev.qr_scans + 1 : prev.qr_scans,
-                  barcode_scans: scanType === 'BARCODE' ? prev.barcode_scans + 1 : prev.barcode_scans,
-                }
-              : null
-          );
-        } else if (result.status === 'DUPLICATE_CHECKIN') {
-          setStats((prev) =>
-            prev ? { ...prev, duplicates_blocked: prev.duplicates_blocked + 1 } : null
-          );
-        } else if (result.status === 'AMBIGUOUS_MATCH' || result.requires_secondary) {
-          setAmbiguousMatch({
-            primaryValue: token,
-            secondaryField: result.secondary_field || event?.secondary_scan_field || 'email',
-          });
-          setSecondaryInputVal('');
-        }
-      } catch (err: any) {
-        console.error('Validation online error, queuing offline:', err);
-        queueScanLocally(token);
       }
-    } else {
-      queueScanLocally(token);
+
+      // Add to local logs array immediately
+      const newLogEntry: ScanAttempt = {
+        id: 'log-' + Date.now(),
+        event_id: eventId,
+        student_id: result.student?.id || null,
+        scanned_value: token,
+        scan_type: scanType,
+        result:
+          result.status === 'SUCCESS' || result.status === 'IDEMPOTENT_SUCCESS' || result.status === 'SUCCESS_OFFLINE'
+            ? 'success'
+            : result.status === 'DUPLICATE_CHECKIN' || result.status === 'POST_SYNC_DUPLICATE_CONFLICT'
+            ? 'duplicate'
+            : 'invalid',
+        reason: result.message,
+        timestamp: new Date().toISOString(),
+        student: result.student,
+        scanner: {
+          id: session.user.id,
+          name: scannerName,
+          event_id: eventId,
+          email: session.user.email,
+          access_code: session.user.id.substring(0, 8),
+          role: 'SCANNER',
+          is_active: true,
+          expires_at: null,
+          last_login_at: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      };
+
+      setLogs((prev) => [newLogEntry, ...prev]);
+
+      // Refresh stats and students roster
+      if (result.status === 'SUCCESS' || result.status === 'IDEMPOTENT_SUCCESS' || result.status === 'SUCCESS_OFFLINE') {
+        if (result.student) {
+          setStudents((prev) =>
+            prev.map((s) =>
+              s.id === result.student!.id
+                ? { ...s, is_checked_in: true, checked_in: true, checked_in_at: new Date().toISOString() }
+                : s
+            )
+          );
+        }
+        setStats((prev) =>
+          prev
+            ? {
+                ...prev,
+                total_checked_in: prev.total_checked_in + 1,
+                total_remaining: Math.max(0, prev.total_remaining - 1),
+                qr_scans: scanType === 'QR' ? prev.qr_scans + 1 : prev.qr_scans,
+                barcode_scans: scanType === 'BARCODE' ? prev.barcode_scans + 1 : prev.barcode_scans,
+              }
+            : null
+        );
+      } else if (result.status === 'DUPLICATE_CHECKIN') {
+        setStats((prev) =>
+          prev ? { ...prev, duplicates_blocked: prev.duplicates_blocked + 1 } : null
+        );
+      } else if (result.status === 'AMBIGUOUS_MATCH' || result.requires_secondary) {
+        setAmbiguousMatch({
+          primaryValue: token,
+          secondaryField: result.secondary_field || event?.secondary_scan_field || 'email',
+        });
+        setSecondaryInputVal('');
+      }
+    } catch (err: any) {
+      console.error('Scan processing error:', err);
+      if (prefs.audioEnabled) playFeedbackSound('error');
+      setLastResult({
+        success: false,
+        status: 'ERROR',
+        message: err.message || 'Scanning processing error',
+      });
     }
 
     // Clear any previous timers
@@ -796,46 +881,51 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
     }
   };
 
-  const queueScanLocally = (token: string) => {
-    const offlineItem: OfflineQueuedScan = {
-      client_scan_id: 'offline_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      scanned_value: token,
-      event_id: eventId,
-      scanner_id: session.user.id,
-      scan_type: scanType,
-      timestamp: new Date().toISOString(),
-      retry_count: 0,
-    };
-
-    offlineQueue.add(offlineItem);
-    setQueuedScans(offlineQueue.get());
-
-    if (prefs.audioEnabled) playFeedbackSound('click');
-
-    setLastResult({
-      success: true,
-      status: 'QUEUED_OFFLINE',
-      message: 'QUEUED FOR SYNC — Stored locally on device. Uniqueness will be reconciled with server upon reconnection.',
-    });
-  };
-
-  const autoSyncOfflineQueue = async () => {
-    const items = offlineQueue.get();
-    if (items.length === 0 || isSyncing) return;
-
+  // Manual Trigger for Sync Engine
+  const handleManualSync = async () => {
+    if (syncStatus.isSyncing) return;
     try {
-      setIsSyncing(true);
-      const res = await scanApi.batchSync(eventId, items);
-      if (res.success) {
-        offlineQueue.clear();
-        setQueuedScans([]);
+      const res = await syncEngine.triggerSync(eventId);
+      if (res.synced > 0) {
         if (prefs.audioEnabled) playFeedbackSound('success');
         loadTerminalData();
       }
     } catch (err) {
-      console.error('Batch sync failed:', err);
-    } finally {
-      setIsSyncing(false);
+      console.error('Manual sync failed:', err);
+    }
+  };
+
+  // Safe Guarded Logout: Prevents accidental loss of unsynced scans
+  const handleSafeLogout = async () => {
+    try {
+      const status = await syncEngine.getQueueStatus(eventId);
+      if (status.pending > 0) {
+        if (navigator.onLine) {
+          try {
+            await syncEngine.triggerSync(eventId);
+            const recheck = await syncEngine.getQueueStatus(eventId);
+            if (recheck.pending === 0) {
+              await purgeEventOfflineData(eventId, false);
+              onLogout();
+              return;
+            }
+          } catch {
+            // continue to user prompt
+          }
+        }
+
+        const confirmProceed = window.confirm(
+          `CAUTION: You have ${status.pending} offline scan(s) that have not yet synced with the cloud.\n\n` +
+          `Logging out will prevent automatic reconciliation from this browser.\n\n` +
+          `Do you want to log out anyway?`
+        );
+        if (!confirmProceed) return;
+      }
+
+      await purgeEventOfflineData(eventId, false);
+      onLogout();
+    } catch {
+      onLogout();
     }
   };
 
@@ -922,14 +1012,40 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
 
           <div
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] sm:text-[11px] font-mono border ${
-              isOnline
+              syncStatus.isSyncing
+                ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300 animate-pulse'
+                : isOnline
                 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
                 : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
             }`}
-            title={isOnline ? 'Connected to live cloud server' : 'Offline mode (Scans queued locally)'}
+            title={
+              syncStatus.isSyncing
+                ? `Synchronizing ${syncStatus.pendingCount} scan(s)...`
+                : isOnline
+                ? 'Connected to live cloud server'
+                : 'Offline mode (Scans saved locally)'
+            }
           >
-            <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-            <span className="font-bold">{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                syncStatus.isSyncing
+                  ? 'bg-indigo-400 animate-spin'
+                  : isOnline
+                  ? 'bg-emerald-400 animate-pulse'
+                  : 'bg-amber-400'
+              }`}
+            />
+            <span className="font-bold">
+              {syncStatus.isSyncing
+                ? `SYNCING ${syncStatus.pendingCount}`
+                : isOnline
+                ? syncStatus.pendingCount > 0
+                  ? `ONLINE (${syncStatus.pendingCount} PENDING)`
+                  : 'ONLINE'
+                : syncStatus.pendingCount > 0
+                ? `OFFLINE (${syncStatus.pendingCount} QUEUED)`
+                : 'OFFLINE'}
+            </span>
           </div>
         </div>
       </header>
@@ -1030,10 +1146,10 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
                     manualInput={manualInput}
                     onManualInputChange={setManualInput}
                     onManualSubmit={handleManualSubmit}
-                    queuedScansCount={queuedScans.length}
-                    isSyncing={isSyncing}
+                    queuedScansCount={syncStatus.pendingCount}
+                    isSyncing={syncStatus.isSyncing}
                     isOnline={isOnline}
-                    onSyncOffline={autoSyncOfflineQueue}
+                    onSyncOffline={handleManualSync}
                     prefs={prefs}
                     onToggleFacingMode={() => {
                       const next = prefs.facingMode === 'environment' ? 'user' : 'environment';
@@ -1068,13 +1184,13 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
                     isOnline={isOnline}
                     isLoadingData={isLoadingData}
                     onRefreshData={loadTerminalData}
-                    offlineCount={queuedScans.length}
-                    onSyncOffline={autoSyncOfflineQueue}
-                    onClearOffline={() => {
-                      offlineQueue.clear();
-                      setQueuedScans([]);
+                    offlineCount={syncStatus.pendingCount}
+                    onSyncOffline={handleManualSync}
+                    onClearOffline={async () => {
+                      await purgeEventOfflineData(eventId, true);
+                      await syncEngine.getQueueStatus(eventId);
                     }}
-                    onLogout={onLogout}
+                    onLogout={handleSafeLogout}
                   />
                 )}
               </>
@@ -1155,7 +1271,7 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
         onSelectTab={handleSelectDockTab}
         studentCount={students.length}
         logCount={logs.length}
-        offlineCount={queuedScans.length}
+        offlineCount={syncStatus.pendingCount}
         duplicateCount={duplicateScansCount}
       />
     </div>

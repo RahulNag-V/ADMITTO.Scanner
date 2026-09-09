@@ -71,6 +71,17 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  if (typeof localStorage !== 'undefined' && !headers['X-Device-UUID']) {
+    try {
+      const devUuid = localStorage.getItem('admitto_device_uuid');
+      if (devUuid) {
+        headers['X-Device-UUID'] = devUuid;
+      }
+    } catch {
+      // Ignore localStorage read errors
+    }
+  }
+
   const res = await fetch(endpoint, {
     ...options,
     headers,

@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import { createServer as createViteServer } from 'vite';
@@ -66,19 +67,63 @@ export const scanLimiter = rateLimit({
 });
 
 // Simple in-memory session store (signed auth bearer tokens)
-interface SessionData {
+export interface SessionData {
   userId: string;
   email: string;
   name: string;
   role: UserRole;
   eventId?: string; // If scanner
   createdAt: number;
+  deviceUuid?: string;
 }
 
-const activeSessions = new Map<string, SessionData>();
+export const activeSessions = new Map<string, SessionData>();
+export const boundScannerDevices = new Map<string, string>(); // scannerId/userId -> deviceUuid
+
+export function resetScannerDeviceBindings(): void {
+  boundScannerDevices.clear();
+}
+
+export function enforceDeviceBinding(
+  session: SessionData,
+  incomingDeviceUuid: string | undefined,
+  res: Response
+): boolean {
+  if (session.role !== 'SCANNER') {
+    return true; // Admins are not restricted to a single hardware device
+  }
+
+  const boundUuid = session.deviceUuid || boundScannerDevices.get(session.userId);
+
+  if (boundUuid) {
+    if (!incomingDeviceUuid || incomingDeviceUuid !== boundUuid) {
+      res.status(403).json({
+        error: 'DEVICE_MISMATCH',
+        code: 'DEVICE_BINDING_VIOLATION',
+        message: 'Security violation: Scanner session is bound to a different device.',
+      });
+      return false;
+    }
+  } else {
+    // If not yet bound, require and bind to incoming device UUID
+    if (!incomingDeviceUuid) {
+      res.status(403).json({
+        error: 'DEVICE_REQUIRED',
+        code: 'DEVICE_BINDING_REQUIRED',
+        message: 'Security violation: Device UUID is required for scanner operations.',
+      });
+      return false;
+    }
+    session.deviceUuid = incomingDeviceUuid;
+    boundScannerDevices.set(session.userId, incomingDeviceUuid);
+  }
+
+  return true;
+}
 
 // Register invalidation hook to terminate scanner sessions when revoked or disabled
 registerScannerInvalidationHook((scannerId: string) => {
+  boundScannerDevices.delete(scannerId);
   for (const [token, session] of activeSessions.entries()) {
     if (session.userId === scannerId) {
       activeSessions.delete(token);
@@ -226,6 +271,27 @@ app.post('/api/auth/login', authLimiter, async (req: Request, res: Response) => 
       }
 
       const { scanner, event } = scannerResult;
+
+      const incomingDeviceUuid =
+        (req.headers['x-device-uuid'] as string) ||
+        (req.body?.deviceUuid as string) ||
+        (req.body?.device_uuid as string);
+
+      const existingBound = boundScannerDevices.get(scanner.id);
+      if (existingBound && incomingDeviceUuid && existingBound !== incomingDeviceUuid) {
+        res.status(403).json({
+          error: 'DEVICE_MISMATCH',
+          code: 'DEVICE_BINDING_VIOLATION',
+          message: 'Security violation: Scanner account is bound to another device. Please contact event administrator to reset binding.',
+        });
+        return;
+      }
+
+      const boundDevice = incomingDeviceUuid || existingBound;
+      if (boundDevice) {
+        boundScannerDevices.set(scanner.id, boundDevice);
+      }
+
       const token = `scan_tok_${crypto.randomBytes(32).toString('hex')}`;
       const sessionData: SessionData = {
         userId: scanner.id,
@@ -234,6 +300,7 @@ app.post('/api/auth/login', authLimiter, async (req: Request, res: Response) => 
         role: 'SCANNER',
         eventId: event.id,
         createdAt: Date.now(),
+        deviceUuid: boundDevice,
       };
       activeSessions.set(token, sessionData);
 
@@ -354,6 +421,26 @@ app.post('/api/auth/scanner-referral-login', authLimiter, async (req: Request, r
       cleanCode
     );
 
+    const incomingDeviceUuid =
+      (req.headers['x-device-uuid'] as string) ||
+      (req.body?.deviceUuid as string) ||
+      (req.body?.device_uuid as string);
+
+    const existingBound = boundScannerDevices.get(request.user_id);
+    if (existingBound && incomingDeviceUuid && existingBound !== incomingDeviceUuid) {
+      res.status(403).json({
+        error: 'DEVICE_MISMATCH',
+        code: 'DEVICE_BINDING_VIOLATION',
+        message: 'Security violation: Scanner operator account is bound to another device.',
+      });
+      return;
+    }
+
+    const boundDevice = incomingDeviceUuid || existingBound;
+    if (boundDevice) {
+      boundScannerDevices.set(request.user_id, boundDevice);
+    }
+
     // 4. Generate active authenticated session
     const token = `scan_tok_${crypto.randomBytes(32).toString('hex')}`;
     const sessionData: SessionData = {
@@ -363,6 +450,7 @@ app.post('/api/auth/scanner-referral-login', authLimiter, async (req: Request, r
       role: 'SCANNER',
       eventId: request.event_id,
       createdAt: Date.now(),
+      deviceUuid: boundDevice,
     };
     activeSessions.set(token, sessionData);
 
@@ -931,6 +1019,127 @@ app.get('/api/events/:id', requireScannerOrAdmin, async (req: Request, res: Resp
   }
 });
 
+// Scanner: Get Offline Event Bundle (Scoped, Sanitized, Expiring)
+app.get('/api/events/:id/offline-bundle', requireScannerOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const session = (req as any).user as SessionData;
+    const eventId = req.params.id;
+
+    // 1. Verify scanner authorization for this event
+    const authCheck = await dbService.validateScannerEventAccess(session.userId, eventId);
+    if (!authCheck.authorized) {
+      res.status(403).json({
+        error: 'FORBIDDEN',
+        code: 'SCANNER_UNAUTHORIZED',
+        message: authCheck.reason || 'Scanner is not authorized for this event.',
+      });
+      return;
+    }
+
+    // 1b. Enforce Device Binding for Scanner
+    const incomingDeviceUuid =
+      (req.headers['x-device-uuid'] as string) ||
+      (req.query.device_uuid as string) ||
+      (req.body?.deviceUuid as string);
+
+    if (!enforceDeviceBinding(session, incomingDeviceUuid, res)) {
+      return;
+    }
+
+    const event = await dbService.getEventById(eventId);
+    if (!event || event.status === 'DELETED') {
+      res.status(404).json({ error: 'NOT_FOUND', message: 'Event does not exist or has been deleted.' });
+      return;
+    }
+
+    // 2. Fetch students for the event
+    const adminId = session.role === 'ADMIN' ? session.userId : undefined;
+    const allStudents = await dbService.getStudents(eventId, adminId);
+
+    // 3. Sanitize attendees - minimal PII, only scan keys and essential display info
+    const primaryKey = event.primary_scan_field || 'usn';
+    const secondaryKey = event.secondary_scan_field;
+
+    const sanitizedAttendees = allStudents.map((s) => {
+      let primaryVal = s.usn;
+      if (primaryKey === 'usn') primaryVal = s.usn;
+      else if (primaryKey === 'email') primaryVal = s.email || '';
+      else if (primaryKey === 'name') primaryVal = s.name;
+      else if (s.meta && s.meta[primaryKey]) primaryVal = String(s.meta[primaryKey]);
+
+      let secondaryVal: string | undefined = undefined;
+      if (secondaryKey) {
+        if (secondaryKey === 'email') secondaryVal = s.email;
+        else if (secondaryKey === 'usn') secondaryVal = s.usn;
+        else if (secondaryKey === 'name') secondaryVal = s.name;
+        else if (secondaryKey === 'phone_number') secondaryVal = s.phone_number;
+        else if (s.meta && s.meta[secondaryKey]) secondaryVal = String(s.meta[secondaryKey]);
+      }
+
+      return {
+        id: s.id,
+        event_id: s.event_id,
+        usn: s.usn,
+        name: s.name,
+        branch: s.branch,
+        qr_code: s.qr_code,
+        barcode: s.barcode,
+        primary_scan_value: primaryVal,
+        secondary_scan_value: secondaryVal,
+        is_checked_in: Boolean(s.is_checked_in),
+        checked_in_at: s.checked_in_at,
+      };
+    });
+
+    const checkedInIds = sanitizedAttendees
+      .filter((s) => s.is_checked_in)
+      .map((s) => s.id);
+
+    // 4. Calculate expires_at: 8 hours default, or scanner account expiry if sooner
+    const now = Date.now();
+    let maxDurationMs = 8 * 60 * 60 * 1000;
+    if (session.role === 'SCANNER' && authCheck.scannerId) {
+      const scanner = await dbService.getScannerById(authCheck.scannerId);
+      if (scanner && scanner.expires_at) {
+        const scannerExp = new Date(scanner.expires_at).getTime();
+        if (!isNaN(scannerExp) && scannerExp > now) {
+          maxDurationMs = Math.min(maxDurationMs, scannerExp - now);
+        }
+      }
+    }
+    const expiresAt = new Date(now + maxDurationMs).toISOString();
+
+    // 5. Version hash
+    const versionString = `${event.id}_${allStudents.length}_${event.updated_at || event.created_at}`;
+    const version = crypto.createHash('sha256').update(versionString).digest('hex').substring(0, 16);
+
+    res.json({
+      success: true,
+      event: {
+        id: event.id,
+        title: event.title,
+        venue: event.venue,
+        event_date: event.event_date,
+        primary_scan_field: event.primary_scan_field || 'usn',
+        secondary_scan_field: event.secondary_scan_field,
+        qr_mode: event.qr_mode,
+        barcode_field: event.barcode_field,
+        downloaded_at: new Date(now).toISOString(),
+        expires_at: expiresAt,
+        version,
+      },
+      attendees: sanitizedAttendees,
+      checked_in_student_ids: checkedInIds,
+      version,
+      downloaded_at: new Date(now).toISOString(),
+      expires_at: expiresAt,
+    });
+  } catch (err: any) {
+    console.error('Offline bundle error:', err);
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message });
+  }
+});
+
 // Update Event
 app.put('/api/events/:id', requireAdminAuth, async (req: Request, res: Response) => {
   try {
@@ -1443,6 +1652,16 @@ app.post('/api/scan/validate', requireScannerOrAdmin, scanLimiter, async (req: R
       return;
     }
 
+    // 1b. Enforce Device Binding for Scanner
+    const incomingDeviceUuid =
+      (req.headers['x-device-uuid'] as string) ||
+      (req.body?.deviceUuid as string) ||
+      (req.body?.device_uuid as string);
+
+    if (!enforceDeviceBinding(session, incomingDeviceUuid, res)) {
+      return;
+    }
+
     const scannerId = authCheck.scannerId;
 
     const result = await dbService.processCheckIn({
@@ -1462,14 +1681,14 @@ app.post('/api/scan/validate', requireScannerOrAdmin, scanLimiter, async (req: R
   }
 });
 
-// Batch Offline Synchronization
+// Batch Offline Synchronization (Hardened with Per-Item Reconciliation & Conflict Detection)
 app.post('/api/scan/batch-sync', requireScannerOrAdmin, async (req: Request, res: Response) => {
   try {
     const session = (req as any).user as SessionData;
-    const { eventId, scans } = req.body;
+    const { eventId, scans, deviceUuid } = req.body;
 
     if (!eventId || !Array.isArray(scans)) {
-      res.status(422).json({ error: 'VALIDATION_ERROR', message: 'Invalid payload format.' });
+      res.status(422).json({ error: 'VALIDATION_ERROR', message: 'Invalid payload format. eventId and scans array are required.' });
       return;
     }
 
@@ -1481,32 +1700,97 @@ app.post('/api/scan/batch-sync', requireScannerOrAdmin, async (req: Request, res
       return;
     }
 
-    if (session.role === 'SCANNER' && session.eventId !== eventId) {
-      res.status(403).json({ error: 'FORBIDDEN', message: 'Unauthorized event sync.' });
+    // 1. Authoritative Scanner Authorization Check
+    const authCheck = await dbService.validateScannerEventAccess(session.userId, eventId);
+    if (!authCheck.authorized) {
+      res.status(403).json({
+        error: 'FORBIDDEN',
+        code: 'SCANNER_REVOKED',
+        message: authCheck.reason || 'Scanner access has been revoked or expired for this event.',
+      });
       return;
     }
 
-    const scannerId = session.role === 'SCANNER' ? session.userId : undefined;
+    // 1b. Enforce Device Binding for Scanner
+    const incomingDeviceUuid =
+      (req.headers['x-device-uuid'] as string) ||
+      (deviceUuid as string) ||
+      (req.body?.device_uuid as string);
+
+    if (!enforceDeviceBinding(session, incomingDeviceUuid, res)) {
+      return;
+    }
+
+    const scannerId = authCheck.scannerId || (session.role === 'ADMIN' ? session.userId : undefined);
     const results = [];
 
+    // 2. Process each scan independently - server arrival order is authoritative
     for (const scan of scans) {
-      const outcome = await dbService.processCheckIn({
-        eventId,
-        scannedValue: scan.scanned_value,
-        scanType: scan.scan_type,
-        scannerId,
-        clientScanId: scan.client_scan_id,
-        source: 'offline_sync',
-      });
-      results.push({ client_scan_id: scan.client_scan_id, ...outcome });
+      const clientScanId = scan.client_scan_id;
+      const scannedVal = scan.scanned_value;
+      const scanType = scan.scan_type || 'QR';
+
+      if (!clientScanId || !scannedVal) {
+        results.push({
+          client_scan_id: clientScanId || 'unknown',
+          success: false,
+          status: 'INVALID_PAYLOAD',
+          message: 'Missing client_scan_id or scanned_value in queued item.',
+        });
+        continue;
+      }
+
+      try {
+        const outcome = await dbService.processCheckIn({
+          eventId,
+          scannedValue: scannedVal,
+          scanType: scanType as ScanType,
+          scannerId,
+          clientScanId,
+          source: 'offline_sync',
+        });
+
+        // Detect Multi-Scanner Post-Sync Duplicate Conflict
+        if (outcome.status === 'DUPLICATE_CHECKIN') {
+          results.push({
+            client_scan_id: clientScanId,
+            success: false,
+            status: 'POST_SYNC_DUPLICATE_CONFLICT',
+            conflict_reason: outcome.message || 'Already checked in by another terminal prior to sync arrival.',
+            student: outcome.student,
+            check_in_at: outcome.check_in_at,
+            message: 'POST-SYNC CONFLICT — Attendee was already checked in on the cloud.',
+          });
+        } else {
+          results.push({
+            client_scan_id: clientScanId,
+            success: outcome.success,
+            status: outcome.status,
+            server_check_in_id: outcome.check_in_id,
+            student: outcome.student,
+            check_in_at: outcome.check_in_at,
+            message: outcome.message,
+          });
+        }
+      } catch (itemErr: any) {
+        console.error(`[BatchSync] Error processing scan ${clientScanId}:`, itemErr);
+        results.push({
+          client_scan_id: clientScanId,
+          success: false,
+          status: 'SERVER_ERROR',
+          message: itemErr.message || 'Unexpected server error during check-in processing.',
+        });
+      }
     }
 
     res.json({
       success: true,
       processed: results.length,
+      device_uuid: deviceUuid,
       results,
     });
   } catch (err: any) {
+    console.error('Batch sync endpoint error:', err);
     res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message });
   }
 });
@@ -1628,14 +1912,19 @@ async function startServer() {
     }
   }
 
-  if (process.env.NODE_ENV !== 'production') {
+  const distPath = path.join(process.cwd(), 'dist');
+  const isProduction =
+    process.env.NODE_ENV === 'production' ||
+    (fs.existsSync(path.join(distPath, 'index.html')) && (process.argv[1]?.includes('dist') || !process.argv[1]?.endsWith('server.ts')));
+
+  if (!isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true, allowedHosts: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    console.log('[ADMITTO Server] Serving production build from:', distPath);
     app.use(express.static(distPath));
     app.get('*', (req: Request, res: Response) => {
       res.sendFile(path.join(distPath, 'index.html'));
@@ -1647,6 +1936,8 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => {
-  console.error('Failed to start ADMITTO server:', err);
-});
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+  startServer().catch((err) => {
+    console.error('Failed to start ADMITTO server:', err);
+  });
+}
