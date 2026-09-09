@@ -177,7 +177,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
   // --- APPROVE REQUEST ---
   const handleOpenApproveModal = (req: ScannerAccessRequest) => {
     setApprovingRequest(req);
-    setSelectedGate(gateStations.length > 0 ? gateStations[0].name : 'Gate 1 (Main Entry)');
+    setSelectedGate(gateStations.length > 0 ? gateStations[0].name : '');
     setSelectedDuration('8');
     playFeedbackSound('click');
   };
@@ -191,7 +191,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
       const durationHours = parseInt(selectedDuration, 10);
       const matchedStation = gateStations.find((s) => s.name === selectedGate);
       const res = await scannerAccessApi.approve(eventId, approvingRequest.id, {
-        gateName: selectedGate,
+        gateName: selectedGate || 'General Scanner',
         scannerId: matchedStation?.id,
         durationHours: durationHours > 0 ? durationHours : undefined,
       });
@@ -307,22 +307,6 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         playFeedbackSound('success');
         const updatedStations = [res.scanner, ...gateStations];
         setGateStations(updatedStations);
-        // If this is the first gate station created, fetch/provision referral codes
-        if (gateStations.length === 0) {
-          try {
-            const codesRes = await referralCodesApi.list(eventId);
-            if (codesRes.codes && codesRes.codes.length > 0) {
-              setReferralCodes(codesRes.codes);
-            } else {
-              const newCodeRes = await referralCodesApi.create(eventId);
-              if (newCodeRes.code) {
-                setReferralCodes([newCodeRes.code]);
-              }
-            }
-          } catch (e) {
-            console.warn('Could not refresh referral codes after gate creation:', e);
-          }
-        }
         setIsAddStationOpen(false);
         setStationName('');
         setStationCode('');
@@ -371,28 +355,14 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
 
         <div className="flex items-center gap-2.5">
           {activeSubTab === 'codes' && (
-            gateStations.length === 0 ? (
-              <button
-                onClick={() => {
-                  setActiveSubTab('stations');
-                  setIsAddStationOpen(true);
-                  playFeedbackSound('click');
-                }}
-                className="px-4 py-2.5 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 text-xs font-bold text-orange-400 flex items-center gap-1.5 border border-orange-500/30 transition cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Gate Station First</span>
-              </button>
-            ) : (
-              <button
-                onClick={handleGenerateReferralCode}
-                disabled={isGeneratingCode}
-                className="px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white flex items-center gap-1.5 shadow-lg shadow-orange-500/25 transition disabled:opacity-50 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Generate Referral Code</span>
-              </button>
-            )
+            <button
+              onClick={handleGenerateReferralCode}
+              disabled={isGeneratingCode}
+              className="px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white flex items-center gap-1.5 shadow-lg shadow-orange-500/25 transition disabled:opacity-50 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Generate Referral Code</span>
+            </button>
           )}
 
           {activeSubTab === 'stations' && (
@@ -443,7 +413,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
           <KeyRound className="w-3.5 h-3.5" />
           <span>Referral Codes</span>
           <span className="text-[10px] font-mono text-zinc-500">
-            ({gateStations.length === 0 ? 0 : referralCodes.length})
+            ({referralCodes.length})
           </span>
         </button>
 
@@ -705,50 +675,31 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
       {/* TAB 2: REFERRAL ACCESS CODES */}
       {activeSubTab === 'codes' && (
         <div className="space-y-4">
-          {gateStations.length === 0 ? (
-            <div className="p-8 rounded-2xl bg-zinc-950/60 border border-amber-500/30 text-center space-y-3">
-              <Smartphone className="w-8 h-8 text-amber-500/70 mx-auto" />
-              <h3 className="text-sm font-bold text-white">Gate Stations Required</h3>
+          <div className="p-4 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-xs text-orange-300 flex items-start gap-3">
+            <KeyRound className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+            <p className="leading-relaxed">
+              Share referral codes with gate staff or volunteer operators. Gate stations are optional — operators can scan for the general event or be assigned to a specific gate.
+            </p>
+          </div>
+
+          {referralCodes.length === 0 ? (
+            <div className="p-8 rounded-2xl bg-zinc-950/60 border border-zinc-800 text-center space-y-3">
+              <KeyRound className="w-8 h-8 text-zinc-600 mx-auto" />
+              <h3 className="text-sm font-bold text-white">No Referral Codes Generated</h3>
               <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                Without gate stations configured, referral codes cannot be generated, viewed, or shared. Please define at least one gate station first.
+                Generate your first referral code to allow gate staff to connect to this event (gate stations are optional).
               </p>
               <button
-                onClick={() => {
-                  setActiveSubTab('stations');
-                  setIsAddStationOpen(true);
-                  playFeedbackSound('click');
-                }}
+                onClick={handleGenerateReferralCode}
+                disabled={isGeneratingCode}
                 className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white shadow-lg shadow-orange-500/20 cursor-pointer inline-flex items-center gap-1.5 mx-auto"
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Gate Station First</span>
+                <span>Generate Code</span>
               </button>
             </div>
           ) : (
-            <>
-              <div className="p-4 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-xs text-orange-300 flex items-start gap-3">
-                <KeyRound className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
-                <p className="leading-relaxed">
-                  Share referral codes with gate staff or volunteer operators. Referral codes do not expire by time and remain valid until this event is deleted.
-                </p>
-              </div>
-
-              {referralCodes.length === 0 ? (
-                <div className="p-8 rounded-2xl bg-zinc-950/60 border border-zinc-800 text-center space-y-3">
-                  <KeyRound className="w-8 h-8 text-zinc-600 mx-auto" />
-                  <h3 className="text-sm font-bold text-white">No Referral Codes Generated</h3>
-                  <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                    Generate your first referral code to allow gate staff to connect to this event.
-                  </p>
-                  <button
-                    onClick={handleGenerateReferralCode}
-                    className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white shadow-lg shadow-orange-500/20 cursor-pointer"
-                  >
-                    Generate Code
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {referralCodes.map((code) => {
                     const isCopied = copiedCode === code.code;
                     const isActive = code.status === 'ACTIVE';
@@ -823,8 +774,6 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
                   })}
                 </div>
               )}
-            </>
-          )}
         </div>
       )}
 
@@ -922,7 +871,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
               <form onSubmit={handleSubmitApproval} className="space-y-4">
                 <div className="space-y-1.5">
                   <label htmlFor="approve-gate-select" className="text-xs font-mono font-bold text-zinc-300">
-                    ASSIGNED GATE STATION
+                    ASSIGNED GATE STATION (OPTIONAL)
                   </label>
                   <select
                     id="approve-gate-select"
@@ -931,19 +880,14 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
                     style={{ colorScheme: 'dark' }}
                     className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-orange-500 cursor-pointer"
                   >
-                    {gateStations.length > 0 ? (
-                      gateStations.map((s) => (
-                        <option key={s.id} value={s.name} className="bg-zinc-900 text-zinc-100 py-2">
-                          {s.name} ({s.access_code})
-                        </option>
-                      ))
-                    ) : (
-                      <>
-                        <option value="Gate 1 (Main Entrance)" className="bg-zinc-900 text-zinc-100 py-2">Gate 1 (Main Entrance)</option>
-                        <option value="Gate 2 (Side Entrance)" className="bg-zinc-900 text-zinc-100 py-2">Gate 2 (Side Entrance)</option>
-                        <option value="VIP Gate" className="bg-zinc-900 text-zinc-100 py-2">VIP Gate</option>
-                      </>
-                    )}
+                    <option value="" className="bg-zinc-900 text-zinc-100 py-2">
+                      None / General Scanner (Default)
+                    </option>
+                    {gateStations.map((s) => (
+                      <option key={s.id} value={s.name} className="bg-zinc-900 text-zinc-100 py-2">
+                        {s.name} ({s.access_code})
+                      </option>
+                    ))}
                   </select>
                 </div>
 

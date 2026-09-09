@@ -385,16 +385,6 @@ app.post('/api/auth/scanner-referral-login', authLimiter, async (req: Request, r
 
     const { referral, event } = lookup;
 
-    // Check if event has gate stations configured
-    const stations = await dbService.getScannersByEvent(event.id);
-    if (!stations || stations.length === 0) {
-      res.status(400).json({
-        error: 'GATE_STATIONS_REQUIRED',
-        message: 'This event does not have any active gate stations configured yet. Please contact the event organizer.',
-      });
-      return;
-    }
-
     const maxUses = referral.max_uses ?? 5;
     const timesUsed = referral.times_used ?? 0;
     if (timesUsed >= maxUses) {
@@ -1469,10 +1459,6 @@ app.post('/api/scanner/request-access', requireScannerOrAdmin, requestAccessLimi
 app.get('/api/events/:id/referral-codes', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const admin = (req as any).user as SessionData;
-    const stations = await dbService.getScannersByEvent(req.params.id);
-    if (!stations || stations.length === 0) {
-      return res.json({ codes: [] });
-    }
     const codes = await dbService.getReferralCodes(req.params.id, admin.userId);
     res.json({ codes });
   } catch (err: any) {
@@ -1484,14 +1470,7 @@ app.get('/api/events/:id/referral-codes', requireAdminAuth, async (req: Request,
 app.post('/api/events/:id/referral-codes', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const admin = (req as any).user as SessionData;
-    const stations = await dbService.getScannersByEvent(req.params.id);
-    if (!stations || stations.length === 0) {
-      return res.status(400).json({
-        error: 'ERROR',
-        message: 'Cannot generate referral codes without at least one gate station provisioned for this event. Please add a gate station first.',
-      });
-    }
-    // Referral codes remain active indefinitely until the event is deleted
+    // Referral codes remain active indefinitely until the event is deleted (gate stations are optional)
     const code = await dbService.createReferralCode(req.params.id, admin.userId, null);
     res.status(201).json({ success: true, code });
   } catch (err: any) {

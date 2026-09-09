@@ -121,4 +121,54 @@ describe('Security, Multi-Tenancy & RBAC Enforcement', () => {
     const lookupAfter = await dbService.getReferralCodeByValue(refCode.code);
     expect(lookupAfter).toBeNull();
   });
+
+  it('allows generating referral codes and approving access without gate stations (gate station is optional)', async () => {
+    // 1. Create a dedicated test event with ZERO gate stations
+    const zeroGateEvent = await dbService.createEvent(adminAId, {
+      title: 'Gate-Free Community Event',
+      venue: 'Open Lawn',
+      event_date: '2026-11-15',
+    });
+
+    // Verify 0 gate stations
+    const stations = await dbService.getScannersByEvent(zeroGateEvent.id, adminAId);
+    expect(stations.length).toBe(0);
+
+    // 2. Generate referral code without any gate stations
+    const refCode = await dbService.createReferralCode(zeroGateEvent.id, adminAId);
+    expect(refCode.code).toBeDefined();
+    expect(refCode.status).toBe('ACTIVE');
+
+    // 3. Retrieve referral codes list
+    const codesList = await dbService.getReferralCodes(zeroGateEvent.id, adminAId);
+    expect(codesList.length).toBeGreaterThanOrEqual(1);
+    expect(codesList.some((c) => c.code === refCode.code)).toBe(true);
+
+    // 4. Create scanner access request with this referral code
+    const operatorEmail = `volunteer_${Date.now()}@admitto.local`;
+    const operatorProfile = await dbService.createScannerProfile(operatorEmail, 'Volunteer Operator');
+    const req = await dbService.createScannerAccessRequest(
+      operatorProfile.id,
+      operatorEmail,
+      'Volunteer Operator',
+      refCode.code
+    );
+    expect(req.status).toBe('PENDING');
+
+    // 5. Approve access without any gate station (unassigned / optional gate)
+    const approved = await dbService.approveScannerRequest(
+      req.id,
+      zeroGateEvent.id,
+      adminAId,
+      undefined, // scannerId is undefined
+      undefined, // gateName is undefined (defaults to General/Main Gate)
+      8
+    );
+    expect(approved.status).toBe('APPROVED');
+    expect(approved.scanner_id).toBeNull();
+    expect(approved.gate_name).toBeDefined();
+
+    // Cleanup
+    await dbService.deleteEvent(zeroGateEvent.id, adminAId);
+  });
 });
