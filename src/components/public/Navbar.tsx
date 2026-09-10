@@ -59,11 +59,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       if (currentScrollY <= 15) {
         setIsNavVisible(true);
       } else if (diff > 6) {
-        // Scrolling DOWN -> navbar appears
-        setIsNavVisible(true);
-      } else if (diff < -6) {
-        // Scrolling UP -> navbar disappears
+        // Scrolling DOWN -> navbar disappears (clean reading view)
         setIsNavVisible(false);
+      } else if (diff < -6) {
+        // Scrolling UP -> navbar appears (easy navigation)
+        setIsNavVisible(true);
       }
 
       setIsScrolled(currentScrollY > 20);
