@@ -44,13 +44,32 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isNavVisible, setIsNavVisible] = useState(true);
+  const lastScrollY = useRef(0);
   const settingsRef = useRef<HTMLDivElement>(null);
 
-  // Monitor window scroll to enhance glassmorphism styling
+  // Monitor window scroll: appear when scrolling down, disappear when scrolling up
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+      const currentScrollY = window.scrollY;
+      const prevScrollY = lastScrollY.current;
+      const diff = currentScrollY - prevScrollY;
+
+      // At top of page, keep navbar visible in resting position
+      if (currentScrollY <= 15) {
+        setIsNavVisible(true);
+      } else if (diff > 6) {
+        // Scrolling DOWN -> navbar appears
+        setIsNavVisible(true);
+      } else if (diff < -6) {
+        // Scrolling UP -> navbar disappears
+        setIsNavVisible(false);
+      }
+
+      setIsScrolled(currentScrollY > 20);
+      lastScrollY.current = currentScrollY;
     };
+
     handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
@@ -101,7 +120,11 @@ export const Navbar: React.FC<NavbarProps> = ({
     <>
       <header
         id="navbar-header"
-        className={`fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300 transform ease-in-out ${
+          isNavVisible || isMobileMenuOpen
+            ? 'translate-y-0 opacity-100'
+            : '-translate-y-full opacity-0 pointer-events-none'
+        } ${
           isScrolled
             ? 'backdrop-blur-2xl bg-[#0a0a0f]/90 border-b border-white/[0.14] shadow-[0_12px_32px_rgba(0,0,0,0.55)]'
             : 'backdrop-blur-xl bg-[#0a0a0f]/75 border-b border-white/[0.08]'
