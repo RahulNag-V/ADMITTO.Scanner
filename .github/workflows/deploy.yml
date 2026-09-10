@@ -35,14 +35,13 @@ jobs:
         run: npm ci
 
       - name: Build Vite Production Frontend
-        run: npm run build
+        run: npm run build:client
         env:
           NODE_ENV: production
           GITHUB_PAGES: 'true'
-
-      - name: Clean Server Artifacts from Static Publish Directory
-        run: |
-          rm -f dist/server.cjs dist/server.cjs.map
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL || vars.VITE_API_URL }}
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
