@@ -9,29 +9,16 @@ function normalizeSupabaseUrl(rawUrl: string): string {
   return url;
 }
 
-const getEnvVar = (key: string): string => {
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      return (import.meta.env as any)[key] || '';
-    }
-  } catch {
-    // fallback
-  }
-  return '';
-};
+const rawSupabaseUrl: string =
+  (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL || import.meta.env.SUPABASE_URL)) ||
+  '';
 
-const rawSupabaseUrl =
-  getEnvVar('VITE_SUPABASE_URL') ||
-  getEnvVar('NEXT_PUBLIC_SUPABASE_URL') ||
-  getEnvVar('SUPABASE_URL');
-
-const rawSupabaseAnonKey =
-  getEnvVar('VITE_SUPABASE_ANON_KEY') ||
-  getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY') ||
-  getEnvVar('SUPABASE_ANON_KEY');
+const rawSupabaseAnonKey: string =
+  (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || import.meta.env.SUPABASE_ANON_KEY)) ||
+  '';
 
 export const SUPABASE_URL = normalizeSupabaseUrl(rawSupabaseUrl);
-export const SUPABASE_ANON_KEY = rawSupabaseAnonKey.trim();
+export const SUPABASE_ANON_KEY = (rawSupabaseAnonKey || '').trim();
 
 let supabaseClient: SupabaseClient | null = null;
 
