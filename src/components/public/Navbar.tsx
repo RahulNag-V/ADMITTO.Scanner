@@ -43,7 +43,18 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
+
+  // Monitor window scroll to enhance glassmorphism styling
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Close settings dropdown on click outside or escape key
   useEffect(() => {
@@ -90,7 +101,11 @@ export const Navbar: React.FC<NavbarProps> = ({
     <>
       <header
         id="navbar-header"
-        className="sticky top-0 z-50 w-full backdrop-blur-2xl bg-[#0a0a0f]/70 border-b border-white/[0.08] transition-colors duration-200 shrink-0 relative"
+        className={`fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300 ${
+          isScrolled
+            ? 'backdrop-blur-2xl bg-[#0a0a0f]/90 border-b border-white/[0.14] shadow-[0_12px_32px_rgba(0,0,0,0.55)]'
+            : 'backdrop-blur-xl bg-[#0a0a0f]/75 border-b border-white/[0.08]'
+        }`}
       >
         {/* Floating Liquid Aurora Background inside Header */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10">
@@ -463,6 +478,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
       </header>
+
+      {/* Layout spacer so page content is not obscured by fixed navbar */}
+      <div className="h-16 sm:h-20 shrink-0 w-full pointer-events-none" aria-hidden="true" />
 
       {/* Dynamic-Height Mobile Bottom-Sheet Navigation Drawer */}
       <AnimatePresence>
