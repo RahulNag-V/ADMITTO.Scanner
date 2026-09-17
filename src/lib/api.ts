@@ -69,7 +69,7 @@ export function getApiUrl(endpoint: string): string {
 export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   if (isStaticDeploymentWithoutBackend()) {
     throw new Error(
-      'Backend API is not configured (missing VITE_API_URL). Please set VITE_API_URL in your deployment configuration.'
+      'Production API URL is not configured. Please deploy the backend and set VITE_API_URL in your deployment configuration.'
     );
   }
   const headers: Record<string, string> = {

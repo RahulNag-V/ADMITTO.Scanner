@@ -571,7 +571,7 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
       };
 
       // Check for secure context and mediaDevices availability
-      if (typeof window !== 'undefined' && !window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      if (typeof window !== 'undefined' && !window.isSecureContext) {
         setIsCameraActive(false);
         setCameraError(
           'Mobile browsers block live camera on plain HTTP IP. Please open using the secure HTTPS tunnel link or upload a QR image/photo.'

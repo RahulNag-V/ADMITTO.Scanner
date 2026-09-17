@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getApiUrl } from '../lib/api';
+import { getApiUrl, isStaticDeploymentWithoutBackend } from '../lib/api';
 
 interface NetworkMonitorOptions {
   initialDelayMs?: number; // 250ms for snappy, smooth boot skeleton
@@ -32,6 +32,9 @@ export function useNetworkMonitor(options: NetworkMonitorOptions = {}) {
       return false;
     }
     if (!checkEndpoint) return true;
+    if (isStaticDeploymentWithoutBackend()) {
+      return navigator.onLine;
+    }
 
     try {
       const controller = new AbortController();

@@ -222,8 +222,9 @@ export async function sendPasswordReset(email: string): Promise<void> {
   }
 
   const origin = window.location.origin;
+  const baseNoTrailing = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-    redirectTo: `${origin}/reset-password`,
+    redirectTo: `${origin}${baseNoTrailing}/reset-password`,
   });
 
   if (error) {

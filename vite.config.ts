@@ -12,14 +12,17 @@ export default defineConfig(({ command, mode }) => {
 
   const sbUrl = process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL || '';
   const sbKey = process.env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || '';
+  const apiUrl = process.env.VITE_API_URL || env.VITE_API_URL || '';
 
   if (command === 'build') {
     const hasUrl = Boolean(sbUrl && sbUrl.trim() && !sbUrl.includes('your-project-id'));
     const hasKey = Boolean(sbKey && sbKey.trim() && !sbKey.includes('your-anon-key'));
+    const hasApi = Boolean(apiUrl && apiUrl.trim() && !apiUrl.includes('localhost'));
 
     console.log('[ADMITTO Build] Verifying Supabase client configuration:');
     console.log(`  - VITE_SUPABASE_URL: ${hasUrl ? 'CONFIGURED' : 'NOT CONFIGURED'}`);
     console.log(`  - VITE_SUPABASE_ANON_KEY: ${hasKey ? 'CONFIGURED' : 'NOT CONFIGURED'}`);
+    console.log(`  - VITE_API_URL: ${hasApi ? 'CONFIGURED' : 'NOT CONFIGURED (Static Frontend Mode)'}`);
   }
 
   return {
@@ -27,6 +30,7 @@ export default defineConfig(({ command, mode }) => {
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(sbUrl),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(sbKey),
+      'import.meta.env.VITE_API_URL': JSON.stringify(apiUrl),
     },
     plugins: [
       react(),
