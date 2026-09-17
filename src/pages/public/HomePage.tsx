@@ -67,9 +67,12 @@ export const HomePage: React.FC<HomePageProps> = ({
   };
 
   return (
-    <div id="home-page" className="w-full space-y-6 sm:space-y-10 pb-14 overflow-x-hidden">
-      {/* 1. HERO SECTION */}
-      <section id="hero-section" className="relative pt-6 lg:pt-12 text-center apple-section-glow overflow-hidden">
+    <div id="home-page" className="w-full pb-14 overflow-x-hidden">
+      {/* 1. HERO SECTION (FIT TO SCREEN VIEWPORT) */}
+      <section
+        id="hero-section"
+        className="relative min-h-[calc(100dvh-4rem)] sm:min-h-[calc(100dvh-5rem)] flex flex-col justify-between items-center text-center apple-section-glow overflow-hidden pt-16 sm:pt-20 pb-0"
+      >
         {/* Ambient Frosted Orb Background Glows with Floating Animation */}
         <motion.div
           animate={{
@@ -97,14 +100,15 @@ export const HomePage: React.FC<HomePageProps> = ({
           className="absolute top-1/3 right-10 w-[450px] h-[350px] bg-purple-500/15 rounded-full blur-[120px] pointer-events-none"
         />
 
+        {/* Vertically Centered Main Hero Content */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-5"
+          className="my-auto w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col items-center justify-center space-y-3 sm:space-y-4 md:space-y-5 py-2 sm:py-4"
         >
           {/* Frosted Pill badge */}
-          <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-pill text-xs font-semibold tracking-wide shadow-sm mx-auto">
+          <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3.5 py-1 sm:py-1.5 rounded-full glass-pill text-[11px] sm:text-xs font-semibold tracking-wide shadow-sm mx-auto">
             <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
             <span>Production Event Access & Token Validation Engine</span>
           </motion.div>
@@ -112,7 +116,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           {/* Headline */}
           <motion.h1
             variants={itemVariants}
-            className="text-4xl sm:text-6xl lg:text-7xl font-black text-white tracking-tight leading-[1.08] font-['Space_Grotesk']"
+            className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1] font-['Space_Grotesk']"
           >
             Zero-Queue Event Access. <br />
             <span className="bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 bg-clip-text text-transparent">
@@ -123,7 +127,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           {/* Body */}
           <motion.p
             variants={itemVariants}
-            className="text-base sm:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed font-normal"
+            className="text-xs sm:text-sm md:text-base text-slate-300 max-w-2xl mx-auto leading-relaxed font-normal px-2"
           >
             ADMITTO is the mission-critical digital event token validation platform. Choose your portal below to manage events or scan passes. Login is mandatory to access both portals.
           </motion.p>
@@ -131,7 +135,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           {/* Primary Dual Portal Actions Directly on Hero */}
           <motion.div
             variants={itemVariants}
-            className="flex flex-col sm:flex-row items-center justify-center gap-3.5 sm:gap-4 pt-2"
+            className="flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-4 pt-1 w-full max-w-md sm:max-w-none"
           >
             {/* Option 1: Admin Console */}
             <motion.button
@@ -139,7 +143,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               whileTap={{ scale: 0.98 }}
               id="hero-admin-console-btn"
               onClick={() => handleOpenPortal('ADMIN')}
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl text-sm font-bold text-slate-900 bg-white hover:bg-slate-100 shadow-xl shadow-white/10 hover:shadow-indigo-500/20 transition-all duration-200 flex items-center justify-center gap-3 cursor-pointer group"
+              className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold text-slate-900 bg-white hover:bg-slate-100 shadow-xl shadow-white/10 hover:shadow-indigo-500/20 transition-all duration-200 flex items-center justify-center gap-3 cursor-pointer group"
             >
               <Shield className="w-4 h-4 text-indigo-600" />
               <span>Admin Console</span>
@@ -161,7 +165,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               whileTap={{ scale: 0.98 }}
               id="hero-scanner-terminal-btn"
               onClick={() => handleOpenPortal('SCANNER')}
-              className="w-full sm:w-auto px-7 py-4 rounded-2xl text-sm font-bold text-orange-300 glass hover:bg-orange-500/15 border border-orange-500/30 hover:border-orange-500/50 shadow-xl shadow-orange-500/10 transition-all flex items-center justify-center gap-3 cursor-pointer group"
+              className="w-full sm:w-auto px-6 sm:px-7 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold text-orange-300 glass hover:bg-orange-500/15 border border-orange-500/30 hover:border-orange-500/50 shadow-xl shadow-orange-500/10 transition-all flex items-center justify-center gap-3 cursor-pointer group"
             >
               <Smartphone className="w-4 h-4 text-orange-400" />
               <span>Scanner Terminal</span>
@@ -181,32 +185,34 @@ export const HomePage: React.FC<HomePageProps> = ({
           {/* Feature check-marks */}
           <motion.div
             variants={itemVariants}
-            className="pt-3 flex flex-wrap items-center justify-center gap-6 text-xs text-slate-400 font-medium"
+            className="pt-1 sm:pt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 sm:gap-6 text-[11px] sm:text-xs text-slate-400 font-medium"
           >
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>Multi-Tenant Isolation</span>
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>Mandatory Authentication</span>
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>Atomic Duplicate Protection</span>
             </div>
           </motion.div>
         </motion.div>
+
+        {/* DYNAMIC SCROLLING CAUTION TAPE RIBBONS DOCKED AT BOTTOM OF FIRST SCREEN FOLD */}
+        <ScrollingCautionTape className="w-full mt-auto py-1 sm:py-2 select-none" />
       </section>
 
-      {/* DYNAMIC SCROLLING CAUTION TAPE RIBBONS */}
-      <ScrollingCautionTape />
+      {/* SUBSEQUENT SECTIONS CONTAINER */}
+      <div className="space-y-8 sm:space-y-12 mt-6 sm:mt-10">
+        {/* 3D GYROSCOPE SPATIAL WATERMARK BANNER */}
+        <Watermark3DGyroBanner />
 
-      {/* 3D GYROSCOPE SPATIAL WATERMARK BANNER */}
-      <Watermark3DGyroBanner />
-
-      {/* 2. CHOOSE YOUR ACCESS PORTAL SECTION (BOTH OPTIONS PROMINENT ON HOME PAGE) */}
-      <section id="portals-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-2 space-y-6">
+        {/* 2. CHOOSE YOUR ACCESS PORTAL SECTION (BOTH OPTIONS PROMINENT ON HOME PAGE) */}
+        <section id="portals-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-2 space-y-6">
         <AppleScrollReveal direction="up" distance={25}>
           <div className="text-center max-w-2xl mx-auto space-y-2.5">
             <div className="inline-flex items-center gap-1.5 text-xs uppercase font-bold tracking-widest text-indigo-400 glass-pill px-3.5 py-1 rounded-full">
@@ -587,6 +593,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </AppleScrollReveal>
       </section>
+      </div>
 
       {/* Digital Event Pass Modal Preview */}
       <DigitalEventPassModal
