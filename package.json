@@ -3,11 +3,14 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "node ./node_modules/tsx/dist/cli.mjs server.ts",
     "build": "npm run build:client && npm run build:server",
     "build:client": "node ./node_modules/vite/bin/vite.js build",
-    "build:server": "node ./node_modules/esbuild/bin/esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build:server": "node build-server.js",
     "start": "node dist/server.cjs",
     "clean": "node -e \"const fs=require('fs'); fs.rmSync('dist', {recursive:true, force:true}); try{fs.unlinkSync('server.js')}catch(e){}\"",
     "lint": "node ./node_modules/typescript/bin/tsc --noEmit",

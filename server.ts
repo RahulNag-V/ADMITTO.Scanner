@@ -1931,11 +1931,23 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    console.log('[ADMITTO Server] Serving production build from:', distPath);
-    app.use(express.static(distPath));
-    app.get('*', (req: Request, res: Response) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    console.log('[ADMITTO Server] Production mode active.');
+    const indexPath = path.join(distPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      app.use(express.static(distPath));
+      app.get('*', (_req: Request, res: Response) => {
+        res.sendFile(indexPath);
+      });
+    } else {
+      app.get('/', (_req: Request, res: Response) => {
+        res.json({
+          service: 'ADMITTO Backend API',
+          status: 'online',
+          health: '/api/health',
+          timestamp: new Date().toISOString(),
+        });
+      });
+    }
   }
 
   app.listen(PORT, '0.0.0.0', () => {
