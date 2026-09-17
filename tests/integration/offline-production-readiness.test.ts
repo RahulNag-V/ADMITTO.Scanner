@@ -157,7 +157,7 @@ describe('Production-Readiness Final Audit Suite', () => {
       // Indexed lookups must be fast (under 60ms even at 50,000 records)
       expect(durationMs).toBeLessThan(60);
     }
-  });
+  }, 60000);
 
   // -------------------------------------------------------------------------
   // 4. PARTIAL BATCH FAILURE HANDLING

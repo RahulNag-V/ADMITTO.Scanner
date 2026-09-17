@@ -355,12 +355,6 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </section>
 
-      {/* DYNAMIC SCROLLING CAUTION TAPE RIBBONS */}
-      <ScrollingCautionTape />
-
-      {/* 3D GYROSCOPE SPATIAL WATERMARK BANNER */}
-      <Watermark3DGyroBanner />
-
       {/* 2. THE 6-STEP WORKFLOW SECTION */}
       <section id="workflow-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         <AppleScrollReveal direction="up" distance={30}>
