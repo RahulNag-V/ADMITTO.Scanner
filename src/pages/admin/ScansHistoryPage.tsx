@@ -31,7 +31,6 @@ import {
 } from 'lucide-react';
 import { ScanAttempt } from '../../types';
 import { scanApi } from '../../lib/api';
-import { playFeedbackSound } from '../../lib/sound';
 import { SkeletonTableRow, TabSkeletonView } from '../../components/common/Skeleton';
 
 interface ScansHistoryPageProps {
@@ -88,7 +87,6 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
   };
 
   const handleExportCSV = async () => {
-    playFeedbackSound('click');
     try {
       await scanApi.downloadCSV(eventId);
     } catch (err) {
@@ -103,7 +101,6 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
   };
 
   const toggleExpand = (scanId: string) => {
-    playFeedbackSound('click');
     setExpandedScanIds((prev) => {
       const next = new Set(prev);
       if (next.has(scanId)) {
@@ -116,7 +113,6 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
   };
 
   const toggleExpandAll = () => {
-    playFeedbackSound('click');
     if (expandedScanIds.size === filteredScans.length) {
       setExpandedScanIds(new Set());
     } else {
@@ -128,7 +124,6 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
     if (e) e.stopPropagation();
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
-    playFeedbackSound('click');
     setTimeout(() => {
       setCopiedKey((curr) => (curr === key ? null : curr));
     }, 2000);
@@ -340,7 +335,6 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
                 <button
                   type="button"
                   onClick={() => {
-                    playFeedbackSound('click');
                     setIsFilterMenuOpen(!isFilterMenuOpen);
                   }}
                   className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 text-xs font-bold text-white flex items-center justify-between sm:justify-start gap-2.5 transition-all cursor-pointer shadow-md group select-none relative z-50 backdrop-blur-md"
@@ -376,7 +370,6 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
                             key={opt.id}
                             type="button"
                             onClick={() => {
-                              playFeedbackSound('click');
                               setResultFilter(opt.id);
                               setIsFilterMenuOpen(false);
                             }}

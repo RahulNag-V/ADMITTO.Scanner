@@ -28,7 +28,6 @@ import {
 } from 'lucide-react';
 import { Student, ScannerAccount, EventStats } from '../../types';
 import { studentsApi, scannersApi } from '../../lib/api';
-import { playFeedbackSound } from '../../lib/sound';
 
 export type MetricModalType = 'total' | 'checked_in' | 'pending' | 'scanners';
 
@@ -156,7 +155,6 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedCode(id);
-    playFeedbackSound('click');
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
@@ -166,7 +164,6 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     const newStatus = !currentStatus;
     try {
       setIsActionLoading(student.id);
-      playFeedbackSound('click');
       setLocalStudents((prev) =>
         prev.map((s) => (s.id === student.id ? { ...s, is_checked_in: newStatus, checked_in: newStatus } : s))
       );
@@ -175,7 +172,6 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     } catch (err) {
       console.error('Failed to toggle student check-in status:', err);
       setLocalStudents(students);
-      playFeedbackSound('error');
     } finally {
       setIsActionLoading(null);
     }
@@ -186,7 +182,6 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     const newStatus = !scanner.is_active;
     try {
       setIsActionLoading(scanner.id);
-      playFeedbackSound('click');
       setLocalScanners((prev) =>
         prev.map((s) => (s.id === scanner.id ? { ...s, is_active: newStatus } : s))
       );
@@ -199,7 +194,6 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     } catch (err) {
       console.error('Failed to toggle scanner status:', err);
       setLocalScanners(scanners);
-      playFeedbackSound('error');
     } finally {
       setIsActionLoading(null);
     }

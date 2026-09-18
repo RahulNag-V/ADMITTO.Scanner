@@ -1,4 +1,4 @@
-// Web Audio API feedback synthesizer (no external audio assets required)
+// Web Audio API feedback synthesizer — Scanner Verification Only
 let audioCtx: AudioContext | null = null;
 
 function getAudioContext(): AudioContext | null {
@@ -15,7 +15,10 @@ function getAudioContext(): AudioContext | null {
   return audioCtx;
 }
 
-export function playFeedbackSound(type: 'success' | 'duplicate' | 'error' | 'click' | 'reminder') {
+export function playFeedbackSound(type: 'success' | 'duplicate' | 'error' | 'reminder' | 'click') {
+  // Click noises are disabled everywhere across the application
+  if (type === 'click') return;
+
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
@@ -23,7 +26,7 @@ export function playFeedbackSound(type: 'success' | 'duplicate' | 'error' | 'cli
     const now = ctx.currentTime;
 
     if (type === 'success') {
-      // High bright affirmative 2-tone chime
+      // High bright affirmative 2-tone chime for valid scan check-in
       const osc1 = ctx.createOscillator();
       const osc2 = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -52,7 +55,7 @@ export function playFeedbackSound(type: 'success' | 'duplicate' | 'error' | 'cli
         navigator.vibrate([40, 30, 40]);
       }
     } else if (type === 'duplicate') {
-      // 2 warning descending pulses
+      // 2 warning descending pulses for duplicate check-in attempt
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
@@ -73,7 +76,7 @@ export function playFeedbackSound(type: 'success' | 'duplicate' | 'error' | 'cli
         navigator.vibrate([100, 50, 100]);
       }
     } else if (type === 'error') {
-      // Low buzz error
+      // Low buzz error for invalid token or unauthorized pass
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
@@ -93,7 +96,7 @@ export function playFeedbackSound(type: 'success' | 'duplicate' | 'error' | 'cli
         navigator.vibrate(250);
       }
     } else if (type === 'reminder') {
-      // Soft gentle 2-pulse bell reminder at 5 seconds
+      // Soft gentle 2-pulse bell reminder at 5 seconds in scanner
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
@@ -113,17 +116,6 @@ export function playFeedbackSound(type: 'success' | 'duplicate' | 'error' | 'cli
       if (navigator.vibrate) {
         navigator.vibrate([50, 50, 50]);
       }
-    } else if (type === 'click') {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(600, now);
-      gain.gain.setValueAtTime(0.05, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.04);
     }
   } catch {
     // Audio context may be restricted by autoplay rules

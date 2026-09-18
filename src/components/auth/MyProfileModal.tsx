@@ -25,7 +25,6 @@ import {
 import { AuthSession } from '../../types';
 import { authApi } from '../../lib/api';
 import { updatePassword as updateSupabasePassword } from '../../lib/supabaseAuth';
-import { playFeedbackSound } from '../../lib/sound';
 
 interface MyProfileModalProps {
   isOpen: boolean;
@@ -109,11 +108,9 @@ export const MyProfileModal: React.FC<MyProfileModalProps> = ({
 
       onProfileUpdated(updatedUser);
       setProfileSuccess('Your profile details have been updated successfully.');
-      playFeedbackSound('success');
       setTimeout(() => setProfileSuccess(null), 4000);
     } catch (err: any) {
       setProfileError(err.message || 'Failed to update profile. Please try again.');
-      playFeedbackSound('error');
     } finally {
       setIsSavingProfile(false);
     }
@@ -151,11 +148,9 @@ export const MyProfileModal: React.FC<MyProfileModalProps> = ({
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      playFeedbackSound('success');
       setTimeout(() => setPasswordSuccess(null), 5000);
     } catch (err: any) {
       setPasswordError(err.message || 'Could not update password. Please check your current password.');
-      playFeedbackSound('error');
     } finally {
       setIsUpdatingPassword(false);
     }
@@ -172,13 +167,11 @@ export const MyProfileModal: React.FC<MyProfileModalProps> = ({
       setCodeSentSuccess(true);
       setCooldown(res.cooldownSeconds || 60);
       setPasswordSuccess(res.message || `A confidential verification code starting with ADMITTO has been dispatched to ${session.user.email}. Please check your inbox.`);
-      playFeedbackSound('success');
     } catch (err: any) {
       if (err.remainingSeconds) {
         setCooldown(err.remainingSeconds);
       }
       setPasswordError(err.message || 'Failed to dispatch verification code to your email.');
-      playFeedbackSound('error');
     } finally {
       setIsSendingCode(false);
     }
@@ -192,19 +185,16 @@ export const MyProfileModal: React.FC<MyProfileModalProps> = ({
     const cleanCode = resetCode.trim();
     if (!/^\d{6}$/.test(cleanCode)) {
       setPasswordError('Please enter the 6-digit verification code sent to your email.');
-      playFeedbackSound('error');
       return;
     }
 
     if (newPassword.length < 8) {
       setPasswordError('New password must be at least 8 characters long.');
-      playFeedbackSound('error');
       return;
     }
 
     if (newPassword !== confirmPassword) {
       setPasswordError('New passwords do not match. Please verify and re-enter.');
-      playFeedbackSound('error');
       return;
     }
 
@@ -223,11 +213,9 @@ export const MyProfileModal: React.FC<MyProfileModalProps> = ({
       setConfirmPassword('');
       setCodeSentSuccess(false);
       setIsForgotMode(false);
-      playFeedbackSound('success');
       setTimeout(() => setPasswordSuccess(null), 6000);
     } catch (err: any) {
       setPasswordError(err.message || 'Invalid or expired verification code. Please request a new code.');
-      playFeedbackSound('error');
     } finally {
       setIsResettingWithCode(false);
     }

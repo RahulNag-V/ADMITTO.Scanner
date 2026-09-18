@@ -13,7 +13,6 @@ import {
 import { signUpWithEmail, signInWithGoogle } from '../../lib/supabaseAuth';
 import { saveSession } from '../../lib/api';
 import { AuthSession } from '../../types';
-import { playFeedbackSound } from '../../lib/sound';
 import { AppLogo } from '../../components/common/AppLogo';
 import { GoogleIcon } from '../../components/common/GoogleIcon';
 
@@ -72,7 +71,6 @@ export const SignupPage: React.FC<SignupPageProps> = ({
       const res = await signUpWithEmail(email, password, fullName);
 
       if (res.needsEmailVerification) {
-        playFeedbackSound('success');
         onNeedsEmailVerification(email.trim());
         return;
       }
@@ -88,14 +86,12 @@ export const SignupPage: React.FC<SignupPageProps> = ({
           },
         };
         saveSession(session);
-        playFeedbackSound('success');
         onSignupSuccess(session);
       } else {
         // Default to verification state
         onNeedsEmailVerification(email.trim());
       }
     } catch (err: any) {
-      playFeedbackSound('error');
       setError(err.message || 'Failed to create account. Please try again.');
     } finally {
       setLoading(false);
@@ -106,10 +102,8 @@ export const SignupPage: React.FC<SignupPageProps> = ({
     setError(null);
     setGoogleLoading(true);
     try {
-      playFeedbackSound('click');
       await signInWithGoogle(returnTo);
     } catch (err: any) {
-      playFeedbackSound('error');
       setError(err.message || 'Google sign-up failed. Please try again.');
       setGoogleLoading(false);
     }

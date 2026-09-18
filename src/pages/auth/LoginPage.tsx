@@ -16,7 +16,6 @@ import {
 import { signInWithEmail, signInWithGoogle, signOut } from '../../lib/supabaseAuth';
 import { authApi, scannerAccessApi, saveSession, getSession } from '../../lib/api';
 import { AuthSession, UserRole } from '../../types';
-import { playFeedbackSound } from '../../lib/sound';
 import { AppLogo } from '../../components/common/AppLogo';
 import { GoogleIcon } from '../../components/common/GoogleIcon';
 
@@ -77,7 +76,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             const stationRes = await authApi.login(cleanInput.toUpperCase(), password, 'SCANNER');
             if (stationRes.session) {
               saveSession(stationRes.session);
-              playFeedbackSound('success');
               onLoginSuccess(stationRes.session, '/scan');
               return;
             }
@@ -96,7 +94,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             const stationFallback = await authApi.login(cleanInput, password, 'SCANNER');
             if (stationFallback.session) {
               saveSession(stationFallback.session);
-              playFeedbackSound('success');
               onLoginSuccess(stationFallback.session, '/scan');
               return;
             }
@@ -154,7 +151,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         };
 
         saveSession(session);
-        playFeedbackSound('success');
 
         // Check if there was a pending referral code from scanner mode
         const pendingRef = sessionStorage.getItem('pending_referral_code') || scannerReferralCode.trim().toUpperCase();
@@ -196,11 +192,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           }
         }
 
-        playFeedbackSound('success');
         onLoginSuccess(currentSession, '/scan');
       }
     } catch (err: any) {
-      playFeedbackSound('error');
       setError(err.message || 'Authentication failed. Please check your credentials.');
     } finally {
       setLoading(false);
@@ -212,10 +206,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setError(null);
     setGoogleLoading(true);
     try {
-      playFeedbackSound('click');
       await signInWithGoogle(returnTo);
     } catch (err: any) {
-      playFeedbackSound('error');
       setError(err.message || 'Google sign-in failed. Please try again.');
       setGoogleLoading(false);
     }
@@ -451,7 +443,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     onClick={() => {
                       setAuthMode('SCANNER_CODE');
                       setError(null);
-                      playFeedbackSound('click');
                     }}
                     className="text-[11px] text-slate-400 hover:text-purple-300 transition-colors flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
                   >
@@ -466,7 +457,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 onClick={() => {
                   setAuthMode('SUPABASE');
                   setError(null);
-                  playFeedbackSound('click');
                 }}
                 className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold transition-colors cursor-pointer"
               >
@@ -520,7 +510,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   sessionStorage.setItem('pending_referral_code', scannerReferralCode.trim().toUpperCase());
                   setShowLoginRequiredModal(false);
                   setAuthMode('SUPABASE');
-                  playFeedbackSound('click');
                 }}
                 className="w-full py-3 sm:py-3.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.98] shadow-lg shadow-purple-500/25 border border-purple-400/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >

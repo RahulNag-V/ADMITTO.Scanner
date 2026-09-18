@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import QRCode from 'qrcode';
 import { Copy, Check, Printer, X, Download } from 'lucide-react';
 import { Student } from '../../types';
-import { playFeedbackSound } from '../../lib/sound';
 
 interface DigitalEventPassModalProps {
   student: Student | null;
@@ -45,12 +44,10 @@ export const DigitalEventPassModal: React.FC<DigitalEventPassModalProps> = ({
     const val = text || student.qr_code || student.qr_token || student.usn;
     navigator.clipboard.writeText(val);
     setCopied(true);
-    playFeedbackSound('click');
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handlePrint = () => {
-    playFeedbackSound('click');
     window.print();
   };
 

@@ -47,7 +47,6 @@ import {
 } from 'lucide-react';
 import { Student, StudentImportRow, QrMode, EventScanConfig, UniquenessValidationResult, EventItem } from '../../types';
 import { studentsApi, scanApi, eventsApi } from '../../lib/api';
-import { playFeedbackSound } from '../../lib/sound';
 import { getAttendeeLabels } from '../../lib/attendeeTypes';
 import { DigitalEventPassModal } from '../../components/common/DigitalEventPassModal';
 import { Skeleton, SkeletonTableRow, TabSkeletonView } from '../../components/common/Skeleton';
@@ -167,7 +166,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   }, [eventId]);
 
   const toggleSelectStudent = (studentId: string) => {
-    playFeedbackSound('click');
     setSelectedStudentIds((prev) => {
       const next = new Set(prev);
       if (next.has(studentId)) {
@@ -180,7 +178,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   };
 
   const toggleSelectAll = () => {
-    playFeedbackSound('click');
     if (selectedStudentIds.size === filteredStudents.length && filteredStudents.length > 0) {
       setSelectedStudentIds(new Set());
     } else {
@@ -207,10 +204,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
       });
       setSelectedStudentIds(new Set());
       setIsBulkDeleteModalOpen(false);
-      playFeedbackSound('success');
     } catch (err: any) {
       console.error('Failed to bulk delete attendees:', err);
-      playFeedbackSound('error');
       alert(err.message || 'Failed to delete some attendees.');
     } finally {
       setIsBulkDeleting(false);
@@ -240,7 +235,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   };
 
   const toggleExpandStudent = (studentId: string) => {
-    playFeedbackSound('click');
     setExpandedStudentIds((prev) => {
       const next = new Set(prev);
       if (next.has(studentId)) {
@@ -253,7 +247,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   };
 
   const toggleExpandAll = () => {
-    playFeedbackSound('click');
     if (expandedStudentIds.size === filteredStudents.length && filteredStudents.length > 0) {
       setExpandedStudentIds(new Set());
     } else {
@@ -264,7 +257,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const handleCopyText = (fieldKey: string, text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldKey);
-    playFeedbackSound('click');
     setTimeout(() => {
       setCopiedField((curr) => (curr === fieldKey ? null : curr));
     }, 2000);
@@ -288,7 +280,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
       });
 
       if (res.student) {
-        playFeedbackSound('success');
         setStudents([res.student, ...students]);
         setIsAddModalOpen(false);
         // Reset
@@ -298,7 +289,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         setSinglePhone('');
       }
     } catch (err: any) {
-      playFeedbackSound('error');
       alert(err.message || 'Failed to add attendee');
     } finally {
       setIsAdding(false);
@@ -307,7 +297,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
   const handleManualCheckInToggle = async (student: Student) => {
     try {
-      playFeedbackSound('click');
       const newStatus = !student.checked_in;
       const res = await studentsApi.toggleCheckIn(student.id, newStatus);
       if (res.student) {
@@ -323,7 +312,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
               : s
           )
         );
-        if (newStatus) playFeedbackSound('success');
       }
     } catch (err: any) {
       alert(err.message || 'Check-in state update failed');
@@ -344,14 +332,12 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         next.delete(student.id);
         return next;
       });
-      playFeedbackSound('click');
     } catch (err: any) {
       console.error('Failed to delete student:', err);
       // Fallback try with single param
       try {
         await studentsApi.delete(student.id);
         setStudents((prev) => prev.filter((s) => s.id !== student.id));
-        playFeedbackSound('click');
       } catch (fallbackErr: any) {
         alert(fallbackErr.message || err.message || 'Failed to delete attendee record.');
       }
@@ -539,7 +525,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
       // Advance to Step 2: Choose Primary Key
       setWizardStep(2);
-      playFeedbackSound('click');
     } catch (err: any) {
       console.error('Failed to parse spreadsheet file:', err);
       alert('Failed to parse spreadsheet file: ' + (err.message || 'Invalid format'));
@@ -591,10 +576,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
       const res = await studentsApi.importCsv(eventId, preparedAttendees, scanConfig);
       setImportSummary({ imported: res.imported, duplicates: res.duplicates, errors: res.errors || [] });
-      playFeedbackSound('success');
       loadStudents();
     } catch (err: any) {
-      playFeedbackSound('error');
       alert(err.message || 'Import failed');
     } finally {
       setIsImporting(false);
@@ -745,7 +728,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                   <button
                     type="button"
                     onClick={() => {
-                      playFeedbackSound('click');
                       setIsStatusDropdownOpen(!isStatusDropdownOpen);
                     }}
                     className="w-full md:w-auto h-10 px-3 rounded-xl bg-zinc-950/40 hover:bg-zinc-900/60 border border-white/10 text-xs font-bold text-white flex items-center justify-between gap-1.5 transition-all cursor-pointer shadow-md select-none backdrop-blur-md"
@@ -782,7 +764,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                               key={opt.id}
                               type="button"
                               onClick={() => {
-                                playFeedbackSound('click');
                                 setStatusFilter(opt.id);
                                 setIsStatusDropdownOpen(false);
                               }}
@@ -861,7 +842,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                           transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            playFeedbackSound('click');
                             setIsBulkDeleteModalOpen(true);
                           }}
                           className="px-2.5 py-1 rounded-lg bg-rose-500/25 hover:bg-rose-500/35 border border-rose-500/40 text-rose-200 hover:text-white text-[10px] font-bold inline-flex items-center gap-1.5 shadow-md shadow-rose-500/20 active:scale-95 transition-all cursor-pointer select-none"
@@ -1460,7 +1440,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                           key={col}
                           type="button"
                           onClick={() => {
-                            playFeedbackSound('click');
                             setPrimaryKeyField(col);
                             const res = checkDatasetUniqueness(rawSpreadsheetRows, col, secondaryKeyField);
                             setUniquenessResult(res);
@@ -1509,7 +1488,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                       const res = checkDatasetUniqueness(rawSpreadsheetRows, primaryKeyField, secondaryKeyField);
                       setUniquenessResult(res);
                       setWizardStep(3);
-                      playFeedbackSound('click');
                     }}
                     className="px-6 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white shadow-lg shadow-orange-500/25 cursor-pointer flex items-center gap-1.5"
                   >
@@ -1591,7 +1569,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                       setSecondaryKeyField(newSec);
                       const res = checkDatasetUniqueness(rawSpreadsheetRows, primaryKeyField, newSec || null);
                       setUniquenessResult(res);
-                      playFeedbackSound('click');
                     }}
                     style={{ colorScheme: 'dark' }}
                     className={`w-full bg-zinc-900 border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none cursor-pointer ${
@@ -1625,7 +1602,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                     disabled={!uniquenessResult?.is_unique}
                     onClick={() => {
                       setWizardStep(4);
-                      playFeedbackSound('click');
                     }}
                     className={`px-6 py-2.5 rounded-xl text-xs font-bold text-white flex items-center gap-1.5 cursor-pointer ${
                       uniquenessResult?.is_unique
@@ -1657,7 +1633,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                     <div
                       onClick={() => {
                         setQrMode('SECURE_TOKEN');
-                        playFeedbackSound('click');
                       }}
                       className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-1.5 ${
                         qrMode === 'SECURE_TOKEN'
@@ -1683,7 +1658,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                     <div
                       onClick={() => {
                         setIsPrivacyModalOpen(true);
-                        playFeedbackSound('click');
                       }}
                       className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-1.5 ${
                         qrMode === 'FULL_DATA'
@@ -1718,7 +1692,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                     value={barcodeField}
                     onChange={(e) => {
                       setBarcodeField(e.target.value);
-                      playFeedbackSound('click');
                     }}
                     style={{ colorScheme: 'dark' }}
                     className="w-full bg-zinc-900 border border-zinc-700 focus:border-orange-500 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none cursor-pointer"
@@ -1765,7 +1738,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                     type="button"
                     onClick={() => {
                       setWizardStep(5);
-                      playFeedbackSound('click');
                     }}
                     className="px-6 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white shadow-lg shadow-orange-500/25 cursor-pointer flex items-center gap-1.5"
                   >
@@ -1932,7 +1904,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                 onClick={() => {
                   setIsPrivacyModalOpen(false);
                   setQrMode('SECURE_TOKEN');
-                  playFeedbackSound('click');
                 }}
                 className="px-4 py-2.5 rounded-xl bg-zinc-800 text-xs font-bold text-zinc-300 hover:text-white cursor-pointer"
               >
@@ -1943,7 +1914,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                 onClick={() => {
                   setIsPrivacyModalOpen(false);
                   setQrMode('FULL_DATA');
-                  playFeedbackSound('click');
                 }}
                 className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 text-xs font-bold shadow-lg shadow-amber-500/25 cursor-pointer"
               >

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { History, Search, RefreshCw, Shield, Trash2, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { ActivityLog } from '../../types';
 import { scanApi } from '../../lib/api';
-import { playFeedbackSound } from '../../lib/sound';
 import { SkeletonActivityItem, TabSkeletonView } from '../../components/common/Skeleton';
 
 interface ActivityLogsPageProps {

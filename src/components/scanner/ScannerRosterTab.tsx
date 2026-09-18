@@ -28,7 +28,6 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { Student } from '../../types';
-import { playFeedbackSound } from '../../lib/sound';
 import { DigitalEventPassModal } from '../common/DigitalEventPassModal';
 
 interface ScannerRosterTabProps {
@@ -86,7 +85,6 @@ export const ScannerRosterTab: React.FC<ScannerRosterTabProps> = ({
   const pendingCount = Math.max(0, students.length - checkedInCount);
 
   const toggleExpandStudent = (studentId: string) => {
-    playFeedbackSound('click');
     setExpandedStudentIds((prev) => {
       const next = new Set(prev);
       if (next.has(studentId)) {
@@ -99,7 +97,6 @@ export const ScannerRosterTab: React.FC<ScannerRosterTabProps> = ({
   };
 
   const toggleExpandAll = () => {
-    playFeedbackSound('click');
     if (
       expandedStudentIds.size === filteredStudents.length &&
       filteredStudents.length > 0
@@ -114,7 +111,6 @@ export const ScannerRosterTab: React.FC<ScannerRosterTabProps> = ({
     if (e) e.stopPropagation();
     navigator.clipboard.writeText(text);
     setCopiedField(fieldKey);
-    playFeedbackSound('click');
     setTimeout(() => {
       setCopiedField((curr) => (curr === fieldKey ? null : curr));
     }, 2000);
@@ -140,7 +136,6 @@ export const ScannerRosterTab: React.FC<ScannerRosterTabProps> = ({
                 <button
                   id="roster-back-home-btn"
                   onClick={() => {
-                    playFeedbackSound('click');
                     onBackToHome();
                   }}
                   className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 active:scale-95 text-slate-900 dark:text-white text-xs font-bold border border-slate-200 dark:border-white/15 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"

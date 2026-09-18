@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import { EventStats, ActivityLog, Student, ScannerAccount, EventItem } from '../../types';
 import { eventsApi, scanApi, studentsApi, scannersApi } from '../../lib/api';
-import { playFeedbackSound } from '../../lib/sound';
 import { getAttendeeLabels } from '../../lib/attendeeTypes';
 import { Skeleton, SkeletonStatCard, TabSkeletonView } from '../../components/common/Skeleton';
 import { MetricDetailModal, MetricModalType } from '../../components/admin/MetricDetailModal';
@@ -94,12 +93,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   };
 
   const handleOpenMetricModal = (type: MetricModalType) => {
-    playFeedbackSound('click');
     setActiveDetailModal(type);
   };
 
   const handleExportCSV = async () => {
-    playFeedbackSound('click');
     try {
       await scanApi.downloadCSV(eventId);
     } catch (err) {

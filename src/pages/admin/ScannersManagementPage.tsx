@@ -28,7 +28,6 @@ import {
 } from 'lucide-react';
 import { ScannerAccount, ScannerReferralCode, ScannerAccessRequest } from '../../types';
 import { scannersApi, referralCodesApi, scannerAccessApi } from '../../lib/api';
-import { playFeedbackSound } from '../../lib/sound';
 import { SkeletonScannerCard, TabSkeletonView } from '../../components/common/Skeleton';
 import { getSupabaseClient } from '../../lib/supabase/client';
 
@@ -140,14 +139,11 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
   const handleGenerateReferralCode = async () => {
     try {
       setIsGeneratingCode(true);
-      playFeedbackSound('click');
       const res = await referralCodesApi.create(eventId);
       if (res.code) {
-        playFeedbackSound('success');
         setReferralCodes([res.code, ...referralCodes]);
       }
     } catch (err: any) {
-      playFeedbackSound('error');
       alert(err.message || 'Failed to generate referral code');
     } finally {
       setIsGeneratingCode(false);
@@ -156,7 +152,6 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
 
   const handleToggleReferralCode = async (code: ScannerReferralCode) => {
     try {
-      playFeedbackSound('click');
       const newStatus = code.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
       const res = await referralCodesApi.toggle(eventId, code.id, newStatus);
       if (res.code) {
@@ -170,7 +165,6 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
   const handleCopyCode = (codeStr: string) => {
     navigator.clipboard.writeText(codeStr);
     setCopiedCode(codeStr);
-    playFeedbackSound('click');
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
@@ -179,7 +173,6 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
     setApprovingRequest(req);
     setSelectedGate(gateStations.length > 0 ? gateStations[0].name : '');
     setSelectedDuration('8');
-    playFeedbackSound('click');
   };
 
   const handleSubmitApproval = async (e: React.FormEvent) => {
@@ -197,14 +190,12 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
       });
 
       if (res.request) {
-        playFeedbackSound('success');
         setAccessRequests((prev) =>
           prev.map((r) => (r.id === approvingRequest.id ? res.request : r))
         );
         setApprovingRequest(null);
       }
     } catch (err: any) {
-      playFeedbackSound('error');
       alert(err.message || 'Failed to approve request');
     } finally {
       setIsSubmittingApproval(false);
@@ -215,7 +206,6 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
   const handleOpenRejectModal = (req: ScannerAccessRequest) => {
     setRejectingRequest(req);
     setRejectionReason('Access declined by event administrator.');
-    playFeedbackSound('click');
   };
 
   const handleSubmitRejection = async (e: React.FormEvent) => {
@@ -226,14 +216,12 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
     try {
       const res = await scannerAccessApi.reject(eventId, rejectingRequest.id, rejectionReason.trim());
       if (res.request) {
-        playFeedbackSound('success');
         setAccessRequests((prev) =>
           prev.map((r) => (r.id === rejectingRequest.id ? res.request : r))
         );
         setRejectingRequest(null);
       }
     } catch (err: any) {
-      playFeedbackSound('error');
       alert(err.message || 'Failed to reject request');
     } finally {
       setIsSubmittingRejection(false);
@@ -247,10 +235,8 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
     }
 
     try {
-      playFeedbackSound('click');
       const res = await scannerAccessApi.revoke(eventId, req.id);
       if (res.request) {
-        playFeedbackSound('success');
         setAccessRequests((prev) => prev.map((r) => (r.id === req.id ? res.request : r)));
       }
     } catch (err: any) {
@@ -265,10 +251,8 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
     }
 
     try {
-      playFeedbackSound('click');
       const res = await scannerAccessApi.block(eventId, req.id);
       if (res.request) {
-        playFeedbackSound('success');
         setAccessRequests((prev) => prev.map((r) => (r.id === req.id ? res.request : r)));
       }
     } catch (err: any) {
@@ -279,10 +263,8 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
   // --- UNBLOCK USER ---
   const handleUnblockUser = async (req: ScannerAccessRequest) => {
     try {
-      playFeedbackSound('click');
       const res = await scannerAccessApi.unblock(eventId, req.id);
       if (res.request) {
-        playFeedbackSound('success');
         setAccessRequests((prev) => prev.map((r) => (r.id === req.id ? res.request : r)));
       }
     } catch (err: any) {
@@ -304,7 +286,6 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
       });
 
       if (res.scanner) {
-        playFeedbackSound('success');
         const updatedStations = [res.scanner, ...gateStations];
         setGateStations(updatedStations);
         setIsAddStationOpen(false);
@@ -312,7 +293,6 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         setStationCode('');
       }
     } catch (err: any) {
-      playFeedbackSound('error');
       alert(err.message || 'Failed to create gate station');
     } finally {
       setIsCreatingStation(false);
@@ -323,7 +303,6 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
     if (!confirm('Are you sure you want to delete this gate station?')) return;
     try {
       await scannersApi.delete(eventId, id);
-      playFeedbackSound('click');
       setGateStations((prev) => prev.filter((s) => s.id !== id));
     } catch (err: any) {
       alert(err.message || 'Failed to delete station');
@@ -382,7 +361,6 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         <button
           onClick={() => {
             setActiveSubTab('requests');
-            playFeedbackSound('click');
           }}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
             activeSubTab === 'requests'
@@ -402,7 +380,6 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         <button
           onClick={() => {
             setActiveSubTab('codes');
-            playFeedbackSound('click');
           }}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
             activeSubTab === 'codes'
@@ -420,7 +397,6 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         <button
           onClick={() => {
             setActiveSubTab('stations');
-            playFeedbackSound('click');
           }}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
             activeSubTab === 'stations'

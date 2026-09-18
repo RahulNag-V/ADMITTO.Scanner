@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, ArrowLeft, CheckCircle2, AlertCircle, KeyRound, Lock, Eye, EyeOff, RefreshCw, Send, ShieldCheck, Clock } from 'lucide-react';
 import { authApi } from '../../lib/api';
-import { playFeedbackSound } from '../../lib/sound';
 import { AppLogo } from '../../components/common/AppLogo';
 
 interface ForgotPasswordPageProps {
@@ -48,13 +47,11 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
       const res = await authApi.sendPasswordResetCode(email.trim());
       setCooldown(res.cooldownSeconds || 60);
       setStatusMessage(res.message || `A confidential verification code has been dispatched to ${email.trim()}`);
-      playFeedbackSound('success');
       setStep('verify_code');
     } catch (err: any) {
       if (err.remainingSeconds) {
         setCooldown(err.remainingSeconds);
       }
-      playFeedbackSound('error');
       setError(err.message || 'Failed to dispatch verification code. Please check your email.');
     } finally {
       setLoading(false);
@@ -68,29 +65,24 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({
     const cleanCode = code.trim();
     if (!/^\d{6}$/.test(cleanCode)) {
       setError('Please enter the 6-digit verification code sent to your email.');
-      playFeedbackSound('error');
       return;
     }
 
     if (newPassword.length < 8) {
       setError('New password must be at least 8 characters long.');
-      playFeedbackSound('error');
       return;
     }
 
     if (newPassword !== confirmPassword) {
       setError('New passwords do not match. Please verify and re-enter.');
-      playFeedbackSound('error');
       return;
     }
 
     setLoading(true);
     try {
       await authApi.resetPasswordWithCode(email.trim(), cleanCode, newPassword);
-      playFeedbackSound('success');
       setStep('success');
     } catch (err: any) {
-      playFeedbackSound('error');
       setError(err.message || 'Invalid or expired verification code.');
     } finally {
       setLoading(false);

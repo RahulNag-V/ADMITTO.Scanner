@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import { AuthSession, ScannerAccessRequest } from '../../types';
 import { scannerAccessApi } from '../../lib/api';
-import { playFeedbackSound } from '../../lib/sound';
 import { AppLogo } from '../common/AppLogo';
 import { getSupabaseClient } from '../../lib/supabase/client';
 
@@ -88,7 +87,6 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
               if (res.request) {
                 setAccessRequest((prev) => {
                   if (res.request?.status === 'APPROVED' && prev?.status !== 'APPROVED') {
-                    playFeedbackSound('success');
                   }
                   return res.request;
                 });
@@ -111,7 +109,6 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
               prev.is_blocked !== res.request?.is_blocked
             ) {
               if (res.request?.status === 'APPROVED' && prev?.status !== 'APPROVED') {
-                playFeedbackSound('success');
               }
               return res.request;
             }
@@ -147,7 +144,6 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    playFeedbackSound('click');
     try {
       const res = await scannerAccessApi.getMyAccess();
       setAccessRequest(res.request);
@@ -155,7 +151,6 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
         setCooldownRemaining(res.request.cooldown_remaining_seconds);
       }
       if (res.request?.status === 'APPROVED') {
-        playFeedbackSound('success');
       }
     } catch (err: any) {
       console.error('Failed to refresh access:', err);
@@ -178,12 +173,10 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
     try {
       const res = await scannerAccessApi.requestAccess(cleanCode, cleanName);
       if (res.request) {
-        playFeedbackSound('success');
         setAccessRequest(res.request);
         setReferralCodeInput('');
       }
     } catch (err: any) {
-      playFeedbackSound('error');
       setErrorMessage(err.message || 'Invalid or expired referral code.');
     } finally {
       setSubmitting(false);
@@ -199,7 +192,6 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
   };
 
   const handleResetRequest = () => {
-    playFeedbackSound('click');
     setAccessRequest(null);
     setReferralCodeInput('');
     setErrorMessage(null);

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertTriangle, X, Trash2, RefreshCw, ShieldAlert } from 'lucide-react';
-import { playFeedbackSound } from '../../lib/sound';
 
 interface DeleteAccountModalProps {
   isOpen: boolean;
@@ -33,12 +32,10 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
     setIsDeleting(true);
     setError(null);
     try {
-      playFeedbackSound('click');
       await onConfirmDelete();
     } catch (err: any) {
       setError(err.message || 'Failed to delete account. Please try again.');
       setIsDeleting(false);
-      playFeedbackSound('error');
     }
   };
 

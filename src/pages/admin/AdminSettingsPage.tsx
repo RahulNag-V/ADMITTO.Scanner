@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { AuthSession, EventItem } from '../../types';
 import { eventsApi } from '../../lib/api';
-import { playFeedbackSound } from '../../lib/sound';
 
 interface AdminSettingsPageProps {
   session: AuthSession;
@@ -38,7 +37,6 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = ({
 
     try {
       await eventsApi.delete(eventId);
-      playFeedbackSound('click');
       alert('Event and associated check-in records were permanently deleted.');
       window.location.reload();
     } catch (err: any) {

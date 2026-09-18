@@ -148,7 +148,6 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
           setDirection(1);
           setIsTabChanging(true);
           setActiveTab(nextTab);
-          playFeedbackSound('click');
           setTimeout(() => setIsTabChanging(false), 500);
         }
       } else {
@@ -158,7 +157,6 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
           setDirection(-1);
           setIsTabChanging(true);
           setActiveTab(prevTab);
-          playFeedbackSound('click');
           setTimeout(() => setIsTabChanging(false), 500);
         }
       }
@@ -335,7 +333,6 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
     if (isRefreshing) return;
     setIsRefreshing(true);
     try {
-      playFeedbackSound('click');
       if (navigator.onLine) {
         await syncEngine.triggerSync(eventId);
         try {
@@ -798,7 +795,6 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
 
   // Reset scanner and resume optical feed for the next attendee
   const handleDoneNextScan = () => {
-    playFeedbackSound('click');
     setLastResult(null);
     setLastScannedPayload('');
     setIsProcessing(false);
@@ -873,7 +869,6 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
   const handleToggleTorch = async () => {
     const nextState = !prefs.torchEnabled;
     handleUpdatePrefs({ torchEnabled: nextState });
-    playFeedbackSound('click');
 
     // 1. Try Html5Qrcode API
     if (qrReaderRef.current) {

@@ -40,7 +40,6 @@ import {
 } from 'lucide-react';
 import { EventItem, QrMode, EventScanConfig, AttendeeType } from '../../types';
 import { eventsApi } from '../../lib/api';
-import { playFeedbackSound } from '../../lib/sound';
 import { ATTENDEE_TYPE_PRESETS, getPresetByType } from '../../lib/attendeeTypes';
 import { TabSkeletonView } from '../../components/common/Skeleton';
 
@@ -239,7 +238,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
         barcode_field: primaryScanField,
       });
       if (res.event) {
-        playFeedbackSound('success');
         setEvents((prev) => [res.event, ...prev]);
         setIsCreateEventModalOpen(false);
         setNewEventTitle('');
@@ -265,7 +263,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
     setIsDeletingEvent(true);
     try {
       await eventsApi.delete(eventId, true);
-      playFeedbackSound('click');
       window.dispatchEvent(new CustomEvent('admitto:events-changed'));
 
       // Refresh event list
@@ -304,7 +301,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
     const reader = new FileReader();
     reader.onload = () => {
       setBannerUrl(reader.result as string);
-      playFeedbackSound('click');
     };
     reader.readAsDataURL(file);
   };
@@ -314,7 +310,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
     setBannerUrl(tempUrl.trim());
     setTempUrl('');
     setShowUrlInput(false);
-    playFeedbackSound('click');
   };
 
   const hasOrganizer = adminName.trim() !== '';
@@ -337,7 +332,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
     setAdminContactEmail(draftOrgEmail.trim());
     setIsOrgEditOpen(false);
     setOrgRequiredError(false);
-    playFeedbackSound('success');
   };
 
   const handleDeleteOrganizer = () => {
@@ -346,7 +340,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
     setAdminContactEmail('');
     setShowOrgDeleteConfirm(false);
     setIsOrgEditOpen(false);
-    playFeedbackSound('click');
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -390,7 +383,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
       if (updatedEv) {
         setEvent(updatedEv);
         setEvents((prev) => prev.map((ev) => (ev.id === updatedEv.id ? updatedEv : ev)));
-        playFeedbackSound('success');
         setSuccessMsg('Event details & scan configuration saved successfully.');
         setTimeout(() => setSuccessMsg(null), 3500);
       }
@@ -438,7 +430,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
               id="event-settings-switcher-btn"
               type="button"
               onClick={() => {
-                playFeedbackSound('click');
                 setIsEventSwitcherOpen(!isEventSwitcherOpen);
               }}
               className="px-3.5 py-2 rounded-2xl bg-[#242b4d]/70 hover:bg-[#242b4d] active:scale-95 border border-white/20 text-xs font-bold text-white flex items-center gap-2 transition-all cursor-pointer shadow-lg backdrop-blur-xl ring-1 ring-white/10"
@@ -473,7 +464,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                         key={ev.id}
                         type="button"
                         onClick={() => {
-                          playFeedbackSound('click');
                           setIsEventSwitcherOpen(false);
                           if (onSelectEventId) {
                             onSelectEventId(ev.id);
@@ -502,7 +492,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                     <button
                       type="button"
                       onClick={() => {
-                        playFeedbackSound('click');
                         setIsEventSwitcherOpen(false);
                         setIsCreateEventModalOpen(true);
                       }}
@@ -526,7 +515,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
           <button
             type="button"
             onClick={() => {
-              playFeedbackSound('click');
               setIsDeleteModalOpen(true);
               setDeleteConfirmText('');
             }}
@@ -829,7 +817,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                             onClick={() => {
                               setSelectedGradient(grad.id);
                               setIsColorDropdownOpen(false);
-                              playFeedbackSound('click');
                             }}
                             className={`w-full p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-2.5 text-left ${
                               isSelected
@@ -1218,7 +1205,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                         setPrimaryScanField(preset.defaultPrimaryKey);
                         setBarcodeField(preset.defaultPrimaryKey);
                       }
-                      playFeedbackSound('click');
                     }}
                     className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                       isSelected
@@ -1354,7 +1340,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                 <div
                   onClick={() => {
                     setQrMode('SECURE_TOKEN');
-                    playFeedbackSound('click');
                   }}
                   className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
                     qrMode === 'SECURE_TOKEN'
@@ -1377,7 +1362,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                 <div
                   onClick={() => {
                     setIsPrivacyModalOpen(true);
-                    playFeedbackSound('click');
                   }}
                   className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
                     qrMode === 'FULL_DATA'
@@ -1409,7 +1393,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                 value={barcodeField}
                 onChange={(e) => {
                   setBarcodeField(e.target.value);
-                  playFeedbackSound('click');
                 }}
                 style={{ colorScheme: 'dark' }}
                 className="w-full bg-[#181d33] border border-white/15 hover:border-white/25 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-orange-400 font-medium shadow-inner transition-colors cursor-pointer"
@@ -1483,7 +1466,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
           <button
             type="button"
             onClick={() => {
-              playFeedbackSound('click');
               setIsDeleteModalOpen(true);
               setDeleteConfirmText('');
             }}
@@ -1521,7 +1503,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                 onClick={() => {
                   setIsPrivacyModalOpen(false);
                   setQrMode('SECURE_TOKEN');
-                  playFeedbackSound('click');
                 }}
                 className="px-4 py-2.5 rounded-xl bg-zinc-800 text-xs font-bold text-zinc-300 hover:text-white cursor-pointer"
               >
@@ -1532,7 +1513,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                 onClick={() => {
                   setIsPrivacyModalOpen(false);
                   setQrMode('FULL_DATA');
-                  playFeedbackSound('click');
                 }}
                 className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 text-xs font-bold shadow-lg shadow-amber-500/25 cursor-pointer"
               >
@@ -1594,7 +1574,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                         type="button"
                         onClick={() => {
                           setNewAttendeeType(preset.id);
-                          playFeedbackSound('click');
                         }}
                         className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                           isSelected

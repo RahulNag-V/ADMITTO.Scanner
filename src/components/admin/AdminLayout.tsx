@@ -27,7 +27,6 @@ import {
 } from 'lucide-react';
 import { AuthSession, EventItem, AttendeeType } from '../../types';
 import { eventsApi, authApi } from '../../lib/api';
-import { playFeedbackSound } from '../../lib/sound';
 import { ATTENDEE_TYPE_PRESETS, getPresetByType } from '../../lib/attendeeTypes';
 import { LiquidBackground } from '../common/LiquidBackground';
 import { TabSkeletonView } from '../common/Skeleton';
@@ -135,7 +134,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       setDirection(currIdx > prevIdx ? 1 : -1);
     }
     onSelectTab(tabId);
-    playFeedbackSound('click');
   };
 
   // Swipe Gesture Handling for Directional Page Transitions
@@ -194,7 +192,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           const nextTab = navItems[currentIdx + 1].id;
           setDirection(1);
           onSelectTab(nextTab);
-          playFeedbackSound('click');
         }
       } else {
         // Swiped Left-to-Right (finger moved right) -> Previous Page (slides in from left to right)
@@ -202,7 +199,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           const prevTab = navItems[currentIdx - 1].id;
           setDirection(-1);
           onSelectTab(prevTab);
-          playFeedbackSound('click');
         }
       }
     }
@@ -242,7 +238,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     if (!confirmed) return;
     try {
       await eventsApi.delete(ev.id, true);
-      playFeedbackSound('click');
       window.dispatchEvent(new CustomEvent('admitto:events-changed'));
       await loadEvents();
     } catch (err: any) {
@@ -271,7 +266,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         barcode_field: primaryScanField,
       });
       if (res.event) {
-        playFeedbackSound('success');
         setEvents([res.event, ...events]);
         onSelectEventId(res.event.id);
         setIsCreateEventModalOpen(false);
@@ -359,7 +353,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                         key={ev.id}
                         type="button"
                         onClick={() => {
-                          playFeedbackSound('click');
                           onSelectEventId(ev.id);
                           setIsEventDropdownOpen(false);
                         }}
@@ -399,7 +392,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        playFeedbackSound('click');
                         setIsEventDropdownOpen(false);
                         setIsCreateEventModalOpen(true);
                       }}
@@ -466,7 +458,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             id="admin-hamburger-menu-btn"
             onClick={() => {
               setIsMobileMenuOpen(!isMobileMenuOpen);
-              playFeedbackSound('click');
             }}
             className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl glass-dark hover:bg-white/[0.1] border border-white/10 text-white transition-all cursor-pointer shrink-0"
             title="Toggle Navigation Menu"
@@ -873,7 +864,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                         type="button"
                         onClick={() => {
                           setNewAttendeeType(preset.id);
-                          playFeedbackSound('click');
                         }}
                         className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                           isSelected

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, Eye, EyeOff, ArrowLeft, CheckCircle2, AlertCircle, Key } from 'lucide-react';
 import { updatePassword } from '../../lib/supabaseAuth';
-import { playFeedbackSound } from '../../lib/sound';
 import { AppLogo } from '../../components/common/AppLogo';
 
 interface ResetPasswordPageProps {
@@ -38,10 +37,8 @@ export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({
 
     try {
       await updatePassword(newPassword);
-      playFeedbackSound('success');
       setUpdatedSuccess(true);
     } catch (err: any) {
-      playFeedbackSound('error');
       setError(err.message || 'Failed to update password. Please try again or request a new reset link.');
     } finally {
       setLoading(false);

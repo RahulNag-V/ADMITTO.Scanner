@@ -13,7 +13,6 @@ import {
   Database,
   Smartphone,
 } from 'lucide-react';
-import { playFeedbackSound } from '../../lib/sound';
 
 interface NetworkErrorViewProps {
   onRetry: () => void;
@@ -52,7 +51,6 @@ export const NetworkErrorView: React.FC<NetworkErrorViewProps> = ({
   }, []);
 
   const handleManualRetry = () => {
-    playFeedbackSound('click');
     setPingStatus('checking');
     onRetry();
     setCountdown(10);

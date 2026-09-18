@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, CheckCircle2, ArrowLeft, RefreshCw, LogIn, AlertCircle } from 'lucide-react';
 import { resendVerificationEmail } from '../../lib/supabaseAuth';
-import { playFeedbackSound } from '../../lib/sound';
 import { AppLogo } from '../../components/common/AppLogo';
 
 interface VerifyEmailPageProps {
@@ -30,7 +29,6 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
 
     try {
       await resendVerificationEmail(email);
-      playFeedbackSound('success');
       setResentSuccess(true);
       setCooldown(60);
 
@@ -44,7 +42,6 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
         });
       }, 1000);
     } catch (err: any) {
-      playFeedbackSound('error');
       setError(err.message || 'Failed to resend verification link. Please try again.');
     } finally {
       setResending(false);
