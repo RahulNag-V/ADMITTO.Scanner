@@ -25,6 +25,7 @@ import {
   Ban,
   History,
   ShieldAlert,
+  Mail,
 } from 'lucide-react';
 import { ScannerAccount, ScannerReferralCode, ScannerAccessRequest } from '../../types';
 import { scannersApi, referralCodesApi, scannerAccessApi } from '../../lib/api';
@@ -61,11 +62,20 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
   const [rejectionReason, setRejectionReason] = useState('');
   const [isSubmittingRejection, setIsSubmittingRejection] = useState(false);
 
-  // Add Gate Station Modal
+  // Create Email & Scanner Account Modal State
   const [isAddStationOpen, setIsAddStationOpen] = useState(false);
+  const [operatorName, setOperatorName] = useState('');
+  const [tempEmail, setTempEmail] = useState('');
+  const [isEmailManuallyEdited, setIsEmailManuallyEdited] = useState(false);
   const [stationName, setStationName] = useState('');
-  const [stationCode, setStationCode] = useState('');
+  const [scannerNumber, setScannerNumber] = useState('');
   const [isCreatingStation, setIsCreatingStation] = useState(false);
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    name: string;
+    email: string;
+    scannerNumber: string;
+    station?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (eventId) {
@@ -272,40 +282,98 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
     }
   };
 
-  // --- CREATE GATE STATION ---
+  // --- CREATE EMAIL & SCANNER ACCOUNT ---
+  const handleOpenCreateModal = () => {
+    const nextCount = gateStations.length;
+    const seq = String(nextCount + 1).padStart(2, '0');
+    setOperatorName('');
+    setStationName('');
+    setCreatedCredentials(null);
+    setIsEmailManuallyEdited(false);
+    const initialNum = `SCN-OP-${seq}`;
+    setScannerNumber(initialNum);
+    setTempEmail(`scanner.${initialNum.toLowerCase().replace(/[^a-z0-9]/g, '')}@scanner.local`);
+    setIsAddStationOpen(true);
+  };
+
+  const updateGeneratedFields = (name: string) => {
+    const nextCount = gateStations.length;
+    const seq = String(nextCount + 1).padStart(2, '0');
+    const clean = name.trim();
+    let tag = 'OP';
+    if (clean) {
+      const parts = clean.split(/\s+/).filter(Boolean);
+      if (parts.length >= 2) {
+        tag = (parts[0][0] + parts[1][0]).toUpperCase();
+      } else if (parts.length === 1) {
+        tag = parts[0].substring(0, Math.min(3, parts[0].length)).toUpperCase();
+      }
+    }
+    const generatedNum = `SCN-${tag}-${seq}`;
+    setScannerNumber(generatedNum);
+
+    if (!isEmailManuallyEdited) {
+      const slug = clean
+        ? clean.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '')
+        : 'scanner';
+      const codeSuffix = generatedNum.toLowerCase().replace(/[^a-z0-9]/g, '');
+      setTempEmail(`${slug}.${codeSuffix}@scanner.local`);
+    }
+  };
+
   const handleCreateStation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!stationName.trim()) return;
+    if (!operatorName.trim()) return;
     setIsCreatingStation(true);
 
     try {
+      const nextCount = gateStations.length;
+      const seq = String(nextCount + 1).padStart(2, '0');
+      const cleanName = operatorName.trim();
+      let tag = 'OP';
+      const parts = cleanName.split(/\s+/).filter(Boolean);
+      if (parts.length >= 2) {
+        tag = (parts[0][0] + parts[1][0]).toUpperCase();
+      } else if (parts.length === 1) {
+        tag = parts[0].substring(0, Math.min(3, parts[0].length)).toUpperCase();
+      }
+      const finalScannerNumber = (scannerNumber.trim() || `SCN-${tag}-${seq}`).toUpperCase();
+      const finalEmail = (tempEmail.trim() || `${finalScannerNumber.toLowerCase()}@scanner.local`).toLowerCase();
+      const finalStation = stationName.trim();
+      const displayName = finalStation ? `${cleanName} (${finalStation})` : cleanName;
+
       const res = await scannersApi.create({
         event_id: eventId,
-        name: stationName.trim(),
-        access_code: stationCode.trim().toUpperCase() || undefined,
+        name: displayName,
+        email: finalEmail,
+        access_code: finalScannerNumber,
+        password: finalScannerNumber,
       });
 
       if (res.scanner) {
         const updatedStations = [res.scanner, ...gateStations];
         setGateStations(updatedStations);
-        setIsAddStationOpen(false);
-        setStationName('');
-        setStationCode('');
+        setCreatedCredentials({
+          name: cleanName,
+          email: finalEmail,
+          scannerNumber: finalScannerNumber,
+          station: finalStation || undefined,
+        });
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to create gate station');
+      alert(err.message || 'Failed to create scanner email account');
     } finally {
       setIsCreatingStation(false);
     }
   };
 
   const handleDeleteStation = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this gate station?')) return;
+    if (!confirm('Are you sure you want to delete this scanner account?')) return;
     try {
       await scannersApi.delete(eventId, id);
       setGateStations((prev) => prev.filter((s) => s.id !== id));
     } catch (err: any) {
-      alert(err.message || 'Failed to delete station');
+      alert(err.message || 'Failed to delete scanner account');
     }
   };
 
@@ -328,7 +396,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
             <span>Scanner Access & Referral Management</span>
           </h1>
           <p className="text-xs text-zinc-400">
-            Generate referral codes, review real-time scanner access requests, assign gate stations, and revoke operator credentials.
+            Generate referral codes, review real-time scanner access requests, provision scanner email accounts, and revoke operator credentials.
           </p>
         </div>
 
@@ -346,11 +414,11 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
 
           {activeSubTab === 'stations' && (
             <button
-              onClick={() => setIsAddStationOpen(true)}
+              onClick={handleOpenCreateModal}
               className="px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white flex items-center gap-1.5 shadow-lg shadow-orange-500/25 transition cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Add Gate Station</span>
+              <span>Create Email</span>
             </button>
           )}
         </div>
@@ -397,6 +465,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         <button
           onClick={() => {
             setActiveSubTab('stations');
+            handleOpenCreateModal();
           }}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
             activeSubTab === 'stations'
@@ -404,8 +473,8 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
               : 'text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent'
           }`}
         >
-          <Smartphone className="w-3.5 h-3.5" />
-          <span>Gate Stations</span>
+          <Mail className="w-3.5 h-3.5" />
+          <span>Create Email</span>
           <span className="text-[10px] font-mono text-zinc-500">({gateStations.length})</span>
         </button>
       </div>
@@ -753,27 +822,36 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         </div>
       )}
 
-      {/* TAB 3: GATE STATIONS */}
+      {/* TAB 3: CREATE EMAIL & SCANNER ACCOUNTS */}
       {activeSubTab === 'stations' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <p className="text-xs text-zinc-400">
-              Define gate stations (e.g. Gate 1, VIP Entrance) that can be assigned when approving scanner operators.
+              Create temporary email accounts and auto-generated scanner IDs for gate operators.
             </p>
+            {gateStations.length > 0 && (
+              <button
+                onClick={handleOpenCreateModal}
+                className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white flex items-center gap-1.5 shadow-lg shadow-orange-500/20 transition cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create Email</span>
+              </button>
+            )}
           </div>
 
           {gateStations.length === 0 ? (
             <div className="p-8 rounded-2xl bg-zinc-950/60 border border-zinc-800 text-center space-y-3">
-              <Smartphone className="w-8 h-8 text-zinc-600 mx-auto" />
-              <h3 className="text-sm font-bold text-white">No Gate Stations Provisioned</h3>
+              <Mail className="w-8 h-8 text-zinc-600 mx-auto" />
+              <h3 className="text-sm font-bold text-white">No Scanner Accounts Created</h3>
               <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                Add physical gate stations to assign incoming scanner volunteers to specific doors.
+                Create temporary email accounts and auto-generated scanner IDs to grant gate operators access.
               </p>
               <button
-                onClick={() => setIsAddStationOpen(true)}
+                onClick={handleOpenCreateModal}
                 className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white shadow-lg shadow-orange-500/20"
               >
-                Add Gate Station
+                Create Email
               </button>
             </div>
           ) : (
@@ -783,27 +861,59 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
                   key={station.id}
                   className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-3 flex flex-col justify-between"
                 >
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-sm font-bold text-white">{station.name}</h3>
-                      <span className="px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[10px] font-mono font-bold">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-bold text-white truncate">{station.name}</h3>
+                        <p className="text-xs text-zinc-400 font-mono flex items-center gap-1 mt-0.5 truncate">
+                          <Mail className="w-3 h-3 text-zinc-500 shrink-0" />
+                          <span className="truncate">{station.email}</span>
+                        </p>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-mono font-bold tracking-wider shrink-0">
                         {station.access_code}
                       </span>
                     </div>
-                    <p className="text-xs text-zinc-500">Gate Station Terminal</p>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 text-[10px] font-mono">
+                        <KeyRound className="w-2.5 h-2.5 text-zinc-400" />
+                        Pass: {station.access_code}
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">
+                        Active
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80">
+                  <div className="flex items-center justify-between pt-3 border-t border-zinc-800/80">
                     <span className="text-[10px] font-mono text-zinc-500">
                       Created: {new Date(station.created_at).toLocaleDateString()}
                     </span>
-                    <button
-                      onClick={() => handleDeleteStation(station.id)}
-                      className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition"
-                      title="Delete Station"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(`Email: ${station.email}\nScanner Number: ${station.access_code}\nPassword: ${station.access_code}`);
+                          setCopiedCode(station.id);
+                          setTimeout(() => setCopiedCode(null), 2000);
+                        }}
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+                        title="Copy Credentials"
+                      >
+                        {copiedCode === station.id ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteStation(station.id)}
+                        className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition"
+                        title="Delete Account"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -959,67 +1069,232 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
           document.body
         )}
 
-      {/* MODAL: ADD GATE STATION */}
+      {/* MODAL: CREATE EMAIL & SCANNER ACCOUNT */}
       {isAddStationOpen &&
         createPortal(
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-3xl p-6 space-y-5 shadow-2xl shadow-black">
-              <div className="space-y-1">
-                <h2 className="text-lg font-black text-white font-['Space_Grotesk']">
-                  Add Gate Station
-                </h2>
-                <p className="text-xs text-zinc-400">
-                  Provision a named physical gate location (e.g. Main Auditorium North, VIP Entry).
-                </p>
-              </div>
+              {createdCredentials ? (
+                <div className="space-y-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                      <CheckCircle2 className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-black text-white font-['Space_Grotesk']">
+                        Scanner Account Created!
+                      </h2>
+                      <p className="text-xs text-zinc-400">
+                        Credentials are ready for gate operator login.
+                      </p>
+                    </div>
+                  </div>
 
-              <form onSubmit={handleCreateStation} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label htmlFor="station-name-input" className="text-xs font-mono font-bold text-zinc-300">
-                    STATION / GATE NAME
-                  </label>
-                  <input
-                    id="station-name-input"
-                    type="text"
-                    required
-                    value={stationName}
-                    onChange={(e) => setStationName(e.target.value)}
-                    placeholder="e.g. Gate 1 (North Concourse)"
-                    className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-orange-500"
-                  />
-                </div>
+                  <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-2.5 font-mono text-xs">
+                    <div className="flex justify-between items-center py-1 border-b border-zinc-800/80">
+                      <span className="text-zinc-500">1. Name:</span>
+                      <span className="font-bold text-white font-sans">{createdCredentials.name}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1 border-b border-zinc-800/80">
+                      <span className="text-zinc-500">2. Temporary Email:</span>
+                      <span className="font-bold text-orange-400 truncate max-w-[200px]">{createdCredentials.email}</span>
+                    </div>
+                    {createdCredentials.station && (
+                      <div className="flex justify-between items-center py-1 border-b border-zinc-800/80">
+                        <span className="text-zinc-500">3. Station:</span>
+                        <span className="font-bold text-zinc-300 font-sans">{createdCredentials.station}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center py-1 border-b border-zinc-800/80">
+                      <span className="text-zinc-500">4. Scanner Number:</span>
+                      <span className="font-bold text-emerald-400">{createdCredentials.scannerNumber}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-zinc-500">Password:</span>
+                      <span className="font-bold text-zinc-300">{createdCredentials.scannerNumber}</span>
+                    </div>
+                  </div>
 
-                <div className="space-y-1.5">
-                  <label htmlFor="station-code-input" className="text-xs font-mono font-bold text-zinc-300">
-                    IDENTIFIER CODE (OPTIONAL)
-                  </label>
-                  <input
-                    id="station-code-input"
-                    type="text"
-                    value={stationCode}
-                    onChange={(e) => setStationCode(e.target.value.toUpperCase())}
-                    placeholder="e.g. GATE-NORTH-1"
-                    className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-orange-500 uppercase"
-                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const creds = `ADMITTO SCANNER CREDENTIALS\nName: ${createdCredentials.name}\nEmail: ${createdCredentials.email}\nStation: ${createdCredentials.station || 'General'}\nScanner Number: ${createdCredentials.scannerNumber}\nPassword: ${createdCredentials.scannerNumber}`;
+                        navigator.clipboard.writeText(creds);
+                        setCopiedCode('all-creds');
+                        setTimeout(() => setCopiedCode(null), 2000);
+                      }}
+                      className="flex-1 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-xs font-bold text-zinc-300 flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    >
+                      {copiedCode === 'all-creds' ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy Credentials</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreatedCredentials(null);
+                        setIsAddStationOpen(false);
+                      }}
+                      className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white transition cursor-pointer"
+                    >
+                      Done
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-500/10 text-orange-400 text-[10px] font-mono font-bold uppercase">
+                      <Mail className="w-3 h-3" />
+                      <span>Scanner Credentials</span>
+                    </div>
+                    <h2 className="text-lg font-black text-white font-['Space_Grotesk']">
+                      Create Scanner Email
+                    </h2>
+                    <p className="text-xs text-zinc-400">
+                      Provision temporary scanner email credentials with auto-generated scanner number.
+                    </p>
+                  </div>
 
-                <div className="flex items-center gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddStationOpen(false)}
-                    className="flex-1 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-xs font-bold text-zinc-400 transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isCreatingStation}
-                    className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white shadow-lg shadow-orange-500/20 transition disabled:opacity-50"
-                  >
-                    {isCreatingStation ? 'Creating...' : 'Save Station'}
-                  </button>
-                </div>
-              </form>
+                  <form onSubmit={handleCreateStation} className="space-y-4">
+                    {/* 1. Name */}
+                    <div className="space-y-1.5">
+                      <label htmlFor="operator-name-input" className="text-xs font-mono font-bold text-zinc-300 flex items-center justify-between">
+                        <span>1. NAME</span>
+                        <span className="text-[10px] text-zinc-500 font-normal">Required</span>
+                      </label>
+                      <input
+                        id="operator-name-input"
+                        type="text"
+                        required
+                        value={operatorName}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setOperatorName(val);
+                          updateGeneratedFields(val);
+                        }}
+                        placeholder="e.g. Rahul Nag or Gate Operator 1"
+                        className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-orange-500"
+                        autoFocus
+                      />
+                    </div>
+
+                    {/* 2. Temporary Email */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label htmlFor="temp-email-input" className="text-xs font-mono font-bold text-zinc-300">
+                          2. TEMPORARY EMAIL
+                        </label>
+                        {isEmailManuallyEdited && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEmailManuallyEdited(false);
+                              updateGeneratedFields(operatorName);
+                            }}
+                            className="text-[10px] font-mono text-orange-400 hover:underline cursor-pointer"
+                          >
+                            Reset to Auto
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        id="temp-email-input"
+                        type="email"
+                        required
+                        value={tempEmail}
+                        onChange={(e) => {
+                          setTempEmail(e.target.value);
+                          setIsEmailManuallyEdited(true);
+                        }}
+                        placeholder="e.g. rahul.nag.scnrn01@scanner.local"
+                        className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-orange-500"
+                      />
+                      <p className="text-[10px] text-zinc-500 font-mono">
+                        Temporary login address for this operator.
+                      </p>
+                    </div>
+
+                    {/* 3. Station (Optional) */}
+                    <div className="space-y-1.5">
+                      <label htmlFor="station-optional-input" className="text-xs font-mono font-bold text-zinc-300 flex items-center justify-between">
+                        <span>3. STATION (OPTIONAL)</span>
+                        <span className="text-[10px] text-zinc-500 font-normal">Optional</span>
+                      </label>
+                      <input
+                        id="station-optional-input"
+                        type="text"
+                        value={stationName}
+                        onChange={(e) => setStationName(e.target.value)}
+                        placeholder="e.g. Gate 1, VIP Entrance, North Concourse"
+                        className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {['Gate 1', 'Gate 2', 'VIP Entrance', 'North Door', 'Roaming'].map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            onClick={() => setStationName(suggestion)}
+                            className="px-2 py-0.5 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[10px] text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
+                          >
+                            + {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 4. Scanner Number */}
+                    <div className="space-y-1.5">
+                      <label htmlFor="scanner-number-input" className="text-xs font-mono font-bold text-zinc-300 flex items-center justify-between">
+                        <span>4. SCANNER NUMBER</span>
+                        <span className="text-[10px] text-emerald-400 font-mono">Auto-generated</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="scanner-number-input"
+                          type="text"
+                          required
+                          value={scannerNumber}
+                          onChange={(e) => setScannerNumber(e.target.value.toUpperCase())}
+                          className="w-full px-3.5 py-2.5 bg-zinc-900/80 border border-zinc-800 rounded-xl text-xs font-mono font-bold text-emerald-400 focus:outline-none focus:border-orange-500 uppercase tracking-wider"
+                        />
+                        <span className="absolute right-3 top-2.5 text-[10px] font-mono text-zinc-500">
+                          #{gateStations.length + 1}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 font-mono">
+                        Generated based on name initials & scanner sequence #{gateStations.length + 1}. Also serves as operator initial access password.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsAddStationOpen(false)}
+                        className="flex-1 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-xs font-bold text-zinc-400 transition cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isCreatingStation || !operatorName.trim()}
+                        className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white shadow-lg shadow-orange-500/20 transition disabled:opacity-50 cursor-pointer"
+                      >
+                        {isCreatingStation ? 'Creating...' : 'Create Email'}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
             </div>
           </div>,
           document.body
