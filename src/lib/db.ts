@@ -2287,6 +2287,34 @@ class DatabaseService {
     return this.inMemoryDB.scanner_accounts.find((s) => s.id === scannerId) || null;
   }
 
+  async getScannerByEmailOrCodeAndEvent(identifier: string, eventId: string): Promise<ScannerAccount | null> {
+    const clean = (identifier || '').trim();
+    const cleanEmail = clean.toLowerCase();
+    const cleanCode = clean.toUpperCase();
+
+    const supabase = this.getClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('scanner_accounts')
+        .select('*')
+        .eq('event_id', eventId)
+        .or(`email.ilike.${cleanEmail},access_code.eq.${cleanCode}`)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[Supabase DB] Error fetching scanner by identifier:', error);
+        throw new Error(`Database error fetching scanner: ${error.message}`);
+      }
+      return (data as ScannerAccount) || null;
+    }
+
+    return (
+      this.inMemoryDB.scanner_accounts.find(
+        (s) => s.event_id === eventId && (s.email.toLowerCase() === cleanEmail || s.access_code.toUpperCase() === cleanCode)
+      ) || null
+    );
+  }
+
   async getScannersByEvent(eventId: string, adminId?: string): Promise<ScannerAccount[]> {
     if (adminId) {
       const event = await this.getEventById(eventId, adminId);
@@ -2322,29 +2350,73 @@ class DatabaseService {
     const cleanCode = (data.access_code || `GATE-${Math.random().toString(36).substring(2, 7).toUpperCase()}`).trim().toUpperCase();
     const cleanEmail = (data.email?.trim() || `${cleanCode.toLowerCase()}@scanner.local`).toLowerCase();
     const cleanName = (data.name || 'Gate Scanner').trim();
+    const normalizedNewName = cleanName.replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase().replace(/\s+/g, ' ');
     const cleanPassword = data.password?.trim() || cleanCode;
 
     const supabase = this.getClient();
 
     if (supabase) {
-      const { data: existing, error: exErr } = await supabase
+      const { data: existingList, error: exErr } = await supabase
         .from('scanner_accounts')
-        .select('id')
-        .eq('event_id', eventId)
-        .or(`email.eq.${cleanEmail},access_code.eq.${cleanCode}`)
-        .maybeSingle();
+        .select('id, email, access_code, name')
+        .eq('event_id', eventId);
 
       if (exErr) throw new Error(`Database error verifying scanner unique constraint: ${exErr.message}`);
 
-      if (existing) {
-        throw new Error('A scanner with this email or access code already exists for this event.');
+      if (existingList && existingList.length > 0) {
+        // 1. Strict duplicate email check
+        const dupEmail = existingList.find(
+          (s: any) => (s.email || '').toLowerCase().trim() === cleanEmail
+        );
+        if (dupEmail) {
+          throw new Error(`Duplicate email: A scanner account with email "${cleanEmail}" already exists. Each scanner account must have a unique email.`);
+        }
+
+        // 2. Strict duplicate name check: identical names not allowed, must differ by at least one letter
+        const dupName = existingList.find((s: any) => {
+          const sName = (s.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+          const sNormalized = (s.name || '').replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase().replace(/\s+/g, ' ');
+          return sName === cleanName.toLowerCase().replace(/\s+/g, ' ') || sNormalized === normalizedNewName;
+        });
+        if (dupName) {
+          throw new Error(`Duplicate operator name: An operator with name "${cleanName}" already exists. Names cannot be identical; at least one letter must be different.`);
+        }
+
+        // 3. Strict duplicate access code check
+        const dupCode = existingList.find(
+          (s: any) => (s.access_code || '').toUpperCase().trim() === cleanCode
+        );
+        if (dupCode) {
+          throw new Error(`Duplicate scanner ID: Access code "${cleanCode}" already exists for this event.`);
+        }
       }
     } else {
-      const existing = this.inMemoryDB.scanner_accounts.find(
-        (s) => s.event_id === eventId && (s.email.toLowerCase() === cleanEmail || s.access_code.toUpperCase() === cleanCode)
+      const existingList = this.inMemoryDB.scanner_accounts.filter((s) => s.event_id === eventId);
+
+      // 1. Strict duplicate email check
+      const dupEmail = existingList.find(
+        (s) => s.email.toLowerCase().trim() === cleanEmail
       );
-      if (existing) {
-        throw new Error('A scanner with this email or access code already exists for this event.');
+      if (dupEmail) {
+        throw new Error(`Duplicate email: A scanner account with email "${cleanEmail}" already exists. Each scanner account must have a unique email.`);
+      }
+
+      // 2. Strict duplicate name check: identical names not allowed, must differ by at least one letter
+      const dupName = existingList.find((s) => {
+        const sName = s.name.trim().toLowerCase().replace(/\s+/g, ' ');
+        const sNormalized = s.name.replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase().replace(/\s+/g, ' ');
+        return sName === cleanName.toLowerCase().replace(/\s+/g, ' ') || sNormalized === normalizedNewName;
+      });
+      if (dupName) {
+        throw new Error(`Duplicate operator name: An operator with name "${cleanName}" already exists. Names cannot be identical; at least one letter must be different.`);
+      }
+
+      // 3. Strict duplicate access code check
+      const dupCode = existingList.find(
+        (s) => s.access_code.toUpperCase().trim() === cleanCode
+      );
+      if (dupCode) {
+        throw new Error(`Duplicate scanner ID: Access code "${cleanCode}" already exists for this event.`);
       }
     }
 

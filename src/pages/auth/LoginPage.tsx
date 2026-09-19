@@ -166,33 +166,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         const targetDest = returnTo || (effectiveRole === 'SCANNER' ? '/scan' : '/admin');
         onLoginSuccess(session, targetDest);
       } else {
-        // Scanner Referral Code Mode: ONLY Referral Code
+        // Scanner Login: ONLY admin-generated email and referral code
+        const cleanEmail = email.trim().toLowerCase();
         const cleanRefCode = scannerReferralCode.trim().toUpperCase();
+
+        if (!cleanEmail) {
+          throw new Error('Please enter your admin-generated scanner email.');
+        }
         if (!cleanRefCode) {
           throw new Error('Please enter your event referral code.');
         }
 
-        // Verify if user is already logged in
-        const currentSession = getSession();
-        if (!currentSession || !currentSession.user || !currentSession.user.email) {
-          // If NOT logged in: save pending code and trigger Login Required popup modal
-          sessionStorage.setItem('pending_referral_code', cleanRefCode);
-          setLoading(false);
-          setShowLoginRequiredModal(true);
+        const res = await authApi.scannerReferralLogin(cleanEmail, cleanRefCode);
+        if (res.session) {
+          saveSession(res.session);
+          onLoginSuccess(res.session, '/scan');
           return;
         }
-
-        // User IS logged in: submit persistent request directly to database
-        try {
-          await scannerAccessApi.requestAccess(cleanRefCode, currentSession.user.name);
-        } catch (reqErr: any) {
-          // If already requested or cooldown active, proceed to /scan so gatekeeper displays the live status
-          if (!reqErr.message?.includes('already') && !reqErr.message?.includes('cooldown')) {
-            throw reqErr;
-          }
-        }
-
-        onLoginSuccess(currentSession, '/scan');
+        throw new Error('Failed to establish scanner session. Please check your credentials.');
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please check your credentials.');
@@ -266,7 +257,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 ? (returnTo === '/scan' || initialRole === 'SCANNER'
                     ? 'Sign in with your account or scanner station credentials.'
                     : 'Sign in to create, manage, or scan event access.')
-                : 'Enter your event referral code to connect.'}
+                : 'Enter your admin-generated scanner email and event referral code to connect.'}
             </p>
           </div>
         </div>
@@ -381,6 +372,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
+                <label htmlFor="scanner-email-input" className="text-xs font-semibold text-slate-300 block">
+                  Admin-Generated Scanner Email
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-purple-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    id="scanner-email-input"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    placeholder="e.g. scanner-main-gate@event.admitto.local"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full glass-input rounded-xl pl-10 pr-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-400 transition-colors"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Enter the scanner email created by the event administrator.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
                 <label htmlFor="scanner-referral-input" className="text-xs font-semibold text-slate-300 block">
                   Event Referral Code
                 </label>
@@ -393,11 +406,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     placeholder="e.g. GTS26-K7P9"
                     value={scannerReferralCode}
                     onChange={(e) => setScannerReferralCode(e.target.value.toUpperCase())}
-                    className="w-full glass-input rounded-xl pl-10 pr-4 py-3.5 text-xs sm:text-sm text-white font-mono placeholder-slate-500 uppercase tracking-wider focus:outline-none focus:border-purple-400 transition-colors"
+                    className="w-full glass-input rounded-xl pl-10 pr-4 py-3 text-xs sm:text-sm text-white font-mono placeholder-slate-500 uppercase tracking-wider focus:outline-none focus:border-purple-400 transition-colors"
                   />
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Enter the referral code provided by your event organizer to connect as a scanner.
+                  Enter the referral code provided for this event.
                 </p>
               </div>
 
@@ -410,12 +423,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 {loading ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Verifying Code...</span>
+                    <span>Verifying Credentials...</span>
                   </>
                 ) : (
                   <>
                     <Smartphone className="w-4 h-4" />
-                    <span>Connect with Referral Code</span>
+                    <span>Connect to Scanner Terminal</span>
                   </>
                 )}
               </button>
@@ -447,7 +460,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     className="text-[11px] text-slate-400 hover:text-purple-300 transition-colors flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
                   >
                     <Smartphone className="w-3.5 h-3.5" />
-                    <span>Looking for Gate Scanner? Enter Referral Code</span>
+                    <span>Looking for Gate Scanner? Sign in with Scanner Email & Referral Code</span>
                   </button>
                 </div>
               </>

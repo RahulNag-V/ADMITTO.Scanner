@@ -396,7 +396,7 @@ app.post('/api/auth/scanner-referral-login', authLimiter, async (req: Request, r
     if (!cleanEmail || !cleanCode) {
       res.status(422).json({
         error: 'VALIDATION_ERROR',
-        message: 'Both email and event referral code are required for scanner login.',
+        message: 'Both admin-generated email and event referral code are required for scanner login.',
       });
       return;
     }
@@ -413,6 +413,25 @@ app.post('/api/auth/scanner-referral-login', authLimiter, async (req: Request, r
 
     const { referral, event } = lookup;
 
+    // 2. Strict Requirement: Only admin-generated scanner emails for this event can log in
+    const scannerAccount = await dbService.getScannerByEmailOrCodeAndEvent(cleanEmail, event.id);
+    if (!scannerAccount) {
+      res.status(403).json({
+        error: 'UNAUTHORIZED_SCANNER_EMAIL',
+        message: 'Access denied: Only admin-generated scanner emails can log in. Please request your event administrator to create your scanner email in the Scanner Management section.',
+      });
+      return;
+    }
+
+    // 3. Strict Requirement: Account must be active (not deactivated by admin)
+    if (!scannerAccount.is_active) {
+      res.status(403).json({
+        error: 'ACCOUNT_DEACTIVATED',
+        message: 'Access denied: This scanner email account has been deactivated by the event administrator.',
+      });
+      return;
+    }
+
     const maxUses = referral.max_uses ?? 5;
     const timesUsed = referral.times_used ?? 0;
     if (timesUsed >= maxUses) {
@@ -423,28 +442,40 @@ app.post('/api/auth/scanner-referral-login', authLimiter, async (req: Request, r
       return;
     }
 
-    // 2. Identify or provision scanner user identity
-    let profile = await dbService.getProfileByEmail(cleanEmail);
-    const effectiveName = (name && typeof name === 'string' && name.trim()) || profile?.name || cleanEmail.split('@')[0];
-    if (!profile) {
-      profile = await dbService.createScannerProfile(cleanEmail, effectiveName);
-    }
-    const userId = profile.id;
+    const effectiveName = scannerAccount.name;
+    const userId = scannerAccount.id;
 
-    // 3. Create or update access request
+    // 4. Create or update access request
     const request = await dbService.createScannerAccessRequest(
       userId,
-      cleanEmail,
+      scannerAccount.email,
       effectiveName,
       cleanCode
     );
+
+    // Auto-approve the request for admin-generated email
+    if (request.status !== 'APPROVED') {
+      const assignedStation = scannerAccount.name.includes('(')
+        ? scannerAccount.name.split('(')[1].replace(')', '').trim()
+        : 'Gate Scanner';
+      await dbService.approveScannerRequest(
+        request.id,
+        event.id,
+        event.admin_id,
+        scannerAccount.id,
+        assignedStation,
+        0
+      );
+      request.status = 'APPROVED';
+      request.gate_name = assignedStation;
+    }
 
     const incomingDeviceUuid =
       (req.headers['x-device-uuid'] as string) ||
       (req.body?.deviceUuid as string) ||
       (req.body?.device_uuid as string);
 
-    const existingBound = boundScannerDevices.get(request.user_id);
+    const existingBound = boundScannerDevices.get(scannerAccount.id);
     if (existingBound && incomingDeviceUuid && existingBound !== incomingDeviceUuid) {
       res.status(403).json({
         error: 'DEVICE_MISMATCH',
@@ -456,17 +487,17 @@ app.post('/api/auth/scanner-referral-login', authLimiter, async (req: Request, r
 
     const boundDevice = incomingDeviceUuid || existingBound;
     if (boundDevice) {
-      boundScannerDevices.set(request.user_id, boundDevice);
+      boundScannerDevices.set(scannerAccount.id, boundDevice);
     }
 
-    // 4. Generate active authenticated session
+    // 5. Generate active authenticated session
     const token = `scan_tok_${crypto.randomBytes(32).toString('hex')}`;
     const sessionData: SessionData = {
-      userId: request.user_id,
-      email: request.user_email,
-      name: request.user_name,
+      userId: scannerAccount.id,
+      email: scannerAccount.email,
+      name: scannerAccount.name,
       role: 'SCANNER',
-      eventId: request.event_id,
+      eventId: event.id,
       createdAt: Date.now(),
       deviceUuid: boundDevice,
     };
@@ -474,12 +505,12 @@ app.post('/api/auth/scanner-referral-login', authLimiter, async (req: Request, r
 
     const authSession: AuthSession = {
       user: {
-        id: request.user_id,
-        email: request.user_email,
-        name: request.user_name,
+        id: scannerAccount.id,
+        email: scannerAccount.email,
+        name: scannerAccount.name,
         role: 'SCANNER',
-        event_id: request.event_id,
-        event_title: request.event_title || event.title,
+        event_id: event.id,
+        event_title: event.title,
       },
       token,
     };

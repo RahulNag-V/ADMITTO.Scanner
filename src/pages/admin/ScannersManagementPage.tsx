@@ -26,6 +26,7 @@ import {
   History,
   ShieldAlert,
   Mail,
+  AlertCircle,
 } from 'lucide-react';
 import { ScannerAccount, ScannerReferralCode, ScannerAccessRequest } from '../../types';
 import { scannersApi, referralCodesApi, scannerAccessApi } from '../../lib/api';
@@ -76,6 +77,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
     scannerNumber: string;
     station?: string;
   } | null>(null);
+  const [togglingScannerId, setTogglingScannerId] = useState<string | null>(null);
 
   useEffect(() => {
     if (eventId) {
@@ -321,9 +323,42 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
     }
   };
 
+  const normalizeOperatorName = (name: string) => {
+    return name
+      .replace(/\s*\([^)]*\)\s*$/, '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
+  };
+
+  const isNameDuplicate = Boolean(
+    operatorName.trim() &&
+      gateStations.some((s) => {
+        const existingNorm = normalizeOperatorName(s.name);
+        const currentNorm = normalizeOperatorName(operatorName);
+        return existingNorm === currentNorm || s.name.trim().toLowerCase() === operatorName.trim().toLowerCase();
+      })
+  );
+
+  const isEmailDuplicate = Boolean(
+    tempEmail.trim() &&
+      gateStations.some((s) => s.email.trim().toLowerCase() === tempEmail.trim().toLowerCase())
+  );
+
   const handleCreateStation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!operatorName.trim()) return;
+
+    if (isNameDuplicate) {
+      alert(`Duplicate operator name: An operator with the name "${operatorName.trim()}" already exists. Names cannot be identical; at least one letter must be different.`);
+      return;
+    }
+
+    if (isEmailDuplicate) {
+      alert(`Duplicate email: An account with email "${tempEmail.trim()}" already exists. Please choose a different email.`);
+      return;
+    }
+
     setIsCreatingStation(true);
 
     try {
@@ -374,6 +409,21 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
       setGateStations((prev) => prev.filter((s) => s.id !== id));
     } catch (err: any) {
       alert(err.message || 'Failed to delete scanner account');
+    }
+  };
+
+  const handleToggleScannerActive = async (station: ScannerAccount) => {
+    try {
+      setTogglingScannerId(station.id);
+      const newStatus = !station.is_active;
+      const res = await scannersApi.update(eventId, station.id, { is_active: newStatus });
+      if (res.scanner) {
+        setGateStations((prev) => prev.map((s) => (s.id === station.id ? res.scanner : s)));
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to update scanner status');
+    } finally {
+      setTogglingScannerId(null);
     }
   };
 
@@ -465,9 +515,8 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         <button
           onClick={() => {
             setActiveSubTab('stations');
-            handleOpenCreateModal();
           }}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
             activeSubTab === 'stations'
               ? 'bg-orange-500/10 text-orange-400 border border-orange-500/30'
               : 'text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent'
@@ -843,15 +892,17 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
           {gateStations.length === 0 ? (
             <div className="p-8 rounded-2xl bg-zinc-950/60 border border-zinc-800 text-center space-y-3">
               <Mail className="w-8 h-8 text-zinc-600 mx-auto" />
-              <h3 className="text-sm font-bold text-white">No Scanner Accounts Created</h3>
+              <h3 className="text-sm font-bold text-white">No Scanner Emails Created Yet</h3>
               <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                Create temporary email accounts and auto-generated scanner IDs to grant gate operators access.
+                Not a single scanner email has been created yet. Click below to create your first operator email account and scanner number.
               </p>
               <button
+                type="button"
                 onClick={handleOpenCreateModal}
-                className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white shadow-lg shadow-orange-500/20"
+                className="px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white shadow-lg shadow-orange-500/20 inline-flex items-center gap-1.5 transition cursor-pointer"
               >
-                Create Email
+                <Plus className="w-4 h-4" />
+                <span>Create Email</span>
               </button>
             </div>
           ) : (
@@ -875,14 +926,34 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 text-[10px] font-mono">
                         <KeyRound className="w-2.5 h-2.5 text-zinc-400" />
                         Pass: {station.access_code}
                       </span>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">
-                        Active
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleScannerActive(station)}
+                        disabled={togglingScannerId === station.id}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition cursor-pointer border ${
+                          station.is_active
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                            : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
+                        } disabled:opacity-50`}
+                        title={station.is_active ? 'Click to Deactivate' : 'Click to Activate'}
+                      >
+                        {station.is_active ? (
+                          <>
+                            <ToggleRight className="w-4 h-4 text-emerald-400" />
+                            <span>Active</span>
+                          </>
+                        ) : (
+                          <>
+                            <ToggleLeft className="w-4 h-4 text-rose-400" />
+                            <span>Deactive</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
 
@@ -1183,9 +1254,19 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
                           updateGeneratedFields(val);
                         }}
                         placeholder="e.g. Rahul Nag or Gate Operator 1"
-                        className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-orange-500"
+                        className={`w-full px-3.5 py-2.5 bg-zinc-900 border rounded-xl text-xs text-white focus:outline-none transition-colors ${
+                          isNameDuplicate
+                            ? 'border-rose-500/80 focus:border-rose-500'
+                            : 'border-zinc-800 focus:border-orange-500'
+                        }`}
                         autoFocus
                       />
+                      {isNameDuplicate && (
+                        <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px] flex items-start gap-2 animate-in fade-in duration-150">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-400" />
+                          <span>Duplicate name: An operator with this name already exists. At least one letter must be different.</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* 2. Temporary Email */}
@@ -1217,8 +1298,18 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
                           setIsEmailManuallyEdited(true);
                         }}
                         placeholder="e.g. rahul.nag.scnrn01@scanner.local"
-                        className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-orange-500"
+                        className={`w-full px-3.5 py-2.5 bg-zinc-900 border rounded-xl text-xs font-mono text-white focus:outline-none transition-colors ${
+                          isEmailDuplicate
+                            ? 'border-rose-500/80 focus:border-rose-500'
+                            : 'border-zinc-800 focus:border-orange-500'
+                        }`}
                       />
+                      {isEmailDuplicate && (
+                        <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px] flex items-start gap-2 animate-in fade-in duration-150">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-400" />
+                          <span>Duplicate email: A scanner account with this email already exists. Please choose a different email.</span>
+                        </div>
+                      )}
                       <p className="text-[10px] text-zinc-500 font-mono">
                         Temporary login address for this operator.
                       </p>
@@ -1286,8 +1377,8 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
                       </button>
                       <button
                         type="submit"
-                        disabled={isCreatingStation || !operatorName.trim()}
-                        className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white shadow-lg shadow-orange-500/20 transition disabled:opacity-50 cursor-pointer"
+                        disabled={isCreatingStation || isNameDuplicate || isEmailDuplicate || !operatorName.trim()}
+                        className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white shadow-lg shadow-orange-500/20 transition disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                       >
                         {isCreatingStation ? 'Creating...' : 'Create Email'}
                       </button>
