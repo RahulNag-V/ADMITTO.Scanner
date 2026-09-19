@@ -10,19 +10,19 @@ export default defineConfig(({ command, mode }) => {
   const isProduction = mode === 'production' || process.env.NODE_ENV === 'production';
   const base = process.env.VITE_BASE || (command === 'build' || isProduction ? '/ADMITTO.Scanner/' : '/');
 
-  const sbUrl = process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL || '';
-  const sbKey = process.env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || '';
-  const apiUrl = process.env.VITE_API_URL || env.VITE_API_URL || '';
+  const sbUrl = (process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL || '').trim();
+  const sbKey = (process.env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || '').trim();
+  const apiUrl = (process.env.VITE_API_URL || env.VITE_API_URL || process.env.API_URL || env.API_URL || '').trim();
 
   if (command === 'build') {
-    const hasUrl = Boolean(sbUrl && sbUrl.trim() && !sbUrl.includes('your-project-id'));
-    const hasKey = Boolean(sbKey && sbKey.trim() && !sbKey.includes('your-anon-key'));
-    const hasApi = Boolean(apiUrl && apiUrl.trim() && !apiUrl.includes('localhost'));
+    const hasUrl = Boolean(sbUrl && !sbUrl.includes('your-project-id'));
+    const hasKey = Boolean(sbKey && !sbKey.includes('your-anon-key'));
+    const hasApi = Boolean(apiUrl && !apiUrl.includes('localhost'));
 
-    console.log('[ADMITTO Build] Verifying Supabase client configuration:');
+    console.log('[ADMITTO Build] Verifying client configuration:');
     console.log(`  - VITE_SUPABASE_URL: ${hasUrl ? 'CONFIGURED' : 'NOT CONFIGURED'}`);
     console.log(`  - VITE_SUPABASE_ANON_KEY: ${hasKey ? 'CONFIGURED' : 'NOT CONFIGURED'}`);
-    console.log(`  - VITE_API_URL: ${hasApi ? 'CONFIGURED' : 'NOT CONFIGURED (Static Frontend Mode)'}`);
+    console.log(`  - VITE_API_URL: ${hasApi ? apiUrl : 'NOT CONFIGURED (Static Frontend Mode)'}`);
   }
 
   return {

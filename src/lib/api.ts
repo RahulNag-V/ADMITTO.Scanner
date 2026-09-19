@@ -43,8 +43,15 @@ export function removeSession(): void {
 
 export function getApiBaseUrl(): string {
   let url = '';
-  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
-    url = (import.meta.env.VITE_API_URL as string).trim();
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) {
+      url = String(import.meta.env.VITE_API_URL).trim();
+    }
+  } catch {
+    // Non-standard environment
+  }
+  if (!url && typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) {
+    url = String(process.env.VITE_API_URL).trim();
   }
   return url.replace(/\/+$/, '');
 }
