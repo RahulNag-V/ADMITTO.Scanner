@@ -87,6 +87,9 @@ export interface Profile {
   id: string;
   email: string;
   name: string;
+  phone?: string;
+  organization?: string;
+  bio?: string;
   role: 'ADMIN' | 'SCANNER';
   auth_id?: string | null;
   password_hash?: string | null;
@@ -307,6 +310,9 @@ export interface AuthSession {
     email: string;
     name: string;
     role: UserRole;
+    phone?: string;
+    organization?: string;
+    bio?: string;
     event_id?: string; // If scanner
     event_title?: string;
   };

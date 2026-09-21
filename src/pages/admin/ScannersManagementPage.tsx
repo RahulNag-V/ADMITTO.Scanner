@@ -32,6 +32,7 @@ import { ScannerAccount, ScannerReferralCode, ScannerAccessRequest } from '../..
 import { scannersApi, referralCodesApi, scannerAccessApi } from '../../lib/api';
 import { SkeletonScannerCard, TabSkeletonView } from '../../components/common/Skeleton';
 import { getSupabaseClient } from '../../lib/supabase/client';
+import { generateFunTempEmail } from '../../lib/tempEmailGenerator';
 
 interface ScannersManagementPageProps {
   eventId: string;
@@ -294,7 +295,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
     setIsEmailManuallyEdited(false);
     const initialNum = `SCN-OP-${seq}`;
     setScannerNumber(initialNum);
-    setTempEmail(`scanner.${initialNum.toLowerCase().replace(/[^a-z0-9]/g, '')}@scanner.local`);
+    setTempEmail(`scanner.${initialNum.toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`);
     setIsAddStationOpen(true);
   };
 
@@ -319,7 +320,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         ? clean.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '')
         : 'scanner';
       const codeSuffix = generatedNum.toLowerCase().replace(/[^a-z0-9]/g, '');
-      setTempEmail(`${slug}.${codeSuffix}@scanner.local`);
+      setTempEmail(`${slug}.${codeSuffix}@gmail.com`);
     }
   };
 
@@ -373,7 +374,10 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         tag = parts[0].substring(0, Math.min(3, parts[0].length)).toUpperCase();
       }
       const finalScannerNumber = (scannerNumber.trim() || `SCN-${tag}-${seq}`).toUpperCase();
-      const finalEmail = (tempEmail.trim() || `${finalScannerNumber.toLowerCase()}@scanner.local`).toLowerCase();
+      const finalEmail = (
+        tempEmail.trim() ||
+        `${finalScannerNumber.toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`
+      ).toLowerCase();
       const finalStation = stationName.trim();
       const displayName = finalStation ? `${cleanName} (${finalStation})` : cleanName;
 
@@ -1275,18 +1279,32 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
                         <label htmlFor="temp-email-input" className="text-xs font-mono font-bold text-zinc-300">
                           2. TEMPORARY EMAIL
                         </label>
-                        {isEmailManuallyEdited && (
+                        <div className="flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() => {
-                              setIsEmailManuallyEdited(false);
-                              updateGeneratedFields(operatorName);
+                              const fun = generateFunTempEmail(operatorName, tempEmail);
+                              setTempEmail(fun);
+                              setIsEmailManuallyEdited(true);
                             }}
-                            className="text-[10px] font-mono text-orange-400 hover:underline cursor-pointer"
+                            className="text-[10px] font-mono text-orange-400 hover:text-orange-300 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 px-2 py-0.5 rounded transition cursor-pointer"
+                            title="Generate a fun or random email based on name"
                           >
-                            Reset to Auto
+                            🎲 Fun Email
                           </button>
-                        )}
+                          {isEmailManuallyEdited && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsEmailManuallyEdited(false);
+                                updateGeneratedFields(operatorName);
+                              }}
+                              className="text-[10px] font-mono text-zinc-400 hover:underline cursor-pointer"
+                            >
+                              Reset
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <input
                         id="temp-email-input"
@@ -1297,7 +1315,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
                           setTempEmail(e.target.value);
                           setIsEmailManuallyEdited(true);
                         }}
-                        placeholder="e.g. rahul.nag.scnrn01@scanner.local"
+                        placeholder="e.g. rahul.nag.scnrn01@gmail.com"
                         className={`w-full px-3.5 py-2.5 bg-zinc-900 border rounded-xl text-xs font-mono text-white focus:outline-none transition-colors ${
                           isEmailDuplicate
                             ? 'border-rose-500/80 focus:border-rose-500'

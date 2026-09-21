@@ -638,7 +638,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       className="w-full py-2.5 rounded-xl text-xs font-semibold text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <User className="w-4 h-4" />
-                      <span>My Profile & Security</span>
+                      <span>My Profile</span>
                     </button>
 
                     {onLogout && (

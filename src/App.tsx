@@ -538,16 +538,10 @@ export default function App() {
     );
   }
 
-  // ─── ROUTE: /verify-email ──────────────────────────────────────────
+  // ─── ROUTE: /verify-email (Bypassed: no verification required) ──
   if (currentPath === '/verify-email') {
-    return (
-      <VerifyEmailPage
-        email={pendingVerificationEmail}
-        onNavigateLogin={() => navigate('/login')}
-        onNavigateHome={() => navigate('/')}
-        onChangeEmail={() => navigate('/signup')}
-      />
-    );
+    navigate('/login');
+    return null;
   }
 
   // ─── ROUTE: /forgot-password ───────────────────────────────────────
@@ -577,10 +571,6 @@ export default function App() {
       <SignupPage
         returnTo={returnTo}
         onSignupSuccess={handleLoginSuccess}
-        onNeedsEmailVerification={(email) => {
-          setPendingVerificationEmail(email);
-          navigate('/verify-email');
-        }}
         onNavigateLogin={() => navigate('/login')}
         onNavigateHome={() => navigate('/')}
       />

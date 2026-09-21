@@ -96,22 +96,61 @@ export async function signInWithEmail(email: string, password: string): Promise<
  * Sign up with Email and Password via Supabase Auth.
  */
 export async function signUpWithEmail(
-  fullName: string,
-  email: string,
-  password: string
+  param1: string,
+  param2: string,
+  param3: string,
+  param4?: string
 ): Promise<AuthResult & { needsEmailVerification: boolean }> {
   const supabase = getSupabaseClient();
   if (!supabase) {
     throw new Error('Supabase is not configured. Please check your environment variables.');
   }
 
+  // Detect which parameter is email (supports both (name, email, password) and (email, password, name))
+  let email = '';
+  let password = '';
+  let fullName = '';
+  let phone = (param4 || '').trim();
+
+  if (param1.includes('@')) {
+    email = param1.trim().toLowerCase();
+    password = param2;
+    fullName = (param3 || '').trim();
+  } else if (param2.includes('@')) {
+    fullName = (param1 || '').trim();
+    email = param2.trim().toLowerCase();
+    password = param3;
+  } else {
+    fullName = (param1 || '').trim();
+    email = (param2 || '').trim().toLowerCase();
+    password = param3;
+  }
+
+  // Pre-check duplicate in profiles table to prevent duplicates in Supabase
+  try {
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (existingProfile) {
+      throw new Error('An account with this email already exists. Try signing in or generate another temporary email.');
+    }
+  } catch (checkErr: any) {
+    if (checkErr.message?.includes('already exists')) {
+      throw checkErr;
+    }
+  }
+
   const { data, error } = await supabase.auth.signUp({
-    email: email.trim().toLowerCase(),
+    email,
     password,
     options: {
       data: {
-        full_name: fullName.trim(),
-        name: fullName.trim(),
+        full_name: fullName,
+        name: fullName,
+        phone: phone || undefined,
       },
       emailRedirectTo: getAuthCallbackUrl(),
     },
@@ -119,6 +158,11 @@ export async function signUpWithEmail(
 
   if (error) {
     throw new Error(mapAuthError(error));
+  }
+
+  // Check if Supabase returned an empty identity (indicates user already exists when email confirmation is enabled)
+  if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    throw new Error('An account with this email already exists. Try signing in or generate another temporary email.');
   }
 
   // If email confirmation is enabled in Supabase project:

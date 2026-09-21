@@ -122,15 +122,22 @@ class DatabaseService {
     return this.inMemoryDB.profiles.find((p) => p.id === id) || null;
   }
 
-  async createAdminProfile(email: string, name: string, passwordPlain: string): Promise<Profile> {
+  async createAdminProfile(
+    email: string,
+    name: string,
+    passwordPlain: string,
+    phone?: string
+  ): Promise<Profile> {
     const cleanEmail = email.toLowerCase().trim();
     const cleanName = name.trim();
+    const cleanPhone = phone?.trim();
     const id = generateId();
     const passwordHash = await bcrypt.hash(passwordPlain, 10);
     const newProfile: Profile = {
       id,
       email: cleanEmail,
       name: cleanName,
+      phone: cleanPhone,
       role: 'ADMIN',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -138,7 +145,19 @@ class DatabaseService {
 
     const supabase = this.getClient();
     if (supabase) {
-      const { error } = await supabase.from('profiles').insert(newProfile);
+      const insertPayload: Record<string, any> = {
+        id,
+        email: cleanEmail,
+        name: cleanName,
+        role: 'ADMIN',
+        created_at: newProfile.created_at,
+        updated_at: newProfile.updated_at,
+      };
+      if (cleanPhone) {
+        insertPayload.phone = cleanPhone;
+      }
+
+      const { error } = await supabase.from('profiles').insert(insertPayload);
       if (error) {
         if (error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('unique')) {
           const existing = await this.getProfileByEmail(cleanEmail);
@@ -147,8 +166,25 @@ class DatabaseService {
             return existing;
           }
         }
-        console.error('[Supabase DB] Error creating admin profile:', error);
-        throw new Error(`Failed to create account in database: ${error.message}`);
+        // If the Supabase profiles table does not have a phone column yet, retry without it
+        if (error.message?.includes('phone') || (error as any).code === '42703') {
+          delete insertPayload.phone;
+          const { error: retryError } = await supabase.from('profiles').insert(insertPayload);
+          if (retryError) {
+            if (retryError.code === '23505' || retryError.message?.includes('duplicate key') || retryError.message?.includes('unique')) {
+              const existing = await this.getProfileByEmail(cleanEmail);
+              if (existing) {
+                this.inMemoryDB.passwords[cleanEmail] = passwordHash;
+                return existing;
+              }
+            }
+            console.error('[Supabase DB] Error creating admin profile:', retryError);
+            throw new Error(`Failed to create account in database: ${retryError.message}`);
+          }
+        } else {
+          console.error('[Supabase DB] Error creating admin profile:', error);
+          throw new Error(`Failed to create account in database: ${error.message}`);
+        }
       }
     }
 
@@ -738,10 +774,28 @@ class DatabaseService {
 
     const supabase = this.getClient();
     if (supabase) {
-      const { error } = await supabase.from('events').update(updatedData).eq('id', eventId).eq('admin_id', adminId);
+      const { error } = await supabase.from('events').update(updatedData).eq('id', eventId);
       if (error) {
-        console.error('[Supabase DB] Error updating event:', error);
-        throw new Error(`Failed to update event in database: ${error.message}`);
+        console.warn('[Supabase DB] Error in full event update, attempting core payload update:', error.message);
+        // Fallback: update only standard verified columns
+        const corePayload: Record<string, any> = {
+          updated_at: updatedData.updated_at,
+        };
+        if (updatedData.title !== undefined) corePayload.title = updatedData.title;
+        if (updatedData.description !== undefined) corePayload.description = updatedData.description;
+        if (updatedData.venue !== undefined) corePayload.venue = updatedData.venue;
+        if (updatedData.event_date !== undefined) corePayload.event_date = updatedData.event_date;
+        if (updatedData.admin_name !== undefined) corePayload.admin_name = updatedData.admin_name;
+        if (updatedData.admin_phone !== undefined) corePayload.admin_phone = updatedData.admin_phone;
+        if (updatedData.admin_email !== undefined) corePayload.admin_email = updatedData.admin_email;
+        if (updatedData.banner_url !== undefined) corePayload.banner_url = updatedData.banner_url;
+        if (updatedData.status !== undefined) corePayload.status = updatedData.status;
+
+        const { error: retryError } = await supabase.from('events').update(corePayload).eq('id', eventId);
+        if (retryError) {
+          console.error('[Supabase DB] Error in fallback core event update:', retryError);
+          throw new Error(`Failed to update event in database: ${retryError.message}`);
+        }
       }
     }
 
@@ -2355,7 +2409,10 @@ class DatabaseService {
     if (!event) throw new Error('Unauthorized');
 
     const cleanCode = (data.access_code || `GATE-${Math.random().toString(36).substring(2, 7).toUpperCase()}`).trim().toUpperCase();
-    const cleanEmail = (data.email?.trim() || `${cleanCode.toLowerCase()}@scanner.local`).toLowerCase();
+    const cleanEmail = (
+      data.email?.trim() ||
+      `${cleanCode.toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`
+    ).toLowerCase();
     const cleanName = (data.name || 'Gate Scanner').trim();
     const normalizedNewName = cleanName.replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase().replace(/\s+/g, ' ');
     const cleanPassword = data.password?.trim() || cleanCode;

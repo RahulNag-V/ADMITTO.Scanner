@@ -288,6 +288,28 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
           handleSafeLogout();
           return;
         }
+        // If offline or network error, fallback to offline cached event bundle
+        try {
+          const cached = await eventBundleService.getCachedEvent(eventId);
+          if (cached) {
+            setEvent((prev) => prev || ({
+              id: cached.id,
+              admin_id: '',
+              title: cached.title,
+              venue: cached.venue,
+              event_date: cached.event_date,
+              admin_name: cached.admin_name || 'Event Organizer',
+              admin_phone: cached.admin_phone,
+              admin_email: cached.admin_email || '',
+              banner_url: cached.banner_url,
+              status: 'ACTIVE',
+              created_at: cached.downloaded_at,
+              updated_at: cached.downloaded_at,
+            } as EventItem));
+          }
+        } catch (cErr) {
+          console.warn('[ScannerPage] Could not load offline cached event:', cErr);
+        }
       }
 
       if (studentsRes.status === 'fulfilled' && studentsRes.value) {
@@ -353,6 +375,11 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
 
   useEffect(() => {
     loadTerminalData();
+    const handleEventsChanged = () => {
+      loadTerminalData();
+    };
+    window.addEventListener('admitto:events-changed', handleEventsChanged);
+    return () => window.removeEventListener('admitto:events-changed', handleEventsChanged);
   }, [eventId]);
 
   // Periodic event liveness check: If admin deletes event, safely terminate

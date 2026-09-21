@@ -25,7 +25,7 @@ interface LoginPageProps {
   onLoginSuccess: (session: AuthSession, overrideReturnTo?: string) => void;
   onNavigateHome: () => void;
   onNavigateSignUp: () => void;
-  onNavigateForgotPassword: () => void;
+  onNavigateForgotPassword?: () => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({
@@ -304,14 +304,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-slate-300 block">Password</label>
-                  <button
-                    type="button"
-                    id="login-forgot-password-link"
-                    onClick={onNavigateForgotPassword}
-                    className="text-[11px] sm:text-xs text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
-                  >
-                    Forgot password?
-                  </button>
+                  {onNavigateForgotPassword && (
+                    <button
+                      type="button"
+                      id="login-forgot-password-link"
+                      onClick={onNavigateForgotPassword}
+                      className="text-[11px] sm:text-xs text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
                 </div>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -338,7 +340,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <button
                 id="login-submit-btn"
                 type="submit"
-                disabled={loading}
+                disabled={loading || googleLoading}
                 className="w-full py-3 sm:py-3.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-[0.98] shadow-lg shadow-indigo-500/25 border border-indigo-400/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
                 {loading ? (
@@ -365,7 +367,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 id="google-login-btn"
                 type="button"
                 onClick={handleGoogleSignIn}
-                disabled={googleLoading}
+                disabled={googleLoading || loading}
                 className="w-full py-3 rounded-xl text-xs sm:text-sm font-semibold text-white bg-white/[0.05] hover:bg-white/[0.1] active:scale-[0.98] border border-white/10 transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-60"
               >
                 {googleLoading ? (

@@ -9,6 +9,10 @@ export interface CachedEvent {
   secondary_scan_field?: string;
   qr_mode?: string;
   barcode_field?: string;
+  banner_url?: string;
+  admin_name?: string;
+  admin_phone?: string;
+  admin_email?: string;
   downloaded_at: string;
   expires_at: string;
   version: string;

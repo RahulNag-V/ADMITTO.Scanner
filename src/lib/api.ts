@@ -167,10 +167,10 @@ export const authApi = {
     );
   },
 
-  register: async (name: string, email: string, password: string) => {
+  register: async (name: string, email: string, password: string, phone: string) => {
     return apiFetch<{ success: boolean; session: AuthSession }>('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, phone }),
     });
   },
 

@@ -36,9 +36,11 @@ export const ScannerHomeTab: React.FC<ScannerHomeTabProps> = ({
   scannerName,
   onNavigateToRoster,
 }) => {
-  const adminName = event?.admin_name || 'Event Organizer';
-  const adminPhone = event?.admin_phone || '';
-  const adminEmail = event?.admin_email || '';
+  const rawAdminName = event?.admin_name?.trim() || '';
+  const adminName = rawAdminName || 'Event Organizer';
+  const adminPhone = event?.admin_phone?.trim() || '';
+  const adminEmail = event?.admin_email?.trim() || '';
+  const hasConfiguredOrganizer = Boolean(rawAdminName || adminPhone || adminEmail);
 
   // Format WhatsApp Link
   const cleanPhoneForWhatsApp = adminPhone.replace(/[^0-9]/g, '');
@@ -280,19 +282,33 @@ export const ScannerHomeTab: React.FC<ScannerHomeTabProps> = ({
           </span>
         </div>
 
-        {adminName ? (
+        {hasConfiguredOrganizer ? (
           <div className="p-5 sm:p-6 space-y-4">
             {/* Organizer Identity Row */}
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-700 flex items-center justify-center text-white font-black text-xl shadow-xl shadow-indigo-600/30 shrink-0">
                 {adminName.substring(0, 2).toUpperCase()}
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-base font-black text-white font-['Space_Grotesk'] truncate">{adminName}</div>
                 <div className="text-[11px] text-indigo-300 font-semibold mt-0.5">Event Organizer</div>
-                {!adminPhone && !adminEmail && (
-                  <div className="text-[11px] text-zinc-500 italic mt-1">No contact details provided</div>
-                )}
+                <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                  {adminPhone && (
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-300 font-mono font-medium">
+                      <Phone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>{adminPhone}</span>
+                    </div>
+                  )}
+                  {adminEmail && (
+                    <div className="flex items-center gap-1.5 text-xs text-orange-300 font-mono font-medium">
+                      <Mail className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                      <span className="truncate max-w-[200px]">{adminEmail}</span>
+                    </div>
+                  )}
+                  {!adminPhone && !adminEmail && (
+                    <div className="text-[11px] text-zinc-500 italic">No phone or email configured</div>
+                  )}
+                </div>
               </div>
             </div>
 

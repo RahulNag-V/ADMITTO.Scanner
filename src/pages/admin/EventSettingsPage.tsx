@@ -39,7 +39,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { EventItem, QrMode, EventScanConfig, AttendeeType } from '../../types';
-import { eventsApi } from '../../lib/api';
+import { eventsApi, getStoredSession } from '../../lib/api';
 import { ATTENDEE_TYPE_PRESETS, getPresetByType } from '../../lib/attendeeTypes';
 import { TabSkeletonView } from '../../components/common/Skeleton';
 
@@ -137,6 +137,8 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
   const [isOrgEditOpen, setIsOrgEditOpen] = useState(false);
   const [showOrgDeleteConfirm, setShowOrgDeleteConfirm] = useState(false);
   const [orgRequiredError, setOrgRequiredError] = useState(false);
+  const [isSavingOrg, setIsSavingOrg] = useState(false);
+  const [orgSavedSuccess, setOrgSavedSuccess] = useState(false);
 
   // Scan Key & QR Configuration States
   const [primaryScanField, setPrimaryScanField] = useState('usn');
@@ -316,30 +318,78 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
 
   const handleOpenOrgEdit = () => {
     setDraftOrgName(adminName);
-    setDraftOrgPhone(adminPhone);
-    setDraftOrgEmail(adminContactEmail);
+    // Auto-prefill phone and email if empty from user session
+    const session = getStoredSession();
+    setDraftOrgPhone(adminPhone || session?.user?.phone || '');
+    setDraftOrgEmail(adminContactEmail || session?.user?.email || '');
     setIsOrgEditOpen(true);
     setOrgRequiredError(false);
   };
 
-  const handleSaveOrganizer = () => {
+  const handleSaveOrganizer = async () => {
     if (!draftOrgName.trim()) {
       setOrgRequiredError(true);
       return;
     }
-    setAdminName(draftOrgName.trim());
-    setAdminPhone(draftOrgPhone.trim());
-    setAdminContactEmail(draftOrgEmail.trim());
+    const newName = draftOrgName.trim();
+    const newPhone = draftOrgPhone.trim();
+    const newEmail = draftOrgEmail.trim();
+
+    setAdminName(newName);
+    setAdminPhone(newPhone);
+    setAdminContactEmail(newEmail);
     setIsOrgEditOpen(false);
     setOrgRequiredError(false);
+
+    // Persist directly to DB
+    setIsSavingOrg(true);
+    try {
+      const res = await eventsApi.update(eventId, {
+        admin_name: newName,
+        admin_phone: newPhone,
+        admin_email: newEmail,
+      });
+      if (res.event) {
+        setEvent(res.event);
+        setEvents((prev) => prev.map((ev) => (ev.id === res.event.id ? res.event : ev)));
+        window.dispatchEvent(new CustomEvent('admitto:events-changed'));
+        setOrgSavedSuccess(true);
+        setTimeout(() => setOrgSavedSuccess(false), 3500);
+      }
+    } catch (err: any) {
+      console.error('Failed to update event organizer in DB:', err);
+      alert(err.message || 'Failed to update event organizer in database');
+    } finally {
+      setIsSavingOrg(false);
+    }
   };
 
-  const handleDeleteOrganizer = () => {
+  const handleDeleteOrganizer = async () => {
     setAdminName('');
     setAdminPhone('');
     setAdminContactEmail('');
     setShowOrgDeleteConfirm(false);
     setIsOrgEditOpen(false);
+
+    // Persist empty organizer to DB
+    setIsSavingOrg(true);
+    try {
+      const res = await eventsApi.update(eventId, {
+        admin_name: '',
+        admin_phone: '',
+        admin_email: '',
+      });
+      if (res.event) {
+        setEvent(res.event);
+        setEvents((prev) => prev.map((ev) => (ev.id === res.event.id ? res.event : ev)));
+        window.dispatchEvent(new CustomEvent('admitto:events-changed'));
+      }
+    } catch (err: any) {
+      console.error('Failed to remove event organizer in DB:', err);
+      alert(err.message || 'Failed to remove event organizer');
+    } finally {
+      setIsSavingOrg(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -362,9 +412,9 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
         venue,
         event_date: eventDate ? new Date(eventDate).toISOString() : undefined,
         banner_url: bannerUrl,
-        admin_name: adminName.trim() || undefined,
-        admin_phone: adminPhone.trim() || undefined,
-        admin_email: adminContactEmail.trim() || undefined,
+        admin_name: adminName.trim(),
+        admin_phone: adminPhone.trim(),
+        admin_email: adminContactEmail.trim(),
         attendee_type: attendeeType,
         attendee_label_singular: attendeeSingular.trim() || 'Attendee',
         attendee_label_plural: attendeePlural.trim() || 'Attendees',
@@ -383,6 +433,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
       if (updatedEv) {
         setEvent(updatedEv);
         setEvents((prev) => prev.map((ev) => (ev.id === updatedEv.id ? updatedEv : ev)));
+        window.dispatchEvent(new CustomEvent('admitto:events-changed'));
         setSuccessMsg('Event details & scan configuration saved successfully.');
         setTimeout(() => setSuccessMsg(null), 3500);
       }
@@ -985,6 +1036,14 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
             </div>
           )}
 
+          {/* Real-time saved success banner */}
+          {orgSavedSuccess && (
+            <div className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold animate-in fade-in slide-in-from-top-1 duration-200">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+              <span>Event organizer details saved to database & synchronized to scanners.</span>
+            </div>
+          )}
+
           {/* ── DISPLAY MODE: Organizer card exists ── */}
           {hasOrganizer && !isOrgEditOpen && (
             <div className="animate-in fade-in slide-in-from-top-1 duration-200 space-y-3">
@@ -1016,7 +1075,8 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                   <button
                     type="button"
                     onClick={handleOpenOrgEdit}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/35 border border-indigo-500/30 text-indigo-300 hover:text-white text-xs font-bold transition-all cursor-pointer"
+                    disabled={isSavingOrg}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/35 border border-indigo-500/30 text-indigo-300 hover:text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                     <span>Edit</span>
@@ -1025,7 +1085,8 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                     <button
                       type="button"
                       onClick={() => setShowOrgDeleteConfirm(true)}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/25 text-rose-400 hover:text-rose-300 text-xs font-bold transition-all cursor-pointer"
+                      disabled={isSavingOrg}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/25 text-rose-400 hover:text-rose-300 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Delete</span>
@@ -1036,13 +1097,16 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                       <button
                         type="button"
                         onClick={handleDeleteOrganizer}
-                        className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold cursor-pointer transition-colors"
+                        disabled={isSavingOrg}
+                        className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold cursor-pointer transition-colors flex items-center gap-1 disabled:opacity-50"
                       >
-                        Yes, Delete
+                        {isSavingOrg && <RefreshCw className="w-3 h-3 animate-spin" />}
+                        <span>Yes, Delete</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowOrgDeleteConfirm(false)}
+                        disabled={isSavingOrg}
                         className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-slate-300 text-[11px] font-bold cursor-pointer transition-colors"
                       >
                         Cancel
@@ -1155,17 +1219,25 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                   <button
                     type="button"
                     onClick={() => { setIsOrgEditOpen(false); setOrgRequiredError(false); }}
-                    className="px-4 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] border border-white/15 text-zinc-300 text-xs font-bold cursor-pointer transition-colors"
+                    disabled={isSavingOrg}
+                    className="px-4 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] border border-white/15 text-zinc-300 text-xs font-bold cursor-pointer transition-colors disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     onClick={handleSaveOrganizer}
-                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 border border-indigo-400/30 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                    disabled={isSavingOrg}
+                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 border border-indigo-400/30 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>{hasOrganizer ? 'Update Organizer' : 'Save Organizer'}</span>
+                    {isSavingOrg ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    )}
+                    <span>
+                      {isSavingOrg ? 'Saving to DB...' : hasOrganizer ? 'Update Organizer' : 'Save Organizer'}
+                    </span>
                   </button>
                 </div>
               </div>

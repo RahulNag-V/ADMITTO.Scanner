@@ -546,10 +546,30 @@ app.post('/api/auth/scanner-referral-login', authLimiter, async (req: Request, r
 // Admin Registration (First Admin / New Admin)
 app.post('/api/auth/register', authLimiter, async (req: Request, res: Response) => {
   try {
-    const { email, name, password } = req.body;
+    const { email, name, password, phone } = req.body;
 
-    if (!email || !name || !password) {
-      res.status(422).json({ error: 'VALIDATION_ERROR', message: 'Name, email, and password are required.' });
+    if (!email || !name || !password || !phone) {
+      res.status(422).json({
+        error: 'VALIDATION_ERROR',
+        message: 'Name, email, phone number, and password are required.',
+      });
+      return;
+    }
+
+    const cleanPhone = String(phone).trim();
+    if (!cleanPhone) {
+      res.status(422).json({
+        error: 'VALIDATION_ERROR',
+        message: 'Phone number is required.',
+      });
+      return;
+    }
+
+    if (cleanPhone.replace(/\D/g, '').length < 7) {
+      res.status(422).json({
+        error: 'VALIDATION_ERROR',
+        message: 'Please enter a valid phone number (at least 7 digits).',
+      });
       return;
     }
 
@@ -564,7 +584,22 @@ app.post('/api/auth/register', authLimiter, async (req: Request, res: Response) 
       return;
     }
 
-    const newProfile = await dbService.createAdminProfile(email, name, password);
+    const newProfile = await dbService.createAdminProfile(email, name, password, cleanPhone);
+
+    // If Supabase admin is available, auto-create user with email_confirm: true so no verification email is required
+    const supabaseAdmin = getServerSupabaseAdmin() || getServerSupabase();
+    if (supabaseAdmin) {
+      try {
+        await supabaseAdmin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { full_name: name, name, phone: cleanPhone },
+        });
+      } catch {
+        // Continue cleanly if already exists or Supabase admin auth is unavailable
+      }
+    }
 
     const token = `adm_tok_${crypto.randomBytes(32).toString('hex')}`;
     const sessionData: SessionData = {
@@ -583,6 +618,7 @@ app.post('/api/auth/register', authLimiter, async (req: Request, res: Response) 
         email: newProfile.email,
         name: newProfile.name,
         role: 'ADMIN',
+        phone: newProfile.phone || cleanPhone,
       },
       token,
     };
@@ -1187,6 +1223,10 @@ app.get('/api/events/:id/offline-bundle', requireScannerOrAdmin, async (req: Req
         title: event.title,
         venue: event.venue,
         event_date: event.event_date,
+        banner_url: event.banner_url || '',
+        admin_name: event.admin_name || 'Event Organizer',
+        admin_phone: event.admin_phone || '',
+        admin_email: event.admin_email || '',
         primary_scan_field: event.primary_scan_field || 'usn',
         secondary_scan_field: event.secondary_scan_field,
         qr_mode: event.qr_mode,
