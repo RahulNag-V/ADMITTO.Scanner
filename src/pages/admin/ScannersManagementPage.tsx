@@ -32,7 +32,6 @@ import { ScannerAccount, ScannerReferralCode, ScannerAccessRequest } from '../..
 import { scannersApi, referralCodesApi, scannerAccessApi } from '../../lib/api';
 import { SkeletonScannerCard, TabSkeletonView } from '../../components/common/Skeleton';
 import { getSupabaseClient } from '../../lib/supabase/client';
-import { generateFunTempEmail } from '../../lib/tempEmailGenerator';
 
 interface ScannersManagementPageProps {
   eventId: string;
@@ -1283,14 +1282,16 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
                           <button
                             type="button"
                             onClick={() => {
-                              const fun = generateFunTempEmail(operatorName, tempEmail);
-                              setTempEmail(fun);
+                              const cleanName = operatorName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                              const randomNum = Math.floor(100 + Math.random() * 900);
+                              const genEmail = cleanName ? `scanner.${cleanName}.${randomNum}@gmail.com` : `scanner.${scannerNumber.toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`;
+                              setTempEmail(genEmail);
                               setIsEmailManuallyEdited(true);
                             }}
-                            className="text-[10px] font-mono text-orange-400 hover:text-orange-300 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 px-2 py-0.5 rounded transition cursor-pointer"
-                            title="Generate a fun or random email based on name"
+                            className="text-[10px] font-mono text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 px-2 py-0.5 rounded transition cursor-pointer"
+                            title="Auto-generate an operator email"
                           >
-                            🎲 Fun Email
+                            Auto Generate
                           </button>
                           {isEmailManuallyEdited && (
                             <button
