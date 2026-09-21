@@ -19,19 +19,36 @@ import {
   User,
   Fingerprint,
   Terminal,
+  Trash2,
+  CheckSquare,
+  Square,
+  MinusSquare,
+  RefreshCw,
+  X,
 } from 'lucide-react';
 import { ScanAttempt } from '../../types';
+import { scanApi } from '../../lib/api';
 
 interface ScannerLogTabProps {
   logs: ScanAttempt[];
   onExportCsv?: () => void;
+  eventId?: string;
+  onClearLogs?: (selectedIds?: string[]) => Promise<void> | void;
 }
 
-export const ScannerLogTab: React.FC<ScannerLogTabProps> = ({ logs, onExportCsv }) => {
+export const ScannerLogTab: React.FC<ScannerLogTabProps> = ({ logs, onExportCsv, eventId, onClearLogs }) => {
   const [filterType, setFilterType] = useState<'ALL' | 'ACCEPTED' | 'DUPLICATE' | 'REJECTED'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedLogIds, setExpandedLogIds] = useState<Set<string>>(new Set());
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
+  const [isClearing, setIsClearing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    mode: 'selected' | 'all';
+    count: number;
+  }>({ isOpen: false, mode: 'all', count: 0 });
 
   const toggleExpand = (logId: string) => {
     setExpandedLogIds((prev) => {
@@ -52,6 +69,57 @@ export const ScannerLogTab: React.FC<ScannerLogTabProps> = ({ logs, onExportCsv 
     setTimeout(() => {
       setCopiedKey((curr) => (curr === key ? null : curr));
     }, 2000);
+  };
+
+  const toggleSelectLog = (logId: string) => {
+    setSelectedLogIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(logId)) next.delete(logId);
+      else next.add(logId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (filteredLogs.length === 0) return;
+    if (selectedLogIds.size === filteredLogs.length) {
+      setSelectedLogIds(new Set());
+    } else {
+      setSelectedLogIds(new Set(filteredLogs.map((l) => l.id)));
+    }
+  };
+
+  const handleConfirmClear = async () => {
+    try {
+      setIsClearing(true);
+      const isSelectedMode = confirmModal.mode === 'selected';
+      const idsToClear = isSelectedMode ? Array.from<string>(selectedLogIds) : undefined;
+
+      if (onClearLogs) {
+        await onClearLogs(idsToClear);
+      } else if (eventId) {
+        await scanApi.clearLogs(eventId, idsToClear);
+      }
+
+      setSelectedLogIds(new Set());
+      setStatusMessage({
+        type: 'success',
+        text: isSelectedMode
+          ? `Cleared ${confirmModal.count} selected scan log(s).`
+          : 'All terminal scan logs cleared successfully.',
+      });
+      setTimeout(() => setStatusMessage(null), 3500);
+      setConfirmModal({ isOpen: false, mode: 'all', count: 0 });
+    } catch (err: any) {
+      console.error('Failed to clear logs in terminal:', err);
+      setStatusMessage({
+        type: 'error',
+        text: err.message || 'Failed to clear logs. Please try again.',
+      });
+      setTimeout(() => setStatusMessage(null), 4000);
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   const acceptedLogs = logs.filter((l) => l.result === 'success');
@@ -123,14 +191,66 @@ export const ScannerLogTab: React.FC<ScannerLogTabProps> = ({ logs, onExportCsv 
             </p>
           </div>
 
-          <button
-            onClick={handleExportDefault}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/10 hover:bg-white/15 text-xs font-bold text-white border border-white/10 transition-all cursor-pointer shadow-sm shrink-0"
-          >
-            <Download className="w-4 h-4 text-indigo-400" />
-            <span>Export CSV</span>
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {selectedLogIds.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setConfirmModal({ isOpen: true, mode: 'selected', count: selectedLogIds.size })}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-xs font-bold text-white transition-all cursor-pointer shadow-lg shadow-rose-600/30 shrink-0 animate-in fade-in"
+                title="Clear selected logs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Clear Selected ({selectedLogIds.size})</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setConfirmModal({ isOpen: true, mode: 'all', count: logs.length })}
+              disabled={logs.length === 0}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 disabled:opacity-40 disabled:pointer-events-none text-xs font-bold text-rose-300 hover:text-white transition-all cursor-pointer shadow-sm shrink-0"
+              title="Clear all logs"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>All Clear</span>
+            </button>
+
+            <button
+              onClick={handleExportDefault}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/10 hover:bg-white/15 text-xs font-bold text-white border border-white/10 transition-all cursor-pointer shadow-sm shrink-0"
+            >
+              <Download className="w-4 h-4 text-indigo-400" />
+              <span>Export CSV</span>
+            </button>
+          </div>
         </div>
+
+        {/* Status Alert Notification */}
+        {statusMessage && (
+          <div
+            className={`p-3.5 rounded-2xl text-xs font-semibold flex items-center justify-between gap-2.5 animate-in fade-in slide-in-from-top-2 duration-150 ${
+              statusMessage.type === 'success'
+                ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300'
+                : 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {statusMessage.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              )}
+              <span>{statusMessage.text}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setStatusMessage(null)}
+              className="text-slate-400 hover:text-white cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* 4 Counter Metrics Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
@@ -209,6 +329,28 @@ export const ScannerLogTab: React.FC<ScannerLogTabProps> = ({ logs, onExportCsv 
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            {filteredLogs.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                  selectedLogIds.size === filteredLogs.length && filteredLogs.length > 0
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'glass-dark text-slate-300 hover:text-white'
+                }`}
+                title={selectedLogIds.size === filteredLogs.length ? 'Deselect all' : 'Select all filtered'}
+              >
+                {selectedLogIds.size === filteredLogs.length && filteredLogs.length > 0 ? (
+                  <CheckSquare className="w-3.5 h-3.5" />
+                ) : selectedLogIds.size > 0 ? (
+                  <MinusSquare className="w-3.5 h-3.5 text-indigo-400" />
+                ) : (
+                  <Square className="w-3.5 h-3.5" />
+                )}
+                <span>Select All</span>
+              </button>
+            )}
+
             <button
               onClick={() => setFilterType('ALL')}
               className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
@@ -253,6 +395,40 @@ export const ScannerLogTab: React.FC<ScannerLogTabProps> = ({ logs, onExportCsv 
         </div>
       </div>
 
+      {/* Active Selection Banner */}
+      {selectedLogIds.size > 0 && (
+        <div className="bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 border border-indigo-500/40 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-top-1">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-pulse" />
+            <span className="text-xs font-bold text-white">
+              {selectedLogIds.size} log{selectedLogIds.size === 1 ? '' : 's'} selected
+            </span>
+            <span className="text-xs text-slate-400">
+              of {filteredLogs.length} shown
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setSelectedLogIds(new Set())}
+              className="px-3 py-1.5 rounded-xl glass hover:bg-white/10 text-xs font-medium text-slate-300 hover:text-white transition-all cursor-pointer"
+            >
+              Deselect All
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setConfirmModal({ isOpen: true, mode: 'selected', count: selectedLogIds.size })}
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-rose-600/30 transition-all cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear Selected ({selectedLogIds.size})</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 3. Log Stream Cards */}
       <div className="space-y-2.5">
         {filteredLogs.length === 0 ? (
@@ -281,12 +457,19 @@ export const ScannerLogTab: React.FC<ScannerLogTabProps> = ({ logs, onExportCsv 
             const isRejected = !isSuccess && !isDuplicate;
 
             const isExpanded = expandedLogIds.has(log.id);
+            const isSelected = selectedLogIds.has(log.id);
+
+            const isBarcode =
+              log.scan_type === 'barcode' ||
+              (log.scanned_value && /^[A-Za-z0-9\-_]{3,32}$/.test(log.scanned_value.trim()) && !log.scanned_value.includes('{'));
 
             return (
               <div
                 key={log.id}
                 className={`rounded-2xl glass-card border transition-all overflow-hidden ${
-                  isSuccess
+                  isSelected
+                    ? 'ring-2 ring-indigo-500/70 border-indigo-500/60 bg-indigo-950/25 shadow-lg'
+                    : isSuccess
                     ? 'border-emerald-500/20 hover:border-emerald-500/40 bg-emerald-950/10'
                     : isRetroactiveDuplicate
                     ? 'border-orange-500/35 hover:border-orange-500/55 bg-orange-950/15'
@@ -300,6 +483,27 @@ export const ScannerLogTab: React.FC<ScannerLogTabProps> = ({ logs, onExportCsv 
                   className="p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer select-none"
                 >
                   <div className="flex items-center gap-3">
+                    {/* Checkbox for Multi-Selection */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelectLog(log.id);
+                      }}
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                        isSelected
+                          ? 'bg-indigo-600 text-white shadow-md'
+                          : 'text-slate-400 hover:text-white hover:bg-white/10'
+                      }`}
+                      title={isSelected ? 'Deselect scan' : 'Select scan'}
+                    >
+                      {isSelected ? (
+                        <CheckSquare className="w-4 h-4 text-white" />
+                      ) : (
+                        <Square className="w-4 h-4" />
+                      )}
+                    </button>
+
                     {/* Status Indicator Icon */}
                     <div
                       className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
@@ -345,79 +549,165 @@ export const ScannerLogTab: React.FC<ScannerLogTabProps> = ({ logs, onExportCsv 
                     </div>
                   </div>
 
-                    {/* Expand/Collapse Chevron Indicator */}
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <span className="text-[11px] hidden sm:inline text-slate-500">
-                        {isExpanded ? 'Hide' : 'Details'}
-                      </span>
-                      <div
-                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
-                          isExpanded
-                            ? 'bg-white/20 text-white rotate-180'
-                            : 'text-slate-400 hover:text-white hover:bg-white/10'
-                        }`}
-                      >
-                        <ChevronDown className="w-4 h-4" />
-                      </div>
+                  {/* Expand/Collapse Chevron Indicator */}
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <span className="text-[11px] hidden sm:inline text-slate-500">
+                      {isExpanded ? 'Hide' : 'Details'}
+                    </span>
+                    <div
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                        isExpanded
+                          ? 'bg-white/20 text-white rotate-180'
+                          : 'text-slate-400 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      <ChevronDown className="w-4 h-4" />
                     </div>
                   </div>
+                </div>
 
-                  {/* Dropdown Detailed Drawer */}
-                  {isExpanded && (
-                    <div className="p-4 sm:p-5 bg-black/40 border-t border-white/10 space-y-3 text-xs animate-in fade-in duration-150">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {/* Attendee Details */}
-                        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5 space-y-1.5">
-                          <div className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5 mb-2">
-                            <User className="w-3.5 h-3.5" />
-                            <span>Attendee Information</span>
+                {/* Dropdown Detailed Drawer */}
+                {isExpanded && (
+                  <div className="p-4 sm:p-5 bg-black/40 border-t border-white/10 space-y-3 text-xs animate-in fade-in duration-150">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Attendee Details */}
+                      <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2">
+                        <div className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5 mb-1">
+                          <User className="w-3.5 h-3.5" />
+                          <span>Attendee Profile</span>
+                        </div>
+                        {log.student ? (
+                          <div className="space-y-1 text-[11px]">
+                            <div className="flex justify-between py-0.5"><span className="text-slate-400">Name:</span> <span className="font-semibold text-white">{log.student.name}</span></div>
+                            <div className="flex justify-between py-0.5"><span className="text-slate-400">USN:</span> <span className="font-mono text-indigo-300">{log.student.usn}</span></div>
+                            {log.student.branch && <div className="flex justify-between py-0.5"><span className="text-slate-400">Branch:</span> <span className="text-slate-200">{log.student.branch}</span></div>}
+                            {log.student.email && <div className="flex justify-between py-0.5"><span className="text-slate-400">Email:</span> <span className="font-mono text-slate-300">{log.student.email}</span></div>}
+                            {log.student.phone_number && <div className="flex justify-between py-0.5"><span className="text-slate-400">Phone:</span> <span className="font-mono text-slate-300">{log.student.phone_number}</span></div>}
                           </div>
-                          {log.student ? (
-                            <>
-                              <div className="flex justify-between py-0.5"><span className="text-slate-400">Name:</span> <span className="font-semibold text-white">{log.student.name}</span></div>
-                              <div className="flex justify-between py-0.5"><span className="text-slate-400">USN:</span> <span className="font-mono text-indigo-300">{log.student.usn}</span></div>
-                              {log.student.branch && <div className="flex justify-between py-0.5"><span className="text-slate-400">Branch:</span> <span className="text-slate-200">{log.student.branch}</span></div>}
-                              {log.student.email && <div className="flex justify-between py-0.5"><span className="text-slate-400">Email:</span> <span className="font-mono text-slate-300">{log.student.email}</span></div>}
-                              {log.student.phone_number && <div className="flex justify-between py-0.5"><span className="text-slate-400">Phone:</span> <span className="font-mono text-slate-300">{log.student.phone_number}</span></div>}
-                            </>
-                          ) : (
-                            <div className="text-slate-500 text-[11px] italic">No attendee record associated with this token</div>
-                          )}
+                        ) : (
+                          <div className="text-slate-500 text-[11px] italic py-2">No registered attendee profile linked to this scanned credential.</div>
+                        )}
+                      </div>
+
+                      {/* Scan Medium & Diagnostics */}
+                      <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2.5">
+                        <div className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5 mb-1">
+                          <Terminal className="w-3.5 h-3.5" />
+                          <span>Scan Medium & Diagnostics</span>
                         </div>
 
-                        {/* Diagnostics & Token */}
-                        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5 space-y-1.5">
-                          <div className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5 mb-2">
-                            <Fingerprint className="w-3.5 h-3.5" />
-                            <span>Payload & Diagnostics</span>
+                        {/* Scan Input Medium */}
+                        <div>
+                          <div className="text-[11px] text-slate-400 mb-1">Scan Input Medium</div>
+                          <div className="flex items-center gap-2">
+                            {isBarcode ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 font-mono text-[11px] font-semibold">
+                                <Barcode className="w-3.5 h-3.5" />
+                                <span>BARCODE Scan</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 font-mono text-[11px] font-semibold">
+                                <QrCode className="w-3.5 h-3.5" />
+                                <span>QR CODE Scan</span>
+                              </span>
+                            )}
                           </div>
-                          <div className="text-[11px] text-slate-400">Raw Token:</div>
-                          <div className="p-2 rounded bg-black/60 border border-white/10 font-mono text-[11px] text-amber-300 break-all select-all flex items-center justify-between gap-2">
-                            <span>{log.scanned_value}</span>
-                            <button
-                              type="button"
-                              onClick={(e) => handleCopy(log.scanned_value, `raw-sc-${log.id}`, e)}
-                              className="text-slate-400 hover:text-white cursor-pointer shrink-0"
-                            >
-                              {copiedKey === `raw-sc-${log.id}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
+                        </div>
+
+                        <div className="space-y-1 text-[11px] pt-1">
+                          <div className="flex justify-between py-0.5">
+                            <span className="text-slate-400">Gate / Scanner:</span>
+                            <span className="font-semibold text-slate-200">{log.scanner?.name || 'Gate Scanner'}</span>
                           </div>
-                          <div className="flex justify-between py-0.5 text-[11px]"><span className="text-slate-400">Result:</span> <span className="font-mono font-bold text-white uppercase">{log.result}</span></div>
-                          <div className="flex justify-between py-0.5 text-[11px]"><span className="text-slate-400">Time:</span> <span className="font-mono text-slate-300">{log.timestamp}</span></div>
-                          {isRetroactiveDuplicate && (
-                            <div className="mt-2 p-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-[11px] text-orange-300 leading-snug">
-                              <strong>Post-Sync Conflict:</strong> This scan was saved locally while terminal was offline, but another gate station checked in this attendee online earlier. Rejected during sync to prevent duplicate entry.
+                          <div className="flex justify-between py-0.5">
+                            <span className="text-slate-400">Result Status:</span>
+                            <span className="font-mono font-bold text-white uppercase">{log.result}</span>
+                          </div>
+                          <div className="flex justify-between py-0.5">
+                            <span className="text-slate-400">Timestamp:</span>
+                            <span className="font-mono text-slate-300">{new Date(log.timestamp).toLocaleString()}</span>
+                          </div>
+                          {log.reason && (
+                            <div className="flex justify-between py-0.5">
+                              <span className="text-slate-400">Reason:</span>
+                              <span className="text-amber-300">{log.reason}</span>
                             </div>
                           )}
                         </div>
+
+                        {isRetroactiveDuplicate && (
+                          <div className="p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-[11px] text-orange-300 leading-snug">
+                            <strong>Post-Sync Conflict:</strong> Saved locally while terminal was offline; another gate checked in this attendee online earlier.
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
-                </div>
-              );
+                  </div>
+                )}
+              </div>
+            );
           })
         )}
       </div>
+
+      {/* Professional Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-[#181d33] border border-white/20 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-white font-['Space_Grotesk']">
+                  {confirmModal.mode === 'all' ? 'All Clear — Reset Terminal Logs?' : 'Clear Selected Logs?'}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {confirmModal.mode === 'all'
+                    ? `This will permanently clear all ${confirmModal.count} scan audit records from this terminal and event.`
+                    : `This will permanently clear ${confirmModal.count} selected scan log record(s).`}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300/90 leading-relaxed flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <span>
+                <strong>Warning:</strong> Clearing scan history logs permanently removes these verification entries. This action cannot be undone.
+              </span>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isClearing}
+                onClick={() => setConfirmModal({ isOpen: false, mode: 'all', count: 0 })}
+                className="px-4 py-2.5 rounded-xl glass hover:bg-white/10 text-xs font-semibold text-slate-300 hover:text-white transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isClearing}
+                onClick={handleConfirmClear}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-rose-600/30 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isClearing ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Clearing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Confirm & Clear</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

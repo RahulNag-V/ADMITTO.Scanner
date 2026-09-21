@@ -3098,6 +3098,50 @@ class DatabaseService {
     return sorted;
   }
 
+  async clearScanHistory(
+    eventId: string,
+    options?: { scanIds?: string[] }
+  ): Promise<{ success: boolean; count: number }> {
+    const supabase = this.getClient();
+    let deletedCount = 0;
+
+    if (supabase) {
+      if (options?.scanIds && options.scanIds.length > 0) {
+        const { error, count } = await supabase
+          .from('scan_attempts')
+          .delete({ count: 'exact' })
+          .eq('event_id', eventId)
+          .in('id', options.scanIds);
+        if (error) throw new Error(`Database error clearing scan records: ${error.message}`);
+        deletedCount = count ?? options.scanIds.length;
+      } else {
+        const { error, count } = await supabase
+          .from('scan_attempts')
+          .delete({ count: 'exact' })
+          .eq('event_id', eventId);
+        if (error) throw new Error(`Database error clearing scan records: ${error.message}`);
+        deletedCount = count ?? 0;
+      }
+    }
+
+    if (options?.scanIds && options.scanIds.length > 0) {
+      const idSet = new Set(options.scanIds);
+      const prevLen = this.inMemoryDB.scan_attempts.length;
+      this.inMemoryDB.scan_attempts = this.inMemoryDB.scan_attempts.filter(
+        (a) => !(a.event_id === eventId && idSet.has(a.id))
+      );
+      deletedCount = deletedCount || (prevLen - this.inMemoryDB.scan_attempts.length);
+    } else {
+      const prevLen = this.inMemoryDB.scan_attempts.length;
+      this.inMemoryDB.scan_attempts = this.inMemoryDB.scan_attempts.filter(
+        (a) => a.event_id !== eventId
+      );
+      deletedCount = deletedCount || (prevLen - this.inMemoryDB.scan_attempts.length);
+    }
+
+    return { success: true, count: deletedCount };
+  }
+
   // --- ACTIVITY LOGS ---
   async getActivityLogs(eventId: string, adminId: string, limit: number = 50, offset: number = 0): Promise<ActivityLog[]> {
     const event = await this.getEventById(eventId, adminId);

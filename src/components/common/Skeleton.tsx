@@ -42,9 +42,15 @@ export const SkeletonStatCard: React.FC = () => (
 // Table Row Skeleton (Students & Scans History)
 export const SkeletonTableRow: React.FC<{ columns?: number }> = ({ columns = 3 }) => (
   <tr className="border-b border-white/[0.06] hover:bg-white/[0.02] transition-colors">
+    {columns >= 5 && (
+      <td className="py-4 pl-3 pr-1 text-center w-10">
+        <Skeleton variant="rounded" className="w-4 h-4 mx-auto rounded-md" />
+      </td>
+    )}
+
     {/* Chevron / Icon col */}
-    <td className="py-4 pl-4 pr-1 text-center w-14">
-      <Skeleton variant="circular" className="w-8 h-8 mx-auto rounded-xl" />
+    <td className="py-4 pl-3 pr-1 text-center w-10">
+      <Skeleton variant="circular" className="w-7 h-7 mx-auto rounded-lg" />
     </td>
 
     {/* Primary Text / Badges col */}

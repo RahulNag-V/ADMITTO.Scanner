@@ -1938,6 +1938,32 @@ app.get('/api/events/:id/scans', requireScannerOrAdmin, async (req: Request, res
   }
 });
 
+// Clear / Delete Scan History Logs (All or Selected)
+app.delete('/api/events/:id/scans', requireScannerOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const session = (req as any).user as SessionData;
+    if (session.role === 'SCANNER' && session.eventId !== req.params.id) {
+      res.status(403).json({ error: 'FORBIDDEN', message: 'Unauthorized event access.' });
+      return;
+    }
+
+    const { scanIds } = req.body || {};
+    const result = await dbService.clearScanHistory(req.params.id, {
+      scanIds: Array.isArray(scanIds) ? scanIds : undefined,
+    });
+
+    res.json({
+      success: true,
+      message: scanIds && scanIds.length > 0
+        ? `Successfully cleared ${result.count} selected scan record(s).`
+        : `Successfully cleared all ${result.count} scan record(s).`,
+      count: result.count,
+    });
+  } catch (err: any) {
+    res.status(400).json({ error: 'ERROR', message: err.message });
+  }
+});
+
 // Activity Logs
 app.get('/api/events/:id/activity', requireAdminAuth, async (req: Request, res: Response) => {
   try {

@@ -28,6 +28,11 @@ import {
   Terminal,
   Info,
   ShieldAlert,
+  Trash2,
+  CheckSquare,
+  Square,
+  MinusSquare,
+  X,
 } from 'lucide-react';
 import { toBrowserPath } from '../../lib/router';
 import { ScanAttempt } from '../../types';
@@ -47,6 +52,14 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [expandedScanIds, setExpandedScanIds] = useState<Set<string>>(new Set());
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [selectedScanIds, setSelectedScanIds] = useState<Set<string>>(new Set());
+  const [isClearing, setIsClearing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    mode: 'selected' | 'all';
+    count: number;
+  }>({ isOpen: false, mode: 'all', count: 0 });
 
   const filterMenuRef = useRef<HTMLDivElement>(null);
 
@@ -118,6 +131,62 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
       setExpandedScanIds(new Set());
     } else {
       setExpandedScanIds(new Set(filteredScans.map((s) => s.id)));
+    }
+  };
+
+  const toggleSelectScan = (scanId: string) => {
+    setSelectedScanIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(scanId)) {
+        next.delete(scanId);
+      } else {
+        next.add(scanId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (filteredScans.length === 0) return;
+    if (selectedScanIds.size === filteredScans.length) {
+      setSelectedScanIds(new Set());
+    } else {
+      setSelectedScanIds(new Set(filteredScans.map((s) => s.id)));
+    }
+  };
+
+  const handleConfirmClear = async () => {
+    try {
+      setIsClearing(true);
+      const isSelectedMode = confirmModal.mode === 'selected';
+      const scanIdsToClear = isSelectedMode ? Array.from<string>(selectedScanIds) : undefined;
+
+      const res = await scanApi.clearLogs(eventId, scanIdsToClear);
+
+      if (isSelectedMode && scanIdsToClear) {
+        const idSet = new Set(scanIdsToClear);
+        setScans((prev) => prev.filter((s) => !idSet.has(s.id)));
+        setSelectedScanIds(new Set());
+      } else {
+        setScans([]);
+        setSelectedScanIds(new Set());
+      }
+
+      setStatusMessage({
+        type: 'success',
+        text: res.message || (isSelectedMode ? 'Selected scan logs cleared successfully.' : 'All scan logs cleared successfully.'),
+      });
+      setTimeout(() => setStatusMessage(null), 3500);
+      setConfirmModal({ isOpen: false, mode: 'all', count: 0 });
+    } catch (err: any) {
+      console.error('Failed to clear scan logs:', err);
+      setStatusMessage({
+        type: 'error',
+        text: err.message || 'Failed to clear scan logs. Please try again.',
+      });
+      setTimeout(() => setStatusMessage(null), 4000);
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -268,8 +337,60 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
             <Download className="w-3.5 h-3.5 text-slate-400" />
             <span>Export CSV</span>
           </button>
+
+          {/* Clear Selected Button */}
+          {selectedScanIds.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setConfirmModal({ isOpen: true, mode: 'selected', count: selectedScanIds.size })}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-rose-600/30 transition-all cursor-pointer animate-in fade-in"
+              title="Clear selected scan logs"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear Selected ({selectedScanIds.size})</span>
+            </button>
+          )}
+
+          {/* All Clear Button */}
+          <button
+            type="button"
+            onClick={() => setConfirmModal({ isOpen: true, mode: 'all', count: scans.length })}
+            disabled={scans.length === 0}
+            className="px-4 py-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 disabled:opacity-40 disabled:pointer-events-none text-rose-300 hover:text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+            title="Clear all scan history logs for this event"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+            <span>All Clear</span>
+          </button>
         </div>
       </div>
+
+      {/* Status Message Notification */}
+      {statusMessage && (
+        <div
+          className={`p-3.5 rounded-2xl text-xs font-semibold flex items-center justify-between gap-2.5 animate-in fade-in slide-in-from-top-2 duration-150 ${
+            statusMessage.type === 'success'
+              ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300'
+              : 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {statusMessage.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            )}
+            <span>{statusMessage.text}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStatusMessage(null)}
+            className="text-slate-400 hover:text-white cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Filters Bar: Search & Filter side-by-side */}
       <div className="bg-[#242b4d]/45 border border-white/20 backdrop-blur-2xl rounded-3xl p-3 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 relative z-40 overflow-visible shadow-xl">
@@ -408,14 +529,60 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
         </div>
       </div>
 
+      {/* Active Selection Action Bar */}
+      {selectedScanIds.size > 0 && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 px-4 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-xs shadow-lg animate-in fade-in slide-in-from-top-1 duration-150">
+          <div className="flex items-center gap-2.5 text-indigo-200">
+            <CheckSquare className="w-4 h-4 text-indigo-400" />
+            <span className="font-bold text-white">{selectedScanIds.size}</span>
+            <span>of {filteredScans.length} scan records selected</span>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setSelectedScanIds(new Set())}
+              className="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white text-xs font-semibold cursor-pointer transition-colors"
+            >
+              Deselect All
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmModal({ isOpen: true, mode: 'selected', count: selectedScanIds.size })}
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear Selected ({selectedScanIds.size})</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Scans Table */}
       <div className="bg-[#242b4d]/40 border border-white/20 backdrop-blur-2xl rounded-3xl overflow-hidden shadow-2xl relative z-0">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-white/15 bg-white/[0.06] backdrop-blur-md text-slate-300 font-semibold uppercase tracking-wider text-[11px]">
-                <th className="py-3.5 pl-4 pr-2 w-10 text-center"></th>
-                <th className="py-3.5 px-4">Attendee Name</th>
+                {/* Select All Checkbox Column */}
+                <th className="py-3.5 pl-4 pr-1 w-10 text-center">
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    disabled={filteredScans.length === 0}
+                    className="w-5 h-5 rounded-md border border-white/25 hover:border-indigo-400 flex items-center justify-center transition-colors cursor-pointer bg-white/5 disabled:opacity-30 disabled:pointer-events-none mx-auto"
+                    title={selectedScanIds.size === filteredScans.length && filteredScans.length > 0 ? 'Deselect all' : 'Select all'}
+                  >
+                    {selectedScanIds.size > 0 && selectedScanIds.size === filteredScans.length ? (
+                      <CheckSquare className="w-3.5 h-3.5 text-indigo-400" />
+                    ) : selectedScanIds.size > 0 ? (
+                      <MinusSquare className="w-3.5 h-3.5 text-indigo-400" />
+                    ) : (
+                      <Square className="w-3.5 h-3.5 text-slate-500" />
+                    )}
+                  </button>
+                </th>
+                <th className="py-3.5 px-1 w-8 text-center"></th>
+                <th className="py-3.5 px-3">Attendee Name</th>
                 <th className="py-3.5 px-4 hidden sm:table-cell">Scanner / Gate</th>
                 <th className="py-3.5 px-4 text-right pr-6">Result Status</th>
               </tr>
@@ -424,12 +591,12 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
               {loading ? (
                 <>
                   {[...Array(6)].map((_, i) => (
-                    <SkeletonTableRow key={i} columns={4} />
+                    <SkeletonTableRow key={i} columns={5} />
                   ))}
                 </>
               ) : filteredScans.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-16 text-center">
+                  <td colSpan={5} className="py-16 text-center">
                     {scans.length === 0 ? (
                       <div className="max-w-md mx-auto space-y-4 px-4">
                         <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center justify-center mx-auto">
@@ -463,6 +630,7 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
               ) : (
                 filteredScans.map((scan) => {
                   const isExpanded = expandedScanIds.has(scan.id);
+                  const isSelected = selectedScanIds.has(scan.id);
                   const student = scan.student;
                   const studentName = student?.name || (scan as any).student_name;
                   const scannerStation = scan.scanner?.name || (scan as any).scanner_name || 'Terminal Gate';
@@ -476,13 +644,34 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
                       <tr
                         onClick={() => toggleExpand(scan.id)}
                         className={`transition-colors cursor-pointer select-none group h-14 ${
-                          isExpanded
+                          isSelected
+                            ? 'bg-rose-500/10 hover:bg-rose-500/15'
+                            : isExpanded
                             ? 'bg-indigo-500/10 hover:bg-indigo-500/15'
                             : 'hover:bg-white/[0.04]'
                         }`}
                       >
+                        {/* Checkbox Column */}
+                        <td
+                          className="py-3 pl-4 pr-1 text-center align-middle w-10"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectScan(scan.id)}
+                            className="w-5 h-5 rounded-md border border-white/20 hover:border-indigo-400 flex items-center justify-center transition-colors cursor-pointer bg-white/5 mx-auto"
+                            aria-label={isSelected ? 'Deselect scan' : 'Select scan'}
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="w-3.5 h-3.5 text-indigo-400" />
+                            ) : (
+                              <Square className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-400" />
+                            )}
+                          </button>
+                        </td>
+
                         {/* Dropdown Chevron Toggle Button */}
-                        <td className="py-3 pl-4 pr-1 text-center align-middle w-10">
+                        <td className="py-3 px-1 text-center align-middle w-8">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -544,7 +733,7 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
                       {/* Dropdown Detailed Data Panel */}
                       {isExpanded && (
                         <tr className="bg-[#080b15] border-t border-b border-indigo-500/20">
-                          <td colSpan={4} className="p-0">
+                          <td colSpan={5} className="p-0">
                             <div className="p-4 sm:p-5 space-y-4 animate-in fade-in slide-in-from-top-1 duration-150">
                               
                               {/* Top Banner inside Dropdown */}
@@ -753,6 +942,65 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
           </table>
         </div>
       </div>
+
+      {/* Professional Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-[#181d33] border border-white/20 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-white font-['Space_Grotesk']">
+                  {confirmModal.mode === 'all' ? 'All Clear — Reset Scan Logs?' : 'Clear Selected Logs?'}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {confirmModal.mode === 'all'
+                    ? `This will permanently clear all ${confirmModal.count} scan audit records for this event.`
+                    : `This will permanently clear ${confirmModal.count} selected scan log record(s).`}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300/90 leading-relaxed flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <span>
+                <strong>Warning:</strong> Deleting scan history logs removes verification records from the dashboard. This action is irreversible.
+              </span>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isClearing}
+                onClick={() => setConfirmModal({ isOpen: false, mode: 'all', count: 0 })}
+                className="px-4 py-2.5 rounded-xl glass hover:bg-white/10 text-xs font-semibold text-slate-300 hover:text-white transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isClearing}
+                onClick={handleConfirmClear}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-rose-600/30 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isClearing ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Clearing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Confirm & Clear</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

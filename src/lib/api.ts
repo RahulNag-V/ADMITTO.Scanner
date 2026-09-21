@@ -402,6 +402,13 @@ export const scanApi = {
     return { scans: scansList, logs: scansList, total: res.total ?? scansList.length };
   },
 
+  clearLogs: async (eventId: string, scanIds?: string[]) => {
+    return apiFetch<{ success: boolean; message: string; count: number }>(`/api/events/${eventId}/scans`, {
+      method: 'DELETE',
+      body: JSON.stringify({ scanIds }),
+    });
+  },
+
   getActivityLogs: async (eventId: string) => {
     return apiFetch<{ logs: ActivityLog[] }>(`/api/events/${eventId}/activity`);
   },

@@ -373,6 +373,18 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
     }
   };
 
+  // Clear Scan History Logs (All or Selected)
+  const handleClearLogs = async (selectedIds?: string[]) => {
+    if (!eventId) return;
+    await scanApi.clearLogs(eventId, selectedIds);
+    if (selectedIds && selectedIds.length > 0) {
+      const idSet = new Set(selectedIds);
+      setLogs((prev) => prev.filter((log) => !idSet.has(log.id)));
+    } else {
+      setLogs([]);
+    }
+  };
+
   useEffect(() => {
     loadTerminalData();
     const handleEventsChanged = () => {
@@ -1178,7 +1190,13 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
                 )}
 
                 {/* TAB 3: LOGS */}
-                {activeTab === 'log' && <ScannerLogTab logs={logs} />}
+                {activeTab === 'log' && (
+                  <ScannerLogTab
+                    logs={logs}
+                    eventId={eventId}
+                    onClearLogs={handleClearLogs}
+                  />
+                )}
 
                 {/* TAB 4: SCANNER - Dedicated Admitto Terminal Viewport */}
                 {activeTab === 'scanner' && (
