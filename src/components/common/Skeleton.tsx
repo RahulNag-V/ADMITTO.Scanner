@@ -55,6 +55,14 @@ export const SkeletonTableRow: React.FC<{ columns?: number }> = ({ columns = 3 }
       </div>
     </td>
 
+    {columns >= 4 && (
+      <td className="py-4 px-4 hidden sm:table-cell">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-28 rounded-lg" />
+        </div>
+      </td>
+    )}
+
     {/* Right Action col */}
     <td className="py-4 pr-4 sm:pr-6 pl-2 text-right w-24">
       <Skeleton className="h-7 w-20 ml-auto rounded-xl" />

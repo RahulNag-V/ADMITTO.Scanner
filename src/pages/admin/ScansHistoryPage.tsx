@@ -416,6 +416,7 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
               <tr className="border-b border-white/15 bg-white/[0.06] backdrop-blur-md text-slate-300 font-semibold uppercase tracking-wider text-[11px]">
                 <th className="py-3.5 pl-4 pr-2 w-10 text-center"></th>
                 <th className="py-3.5 px-4">Attendee Name</th>
+                <th className="py-3.5 px-4 hidden sm:table-cell">Scanner / Gate</th>
                 <th className="py-3.5 px-4 text-right pr-6">Result Status</th>
               </tr>
             </thead>
@@ -423,12 +424,12 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
               {loading ? (
                 <>
                   {[...Array(6)].map((_, i) => (
-                    <SkeletonTableRow key={i} />
+                    <SkeletonTableRow key={i} columns={4} />
                   ))}
                 </>
               ) : filteredScans.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="py-16 text-center">
+                  <td colSpan={4} className="py-16 text-center">
                     {scans.length === 0 ? (
                       <div className="max-w-md mx-auto space-y-4 px-4">
                         <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center justify-center mx-auto">
@@ -471,10 +472,10 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
 
                   return (
                     <React.Fragment key={scan.id}>
-                      {/* Main Collapsed Row: ONLY Name and Status */}
+                      {/* Main Collapsed Row */}
                       <tr
                         onClick={() => toggleExpand(scan.id)}
-                        className={`transition-colors cursor-pointer select-none group h-12 ${
+                        className={`transition-colors cursor-pointer select-none group h-14 ${
                           isExpanded
                             ? 'bg-indigo-500/10 hover:bg-indigo-500/15'
                             : 'hover:bg-white/[0.04]'
@@ -499,7 +500,7 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
                           </button>
                         </td>
 
-                        {/* Only Attendee Name - single line with clean ellipsis */}
+                        {/* Attendee Name + Mobile Scanner Subtitle */}
                         <td className="py-3 px-3 align-middle">
                           {studentName ? (
                             <div className="font-bold text-white text-sm truncate max-w-[220px] sm:max-w-md">
@@ -511,9 +512,30 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
                               <span>Unregistered Token</span>
                             </div>
                           )}
+
+                          {/* Scanner Name Subtitle for Mobile / Quick Context */}
+                          <div className="flex items-center gap-1.5 text-[11px] text-indigo-300/80 mt-1 font-medium">
+                            <Smartphone className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            <span className="truncate max-w-[200px] sm:max-w-[260px]">{scannerStation}</span>
+                            <span className="text-slate-600 sm:hidden">•</span>
+                            <span className="text-slate-400 font-mono text-[10px] sm:hidden">{formatTimestamp(timestampStr)}</span>
+                          </div>
                         </td>
 
-                        {/* Only Result Status */}
+                        {/* Dedicated Scanner / Gate Column (Desktop & Tablets) */}
+                        <td className="py-3 px-4 align-middle hidden sm:table-cell">
+                          <div className="flex flex-col gap-0.5">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/25 text-indigo-300 text-xs font-medium w-fit max-w-[220px]">
+                              <Smartphone className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                              <span className="truncate">{scannerStation}</span>
+                            </div>
+                            <span className="text-slate-400 text-[10px] font-mono pl-1">
+                              {formatTimestamp(timestampStr)}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Result Status */}
                         <td className="py-3 pr-4 sm:pr-6 text-right align-middle">
                           {getResultBadge(scan.result)}
                         </td>
@@ -522,7 +544,7 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
                       {/* Dropdown Detailed Data Panel */}
                       {isExpanded && (
                         <tr className="bg-[#080b15] border-t border-b border-indigo-500/20">
-                          <td colSpan={3} className="p-0">
+                          <td colSpan={4} className="p-0">
                             <div className="p-4 sm:p-5 space-y-4 animate-in fade-in slide-in-from-top-1 duration-150">
                               
                               {/* Top Banner inside Dropdown */}

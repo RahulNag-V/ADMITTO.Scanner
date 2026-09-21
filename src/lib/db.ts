@@ -1831,7 +1831,7 @@ class DatabaseService {
     }
 
     if (event.admin_id === userId) {
-      return { authorized: true, gateName: 'Admin Terminal' };
+      return { authorized: true, gateName: 'Admin Terminal', scannerId: event.admin_id };
     }
 
     // 2. Check direct scanner account
@@ -2946,20 +2946,96 @@ class DatabaseService {
         atmQuery = atmQuery.range(offset, offset + limit - 1);
       }
 
-      const [atmRes, stRes, scnRes] = await Promise.all([
+      const [atmRes, stRes, scnRes, reqRes, profRes] = await Promise.all([
         atmQuery,
         supabase.from('students').select('*').eq('event_id', eventId),
         supabase.from('scanner_accounts').select('*').eq('event_id', eventId),
+        supabase.from('scanner_access_requests').select('*').eq('event_id', eventId),
+        supabase.from('profiles').select('id, name, email'),
       ]);
 
       if (atmRes.error) throw new Error(`Database error fetching scan history: ${atmRes.error.message}`);
       if (atmRes.data) attempts = atmRes.data as ScanAttempt[];
       if (stRes.data) (stRes.data as Student[]).forEach((s) => studentsMap.set(s.id, s));
       if (scnRes.data) (scnRes.data as ScannerAccount[]).forEach((sc) => scannersMap.set(sc.id, sc));
+
+      if (reqRes.data) {
+        (reqRes.data as any[]).forEach((r) => {
+          const displayName = `${r.user_name || 'Volunteer Scanner'} (${r.gate_name || 'Gate Terminal'})`;
+          const acc: ScannerAccount = {
+            id: r.scanner_id || r.id,
+            name: displayName,
+            email: r.user_email || '',
+            access_code: r.referral_code || 'VOLUNTEER',
+            role: 'SCANNER',
+            event_id: eventId,
+            is_active: true,
+            created_at: r.created_at || new Date().toISOString(),
+            updated_at: r.updated_at || new Date().toISOString(),
+          };
+          if (r.scanner_id) scannersMap.set(r.scanner_id, acc);
+          if (r.id) scannersMap.set(r.id, acc);
+          if (r.user_id) scannersMap.set(r.user_id, acc);
+        });
+      }
+
+      if (profRes.data) {
+        (profRes.data as any[]).forEach((p) => {
+          if (!scannersMap.has(p.id)) {
+            scannersMap.set(p.id, {
+              id: p.id,
+              name: `${p.name || 'Admin'} (Organizer)`,
+              email: p.email || '',
+              access_code: 'ADMIN',
+              role: 'SCANNER',
+              event_id: eventId,
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+          }
+        });
+      }
     } else {
       attempts = this.inMemoryDB.scan_attempts.filter((a) => a.event_id === eventId);
       this.inMemoryDB.students.filter((s) => s.event_id === eventId).forEach((s) => studentsMap.set(s.id, s));
       this.inMemoryDB.scanner_accounts.filter((sc) => sc.event_id === eventId).forEach((sc) => scannersMap.set(sc.id, sc));
+
+      this.inMemoryDB.scanner_access_requests
+        .filter((r) => r.event_id === eventId)
+        .forEach((r) => {
+          const displayName = `${r.user_name || 'Volunteer Scanner'} (${r.gate_name || 'Gate Terminal'})`;
+          const acc: ScannerAccount = {
+            id: r.scanner_id || r.id,
+            name: displayName,
+            email: r.user_email || '',
+            access_code: r.referral_code || 'VOLUNTEER',
+            role: 'SCANNER',
+            event_id: eventId,
+            is_active: true,
+            created_at: r.created_at || new Date().toISOString(),
+            updated_at: r.updated_at || new Date().toISOString(),
+          };
+          if (r.scanner_id) scannersMap.set(r.scanner_id, acc);
+          if (r.id) scannersMap.set(r.id, acc);
+          if (r.user_id) scannersMap.set(r.user_id, acc);
+        });
+
+      this.inMemoryDB.profiles.forEach((p) => {
+        if (!scannersMap.has(p.id)) {
+          scannersMap.set(p.id, {
+            id: p.id,
+            name: `${p.name || 'Admin'} (Organizer)`,
+            email: p.email || '',
+            access_code: 'ADMIN',
+            role: 'SCANNER',
+            event_id: eventId,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      });
     }
 
     if (filters?.result && filters.result !== 'ALL') {
@@ -2969,11 +3045,41 @@ class DatabaseService {
       attempts = attempts.filter((a) => a.scanner_id === filters.scannerId);
     }
 
-    let enriched = attempts.map((a) => ({
-      ...a,
-      student: a.student_id ? studentsMap.get(a.student_id) : undefined,
-      scanner: a.scanner_id ? scannersMap.get(a.scanner_id) : undefined,
-    }));
+    let enriched = attempts.map((a) => {
+      let scanner = a.scanner_id ? scannersMap.get(a.scanner_id) : undefined;
+      if (!scanner) {
+        if (!a.scanner_id || a.scanner_id === event.admin_id) {
+          scanner = {
+            id: event.admin_id,
+            name: `${event.admin_name || 'Admin'} (Organizer)`,
+            email: event.admin_email || '',
+            access_code: 'ADMIN',
+            role: 'SCANNER',
+            event_id: eventId,
+            is_active: true,
+            created_at: a.timestamp,
+            updated_at: a.timestamp,
+          };
+        } else {
+          scanner = {
+            id: a.scanner_id,
+            name: 'Gate Scanner Terminal',
+            email: '',
+            access_code: 'STATION',
+            role: 'SCANNER',
+            event_id: eventId,
+            is_active: true,
+            created_at: a.timestamp,
+            updated_at: a.timestamp,
+          };
+        }
+      }
+      return {
+        ...a,
+        student: a.student_id ? studentsMap.get(a.student_id) : undefined,
+        scanner,
+      };
+    });
 
     if (filters?.search) {
       const q = filters.search.toLowerCase();
