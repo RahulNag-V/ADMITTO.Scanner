@@ -671,26 +671,14 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
                                   </div>
 
                                   <div className="space-y-2.5 text-xs">
-                                    <div>
-                                      <div className="text-[11px] text-slate-400 mb-1 flex items-center justify-between">
-                                        <span>Raw Scanned Value</span>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => handleCopy(scan.scanned_value, `raw-${scan.id}`, e)}
-                                          className="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
-                                        >
-                                          {copiedKey === `raw-${scan.id}` ? (
-                                            <Check className="w-3 h-3 text-emerald-400" />
-                                          ) : (
-                                            <Copy className="w-3 h-3" />
-                                          )}
-                                          <span>{copiedKey === `raw-${scan.id}` ? 'Copied' : 'Copy'}</span>
-                                        </button>
+                                    {!student?.qr_code && !student?.barcode && (
+                                      <div className="flex justify-between items-center py-1 border-b border-white/5 text-[11px]">
+                                        <span className="text-slate-400">Token Status</span>
+                                        <span className="font-mono text-slate-300">
+                                          {isSuccess ? 'Verified Token' : 'Unrecognized Token'}
+                                        </span>
                                       </div>
-                                      <div className="p-2.5 rounded-xl bg-black/60 border border-white/10 font-mono text-[11px] text-amber-300 break-all select-all">
-                                        {scan.scanned_value}
-                                      </div>
-                                    </div>
+                                    )}
 
                                     {student?.qr_code && (
                                       <div className="flex justify-between items-center py-1 border-b border-white/5 text-[11px]">
