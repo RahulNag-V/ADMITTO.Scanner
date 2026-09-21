@@ -94,7 +94,7 @@ class DatabaseService {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('email', cleanEmail)
+        .ilike('email', cleanEmail)
         .maybeSingle();
       if (error) {
         console.error('[Supabase DB] Error getting profile by email:', error);
@@ -140,6 +140,13 @@ class DatabaseService {
     if (supabase) {
       const { error } = await supabase.from('profiles').insert(newProfile);
       if (error) {
+        if (error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('unique')) {
+          const existing = await this.getProfileByEmail(cleanEmail);
+          if (existing) {
+            this.inMemoryDB.passwords[cleanEmail] = passwordHash;
+            return existing;
+          }
+        }
         console.error('[Supabase DB] Error creating admin profile:', error);
         throw new Error(`Failed to create account in database: ${error.message}`);
       }

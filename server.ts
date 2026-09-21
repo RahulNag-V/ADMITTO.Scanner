@@ -215,28 +215,43 @@ async function getSessionFromReq(req: Request): Promise<SessionData | null> {
         // Look up or provision profile in profiles table
         let profile = await dbService.getProfileByEmail(userEmail);
         if (!profile) {
-          const name =
-            user.user_metadata?.full_name ||
-            user.user_metadata?.name ||
-            userEmail.split('@')[0] ||
-            'Organizer';
-          profile = await dbService.createAdminProfile(userEmail, name, 'supabase-managed');
+          try {
+            const name =
+              user.user_metadata?.full_name ||
+              user.user_metadata?.name ||
+              userEmail.split('@')[0] ||
+              'Organizer';
+            profile = await dbService.createAdminProfile(userEmail, name, 'supabase-managed');
+          } catch {
+            profile = await dbService.getProfileByEmail(userEmail);
+          }
         }
 
-        const sessionData: SessionData = {
-          userId: profile.id,
-          email: profile.email,
-          name: profile.name,
-          role: profile.role || 'ADMIN',
-          createdAt: Date.now(),
-        };
+        if (profile) {
+          if (!profile.auth_id && user.id) {
+            try {
+              await supabaseAdmin.from('profiles').update({ auth_id: user.id }).eq('id', profile.id);
+              profile.auth_id = user.id;
+            } catch {
+              // Ignore if profile update is non-critical
+            }
+          }
 
-        // Cache in memory for 5 minutes
-        activeSessions.set(token, sessionData);
-        return sessionData;
+          const sessionData: SessionData = {
+            userId: profile.id,
+            email: profile.email,
+            name: profile.name,
+            role: profile.role || 'ADMIN',
+            createdAt: Date.now(),
+          };
+
+          // Cache in memory for 5 minutes
+          activeSessions.set(token, sessionData);
+          return sessionData;
+        }
       }
-    } catch {
-      // Token verification failed or expired
+    } catch (err: any) {
+      console.warn('[getSessionFromReq] Token verification or profile lookup issue:', err?.message || err);
     }
   }
 

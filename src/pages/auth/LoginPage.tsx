@@ -89,12 +89,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         try {
           authResult = await signInWithEmail(cleanInput, password);
         } catch (supaErr: any) {
-          // Fallback check: could this be a station account created with an email address?
+          // Fallback check 1: could this be a station account created with an email address?
           try {
             const stationFallback = await authApi.login(cleanInput, password, 'SCANNER');
             if (stationFallback.session) {
               saveSession(stationFallback.session);
               onLoginSuccess(stationFallback.session, '/scan');
+              return;
+            }
+          } catch {
+            // Check fallback 2
+          }
+
+          // Fallback check 2: backend verified admin account
+          try {
+            const adminFallback = await authApi.login(cleanInput, password, 'ADMIN');
+            if (adminFallback.session) {
+              saveSession(adminFallback.session);
+              onLoginSuccess(adminFallback.session, returnTo || '/admin');
               return;
             }
           } catch {
