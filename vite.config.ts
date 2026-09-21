@@ -14,19 +14,19 @@ export default defineConfig(({ command, mode }) => {
   const isProduction = mode === 'production' || process.env.NODE_ENV === 'production';
   const base = process.env.VITE_BASE || (command === 'build' || isProduction ? '/ADMITTO.Scanner/' : '/');
 
-  const sbUrl = (process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || env.SUPABASE_URL || '').trim();
-  const sbKey = (process.env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || '').trim();
-  const apiUrl = (process.env.VITE_API_URL || env.VITE_API_URL || process.env.API_URL || env.API_URL || '').trim();
+  const rawSbUrl = (process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || env.SUPABASE_URL || '').trim();
+  const rawSbKey = (process.env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || '').trim();
+  const rawApiUrl = (process.env.VITE_API_URL || env.VITE_API_URL || process.env.API_URL || env.API_URL || '').trim();
+
+  const sbUrl = rawSbUrl && !rawSbUrl.includes('your-project-id') ? rawSbUrl : 'https://vifgaafjgzahqxuxtdar.supabase.co';
+  const sbKey = rawSbKey && !rawSbKey.includes('your-anon-key') && !rawSbKey.includes('your-') ? rawSbKey : 'sb_publishable_N40WjzqQ56ZVFuBdDKs34Q_Hopg04S2';
+  const apiUrl = rawApiUrl || 'https://admitto-scanner.onrender.com';
 
   if (command === 'build') {
-    const hasUrl = Boolean(sbUrl && !sbUrl.includes('your-project-id'));
-    const hasKey = Boolean(sbKey && !sbKey.includes('your-anon-key'));
-    const hasApi = Boolean(apiUrl && !apiUrl.includes('localhost'));
-
     console.log('[ADMITTO Build] Verifying client configuration:');
-    console.log(`  - VITE_SUPABASE_URL: ${hasUrl ? 'CONFIGURED' : 'NOT CONFIGURED'}`);
-    console.log(`  - VITE_SUPABASE_ANON_KEY: ${hasKey ? 'CONFIGURED' : 'NOT CONFIGURED'}`);
-    console.log(`  - VITE_API_URL: ${hasApi ? apiUrl : 'NOT CONFIGURED (Static Frontend Mode)'}`);
+    console.log(`  - VITE_SUPABASE_URL: ${sbUrl}`);
+    console.log(`  - VITE_SUPABASE_ANON_KEY: ${sbKey.substring(0, 16)}...`);
+    console.log(`  - VITE_API_URL: ${apiUrl}`);
   }
 
   return {

@@ -9,21 +9,33 @@ function normalizeSupabaseUrl(rawUrl: string): string {
   return url;
 }
 
-const rawSupabaseUrl: string =
+const DEFAULT_CLIENT_SUPABASE_URL = 'https://vifgaafjgzahqxuxtdar.supabase.co';
+const DEFAULT_CLIENT_SUPABASE_ANON_KEY = 'sb_publishable_N40WjzqQ56ZVFuBdDKs34Q_Hopg04S2';
+
+const envSupabaseUrl: string =
   (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL || import.meta.env.SUPABASE_URL)) ||
   '';
 
-const rawSupabaseAnonKey: string =
+const envSupabaseAnonKey: string =
   (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || import.meta.env.SUPABASE_ANON_KEY)) ||
   '';
 
-export const SUPABASE_URL = normalizeSupabaseUrl(rawSupabaseUrl);
-export const SUPABASE_ANON_KEY = (rawSupabaseAnonKey || '').trim();
+const normalizedUrl = normalizeSupabaseUrl(envSupabaseUrl);
+export const SUPABASE_URL =
+  normalizedUrl && !normalizedUrl.includes('your-project-id')
+    ? normalizedUrl
+    : DEFAULT_CLIENT_SUPABASE_URL;
+
+const normalizedKey = (envSupabaseAnonKey || '').trim();
+export const SUPABASE_ANON_KEY =
+  normalizedKey && !normalizedKey.includes('your-anon-key') && !normalizedKey.includes('your-')
+    ? normalizedKey
+    : DEFAULT_CLIENT_SUPABASE_ANON_KEY;
 
 let supabaseClient: SupabaseClient | null = null;
 
 export function getSupabaseClient(): SupabaseClient | null {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || SUPABASE_URL.includes('your-project-id') || SUPABASE_ANON_KEY.includes('your-anon-key')) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     return null;
   }
   if (!supabaseClient) {

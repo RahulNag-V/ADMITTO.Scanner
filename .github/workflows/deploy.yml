@@ -39,9 +39,9 @@ jobs:
         env:
           NODE_ENV: production
           GITHUB_PAGES: 'true'
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
-          VITE_API_URL: ${{ secrets.VITE_API_URL || vars.VITE_API_URL || secrets.API_URL || vars.API_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL || 'https://vifgaafjgzahqxuxtdar.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY || 'sb_publishable_N40WjzqQ56ZVFuBdDKs34Q_Hopg04S2' }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL || vars.VITE_API_URL || secrets.API_URL || vars.API_URL || 'https://admitto-scanner.onrender.com' }}
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

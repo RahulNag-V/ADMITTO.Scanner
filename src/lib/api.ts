@@ -53,6 +53,9 @@ export function getApiBaseUrl(): string {
   if (!url && typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) {
     url = String(process.env.VITE_API_URL).trim();
   }
+  if (!url && typeof window !== 'undefined' && window.location && window.location.hostname.includes('github.io')) {
+    url = 'https://admitto-scanner.onrender.com';
+  }
   return url.replace(/\/+$/, '');
 }
 
@@ -135,10 +138,13 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
     }
 
     if (res.status === 401) {
-      // Only dispatch session-expired if this wasn't an authentication attempt
+      // Only dispatch session-expired for station scanner tokens or if this wasn't an authentication attempt
       if (!endpoint.includes('/api/auth/')) {
-        saveSession(null);
-        window.dispatchEvent(new CustomEvent('admitto:session-expired'));
+        const isSupabaseUser = stored?.token?.startsWith('eyJ') || (stored?.user?.role === 'ADMIN');
+        if (!isSupabaseUser) {
+          saveSession(null);
+          window.dispatchEvent(new CustomEvent('admitto:session-expired'));
+        }
       }
     }
 

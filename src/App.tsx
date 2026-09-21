@@ -534,7 +534,17 @@ export default function App() {
 
   // Auto-logout on session expiry
   useEffect(() => {
-    const handleSessionExpired = () => {
+    const handleSessionExpired = async () => {
+      // Check if user still has a valid active Supabase session before purging
+      try {
+        const supaSession = await getCurrentSession();
+        if (supaSession?.user) {
+          console.warn('[ADMITTO] Session-expired received, but Supabase user session is active. Suppressing premature logout.');
+          return;
+        }
+      } catch {
+        // Fall through to logout if Supabase check fails
+      }
       setSession(null);
       handleStartScanner(null);
       navigate('/login');

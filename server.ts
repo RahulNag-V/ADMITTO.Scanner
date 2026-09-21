@@ -39,7 +39,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Device-UUID, x-bypass-rate-limit');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Device-UUID, x-bypass-rate-limit, Accept, X-Requested-With');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
   }
@@ -249,6 +249,23 @@ async function getSessionFromReq(req: Request): Promise<SessionData | null> {
           activeSessions.set(token, sessionData);
           return sessionData;
         }
+
+        // Fallback if profile row is not yet found or created: user is validly authenticated in Supabase
+        const fallbackName =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          userEmail.split('@')[0] ||
+          'Organizer';
+
+        const fallbackSessionData: SessionData = {
+          userId: user.id,
+          email: userEmail,
+          name: fallbackName,
+          role: 'ADMIN',
+          createdAt: Date.now(),
+        };
+        activeSessions.set(token, fallbackSessionData);
+        return fallbackSessionData;
       }
     } catch (err: any) {
       console.warn('[getSessionFromReq] Token verification or profile lookup issue:', err?.message || err);
