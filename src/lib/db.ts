@@ -2832,7 +2832,7 @@ class DatabaseService {
         supabase.from('students').select('*').eq('event_id', eventId),
         supabase.from('check_ins').select('*').eq('event_id', eventId),
         supabase.from('scan_attempts').select('*').eq('event_id', eventId),
-        supabase.from('scanner_accounts').select('*').eq('event_id', eventId).eq('is_active', true),
+        supabase.from('scanner_accounts').select('*').eq('event_id', eventId),
         adminId
           ? supabase.from('events').select('*', { count: 'exact', head: true }).eq('admin_id', adminId).neq('status', 'DELETED')
           : Promise.resolve({ count: 1, error: null }),
@@ -2852,7 +2852,7 @@ class DatabaseService {
       attendees = this.inMemoryDB.students.filter((s) => s.event_id === eventId);
       checkins = this.inMemoryDB.check_ins.filter((c) => c.event_id === eventId);
       attempts = this.inMemoryDB.scan_attempts.filter((a) => a.event_id === eventId);
-      scanners = this.inMemoryDB.scanner_accounts.filter((s) => s.event_id === eventId && s.is_active);
+      scanners = this.inMemoryDB.scanner_accounts.filter((s) => s.event_id === eventId);
       totalEvents = adminId
         ? this.inMemoryDB.events.filter((e) => e.admin_id === adminId && e.status !== 'DELETED').length
         : 1;
@@ -2906,13 +2906,47 @@ class DatabaseService {
       checked_in: counts.checked_in,
     }));
 
+    const active_scanners_count = scanners.filter((s) => s.is_active).length;
+
+    // Individual scanner activity and performance
+    const scanner_activity = scanners.map((scn) => {
+      const scnSuccessfulScans =
+        attempts.filter((a) => a.scanner_id === scn.id && a.result === 'success').length ||
+        checkins.filter((c) => c.scanner_id === scn.id).length;
+
+      const scnAttempts = attempts.filter((a) => a.scanner_id === scn.id);
+      const scnCheckins = checkins.filter((c) => c.scanner_id === scn.id);
+
+      const timestamps = [
+        ...scnAttempts.map((a) => new Date(a.timestamp).getTime()),
+        ...scnCheckins.map((c) => new Date(c.check_in_at).getTime()),
+        scn.last_login_at ? new Date(scn.last_login_at).getTime() : 0,
+      ].filter((t) => !isNaN(t) && t > 0);
+
+      const latestTime = timestamps.length > 0 ? Math.max(...timestamps) : null;
+      const isRecent = latestTime ? Date.now() - latestTime < 15 * 60 * 1000 : false;
+
+      let status: 'Active' | 'Idle' | 'Inactive' = 'Inactive';
+      if (scn.is_active) {
+        status = isRecent ? 'Active' : 'Idle';
+      }
+
+      return {
+        scanner_id: scn.id,
+        scanner_name: scn.name,
+        total_successful_scans: scnSuccessfulScans,
+        last_scan_time: latestTime ? new Date(latestTime).toISOString() : null,
+        status,
+      };
+    });
+
     return {
       total_events: totalEvents,
       total_attendees,
       total_checked_in,
       total_remaining,
       checkin_percentage,
-      active_scanners_count: scanners.length,
+      active_scanners_count,
       total_scan_attempts: attempts.length,
       duplicates_blocked,
       invalid_attempts,
@@ -2920,6 +2954,7 @@ class DatabaseService {
       barcode_scans,
       branch_breakdown,
       year_breakdown,
+      scanner_activity,
     };
   }
 

@@ -43,6 +43,7 @@ import { syncEngine, SyncEngineStatus } from '../../lib/offline/syncEngine';
 import { eventBundleService } from '../../lib/offline/eventBundle';
 import { saveOfflineAuthContext, getOrCreateDeviceUuid } from '../../lib/offline/security';
 import { purgeEventOfflineData, getCachedAttendees } from '../../lib/offline/idb';
+import { subscribeToEventSync, broadcastEventScan, broadcastEventLogsCleared } from '../../lib/realtimeSync';
 
 // Dock and Tab subcomponents
 import { AppleDock, ScannerDockTab } from '../../components/scanner/AppleDock';
@@ -75,6 +76,20 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
   const [isTabChanging, setIsTabChanging] = useState(false);
   const [direction, setDirection] = useState<number>(0);
   const prevTabRef = useRef<ScannerDockTab>('scanner');
+
+  // 1b. Real-Time Peer Scanner Broadcast Notification
+  const [peerNotification, setPeerNotification] = useState<{
+    id: string;
+    studentName: string;
+    usn: string;
+    branch?: string;
+    year?: string;
+    section?: string;
+    scannerName: string;
+    status: string;
+    timestamp: string;
+  } | null>(null);
+  const peerNotificationTimerRef = useRef<any>(null);
 
   const dockTabOrder: ScannerDockTab[] = ['home', 'log', 'scanner', 'stats', 'settings'];
 
@@ -377,6 +392,7 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
   const handleClearLogs = async (selectedIds?: string[]) => {
     if (!eventId) return;
     await scanApi.clearLogs(eventId, selectedIds);
+    await broadcastEventLogsCleared(eventId, selectedIds);
     if (selectedIds && selectedIds.length > 0) {
       const idSet = new Set(selectedIds);
       setLogs((prev) => prev.filter((log) => !idSet.has(log.id)));
@@ -393,6 +409,85 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
     window.addEventListener('admitto:events-changed', handleEventsChanged);
     return () => window.removeEventListener('admitto:events-changed', handleEventsChanged);
   }, [eventId]);
+
+  // Real-Time Multi-Scanner Synchronization & Peer Live Notifications
+  useEffect(() => {
+    if (!eventId) return;
+
+    const unsubscribe = subscribeToEventSync(eventId, {
+      onScan: (eventData) => {
+        // Skip echo if our own scanner performed the scan
+        if (eventData.scanner?.id === session.user.id) {
+          return;
+        }
+
+        // 1. Immediately prepend to local terminal logs
+        setLogs((prev) => {
+          if (prev.some((l) => l.id === eventData.scan.id)) return prev;
+          return [eventData.scan, ...prev];
+        });
+
+        // 2. If valid check-in, update local students roster & attendance metrics
+        if (eventData.isCheckIn && eventData.student) {
+          setStudents((prev) =>
+            prev.map((s) =>
+              s.id === eventData.student!.id
+                ? { ...s, is_checked_in: true, checked_in: true, checked_in_at: eventData.timestamp }
+                : s
+            )
+          );
+
+          setStats((prev) => {
+            if (!prev) return null;
+            const updatedCheckedIn = prev.total_checked_in + 1;
+            const updatedRemaining = Math.max(0, prev.total_remaining - 1);
+            return {
+              ...prev,
+              total_checked_in: updatedCheckedIn,
+              total_remaining: updatedRemaining,
+              checkin_percentage:
+                prev.total_attendees > 0
+                  ? Math.round((updatedCheckedIn / prev.total_attendees) * 100)
+                  : 0,
+              qr_scans: eventData.scan.scan_type === 'QR' ? prev.qr_scans + 1 : prev.qr_scans,
+              barcode_scans: eventData.scan.scan_type === 'BARCODE' ? prev.barcode_scans + 1 : prev.barcode_scans,
+            };
+          });
+        }
+
+        // 3. Show live peer notification toast
+        if (peerNotificationTimerRef.current) clearTimeout(peerNotificationTimerRef.current);
+        setPeerNotification({
+          id: eventData.id,
+          studentName: eventData.student?.name || 'Attendee',
+          usn: eventData.student?.usn || eventData.scan.scanned_value,
+          branch: eventData.student?.branch,
+          year: eventData.student?.year,
+          section: eventData.student?.section,
+          scannerName: eventData.scanner.name || 'Terminal Gate',
+          status: eventData.scan.result,
+          timestamp: eventData.timestamp,
+        });
+
+        peerNotificationTimerRef.current = setTimeout(() => {
+          setPeerNotification(null);
+        }, 4500);
+      },
+      onLogsCleared: (payload) => {
+        if (payload.scanIds && payload.scanIds.length > 0) {
+          const idSet = new Set(payload.scanIds);
+          setLogs((prev) => prev.filter((l) => !idSet.has(l.id)));
+        } else {
+          setLogs([]);
+        }
+      },
+    });
+
+    return () => {
+      unsubscribe();
+      if (peerNotificationTimerRef.current) clearTimeout(peerNotificationTimerRef.current);
+    };
+  }, [eventId, session.user.id]);
 
   // Periodic event liveness check: If admin deletes event, safely terminate
   useEffect(() => {
@@ -770,6 +865,23 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
 
       setLogs((prev) => [newLogEntry, ...prev]);
 
+      // Broadcast scan event across all connected terminals & admin in real-time
+      broadcastEventScan(eventId, {
+        id: newLogEntry.id,
+        eventId,
+        scan: newLogEntry,
+        student: result.student,
+        scanner: {
+          id: session.user.id,
+          name: scannerName,
+        },
+        isCheckIn:
+          result.status === 'SUCCESS' ||
+          result.status === 'IDEMPOTENT_SUCCESS' ||
+          result.status === 'SUCCESS_OFFLINE',
+        timestamp: newLogEntry.timestamp,
+      });
+
       // Refresh stats and students roster
       if (result.status === 'SUCCESS' || result.status === 'IDEMPOTENT_SUCCESS' || result.status === 'SUCCESS_OFFLINE') {
         if (result.student) {
@@ -781,17 +893,22 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
             )
           );
         }
-        setStats((prev) =>
-          prev
-            ? {
-                ...prev,
-                total_checked_in: prev.total_checked_in + 1,
-                total_remaining: Math.max(0, prev.total_remaining - 1),
-                qr_scans: scanType === 'QR' ? prev.qr_scans + 1 : prev.qr_scans,
-                barcode_scans: scanType === 'BARCODE' ? prev.barcode_scans + 1 : prev.barcode_scans,
-              }
-            : null
-        );
+        setStats((prev) => {
+          if (!prev) return null;
+          const updatedCheckedIn = prev.total_checked_in + 1;
+          const updatedRemaining = Math.max(0, prev.total_remaining - 1);
+          return {
+            ...prev,
+            total_checked_in: updatedCheckedIn,
+            total_remaining: updatedRemaining,
+            checkin_percentage:
+              prev.total_attendees > 0
+                ? Math.round((updatedCheckedIn / prev.total_attendees) * 100)
+                : 0,
+            qr_scans: scanType === 'QR' ? prev.qr_scans + 1 : prev.qr_scans,
+            barcode_scans: scanType === 'BARCODE' ? prev.barcode_scans + 1 : prev.barcode_scans,
+          };
+        });
       } else if (result.status === 'DUPLICATE_CHECKIN') {
         setStats((prev) =>
           prev ? { ...prev, duplicates_blocked: prev.duplicates_blocked + 1 } : null
@@ -1022,8 +1139,31 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
   return (
     <div
       id="scanner-terminal-app"
-      className="h-full h-[100dvh] max-h-[100dvh] w-full overflow-hidden mesh-bg text-slate-100 flex flex-col selection:bg-indigo-500 selection:text-white"
+      className="h-full h-[100dvh] max-h-[100dvh] w-full overflow-hidden mesh-bg text-slate-100 flex flex-col selection:bg-indigo-500 selection:text-white relative"
     >
+      {/* Floating Live Sync Toast from Peer Scanners */}
+      {peerNotification && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 max-w-md w-[92%] sm:w-auto bg-[#181d33]/95 border border-indigo-500/40 backdrop-blur-2xl rounded-2xl p-3 sm:px-4 sm:py-2.5 shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-3 duration-200">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+            <CheckCheck className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-bold text-white truncate flex items-center gap-1.5">
+              <span className="text-indigo-300 font-semibold">{peerNotification.scannerName}</span>
+              <span className="text-slate-400 font-normal">checked in</span>
+              <span className="text-emerald-300">{peerNotification.studentName}</span>
+            </div>
+            <div className="text-[11px] text-slate-300 font-mono truncate flex items-center gap-2">
+              <span>{peerNotification.usn}</span>
+              {peerNotification.branch && <span>• {peerNotification.branch}</span>}
+              {(peerNotification.year || peerNotification.section) && (
+                <span>• {peerNotification.year || ''} {peerNotification.section || ''}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. Universal Top Header Bar with Refresh Action */}
       <header className="glass-header border-b border-white/[0.08] px-3.5 sm:px-6 py-2.5 sm:py-3 sticky top-0 z-40 flex items-center justify-between shadow-lg shrink-0">
         <div

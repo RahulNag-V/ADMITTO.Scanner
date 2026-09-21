@@ -1738,8 +1738,66 @@ app.delete('/api/scanner-requests/:reqId', requireAdminAuth, async (req: Request
 });
 
 // ==========================================
-// 5. CENTRALIZED ATOMIC CHECK-IN ENGINE
+// 5. CENTRALIZED ATOMIC CHECK-IN ENGINE & REAL-TIME SYNC
 // ==========================================
+
+// Active Server-Sent Events (SSE) connections per event
+const sseClientsByEvent = new Map<string, Set<Response>>();
+
+export function broadcastToEventStream(eventId: string, payload: any) {
+  const clients = sseClientsByEvent.get(eventId);
+  if (!clients || clients.size === 0) return;
+  const message = `data: ${JSON.stringify(payload)}\n\n`;
+  for (const client of clients) {
+    try {
+      client.write(message);
+    } catch {
+      // client connection might be dead
+    }
+  }
+}
+
+// Live SSE Stream for Real-Time Synchronization across Scanners and Admin
+app.get('/api/events/:id/live-stream', (req: Request, res: Response) => {
+  const eventId = req.params.id;
+  if (!eventId) {
+    res.status(400).end();
+    return;
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+    'Access-Control-Allow-Origin': req.headers.origin || '*',
+    'Access-Control-Allow-Credentials': 'true',
+  });
+
+  res.write(`data: ${JSON.stringify({ type: 'CONNECTED', eventId, timestamp: new Date().toISOString() })}\n\n`);
+
+  if (!sseClientsByEvent.has(eventId)) {
+    sseClientsByEvent.set(eventId, new Set());
+  }
+  const clientSet = sseClientsByEvent.get(eventId)!;
+  clientSet.add(res);
+
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(': heartbeat\n\n');
+    } catch {
+      clearInterval(heartbeat);
+    }
+  }, 20000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    clientSet.delete(res);
+    if (clientSet.size === 0) {
+      sseClientsByEvent.delete(eventId);
+    }
+  });
+});
 
 // Validate Token & Record Check-In
 app.post('/api/scan/validate', requireScannerOrAdmin, scanLimiter, async (req: Request, res: Response) => {
@@ -1785,6 +1843,42 @@ app.post('/api/scan/validate', requireScannerOrAdmin, scanLimiter, async (req: R
       clientScanId,
       source: 'online',
       secondaryValue,
+    });
+
+    const scannerName = (session as any).name || (authCheck as any).scannerName || 'Gate Scanner';
+
+    // Broadcast scan event to all connected clients in real-time
+    broadcastToEventStream(eventId, {
+      type: 'SCAN_EVENT',
+      eventId,
+      scan: {
+        id: 'scan-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+        event_id: eventId,
+        student_id: result.student?.id || null,
+        scanned_value: scannedValue,
+        scan_type: scanType,
+        result:
+          result.status === 'SUCCESS' || result.status === 'IDEMPOTENT_SUCCESS'
+            ? 'success'
+            : result.status === 'DUPLICATE_CHECKIN'
+            ? 'duplicate'
+            : 'invalid',
+        reason: result.message,
+        scanner_id: scannerId || session.userId,
+        timestamp: new Date().toISOString(),
+        student: result.student,
+        scanner: {
+          id: scannerId || session.userId,
+          name: scannerName,
+        },
+      },
+      student: result.student,
+      scanner: {
+        id: scannerId || session.userId,
+        name: scannerName,
+      },
+      isCheckIn: result.status === 'SUCCESS' || result.status === 'IDEMPOTENT_SUCCESS',
+      timestamp: new Date().toISOString(),
     });
 
     res.json(result);
@@ -1950,6 +2044,13 @@ app.delete('/api/events/:id/scans', requireScannerOrAdmin, async (req: Request, 
     const { scanIds } = req.body || {};
     const result = await dbService.clearScanHistory(req.params.id, {
       scanIds: Array.isArray(scanIds) ? scanIds : undefined,
+    });
+
+    broadcastToEventStream(req.params.id, {
+      type: 'LOGS_CLEARED',
+      eventId: req.params.id,
+      scanIds: Array.isArray(scanIds) ? scanIds : undefined,
+      timestamp: new Date().toISOString(),
     });
 
     res.json({

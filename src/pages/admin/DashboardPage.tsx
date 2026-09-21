@@ -21,6 +21,7 @@ import { eventsApi, scanApi, studentsApi, scannersApi } from '../../lib/api';
 import { getAttendeeLabels } from '../../lib/attendeeTypes';
 import { Skeleton, SkeletonStatCard, TabSkeletonView } from '../../components/common/Skeleton';
 import { MetricDetailModal, MetricModalType } from '../../components/admin/MetricDetailModal';
+import { subscribeToEventSync } from '../../lib/realtimeSync';
 
 interface DashboardPageProps {
   eventId: string;
@@ -47,14 +48,109 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const [activeDetailModal, setActiveDetailModal] = useState<MetricModalType | null>(null);
 
   useEffect(() => {
-    if (eventId) {
-      loadDashboardData();
-      // Auto-refresh stats every 8 seconds for live dashboard experience
-      const interval = setInterval(() => {
+    if (!eventId) return;
+
+    loadDashboardData();
+
+    // Real-Time Multi-Scanner Synchronization (Instant updates on scan)
+    const unsubscribe = subscribeToEventSync(eventId, {
+      onScan: (eventData) => {
+        const isCheckIn = eventData.isCheckIn;
+
+        // 1. Instant update to aggregate stats counters & progress
+        setStats((prev) => {
+          if (!prev) return null;
+          const updatedCheckedIn = isCheckIn ? prev.total_checked_in + 1 : prev.total_checked_in;
+          const updatedRemaining = isCheckIn ? Math.max(0, prev.total_remaining - 1) : prev.total_remaining;
+          const updatedPct =
+            prev.total_attendees > 0
+              ? Math.round((updatedCheckedIn / prev.total_attendees) * 100)
+              : 0;
+
+          // 2. Real-time update to individual scanner activity
+          const currentActivity = prev.scanner_activity || [];
+          const scnIdx = currentActivity.findIndex(
+            (s) => s.scanner_id === eventData.scanner.id || s.scanner_name === eventData.scanner.name
+          );
+
+          let updatedActivity = [...currentActivity];
+          if (scnIdx !== -1) {
+            updatedActivity[scnIdx] = {
+              ...updatedActivity[scnIdx],
+              total_successful_scans: isCheckIn
+                ? updatedActivity[scnIdx].total_successful_scans + 1
+                : updatedActivity[scnIdx].total_successful_scans,
+              last_scan_time: eventData.timestamp,
+              status: 'Active',
+            };
+          } else {
+            updatedActivity.push({
+              scanner_id: eventData.scanner.id,
+              scanner_name: eventData.scanner.name,
+              total_successful_scans: isCheckIn ? 1 : 0,
+              last_scan_time: eventData.timestamp,
+              status: 'Active',
+            });
+          }
+
+          return {
+            ...prev,
+            total_checked_in: updatedCheckedIn,
+            total_remaining: updatedRemaining,
+            checkin_percentage: updatedPct,
+            total_scan_attempts: prev.total_scan_attempts + 1,
+            duplicates_blocked:
+              eventData.scan.result === 'duplicate' ? prev.duplicates_blocked + 1 : prev.duplicates_blocked,
+            invalid_attempts:
+              eventData.scan.result === 'invalid' ? prev.invalid_attempts + 1 : prev.invalid_attempts,
+            qr_scans: eventData.scan.scan_type === 'QR' && isCheckIn ? prev.qr_scans + 1 : prev.qr_scans,
+            barcode_scans:
+              eventData.scan.scan_type === 'BARCODE' && isCheckIn
+                ? prev.barcode_scans + 1
+                : prev.barcode_scans,
+            scanner_activity: updatedActivity,
+          };
+        });
+
+        // 3. Prepend to live audit stream
+        setRecentActivity((prev) => [
+          {
+            id: 'act-' + Date.now(),
+            event_id: eventId,
+            actor_id: eventData.scanner.id,
+            actor_name: eventData.scanner.name,
+            type: isCheckIn ? 'checkin_success' : 'checkin_invalid',
+            message: `${eventData.scanner.name} checked in ${eventData.student?.name || eventData.scan.scanned_value} (${eventData.scan.result.toUpperCase()})`,
+            timestamp: eventData.timestamp,
+          },
+          ...prev.slice(0, 15),
+        ]);
+
+        // 4. Update student roster status
+        if (isCheckIn && eventData.student) {
+          setStudents((prev) =>
+            prev.map((s) =>
+              s.id === eventData.student!.id
+                ? { ...s, is_checked_in: true, checked_in: true, checked_in_at: eventData.timestamp }
+                : s
+            )
+          );
+        }
+      },
+      onLogsCleared: () => {
         loadDashboardData(true);
-      }, 8000);
-      return () => clearInterval(interval);
-    }
+      },
+    });
+
+    // Background heartbeat (every 12s)
+    const interval = setInterval(() => {
+      loadDashboardData(true);
+    }, 12000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, [eventId]);
 
   const loadDashboardData = async (silent = false) => {
@@ -306,7 +402,122 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         </div>
       </div>
 
-      {/* 3. Branch Distributions & Live Activity Feed Grid */}
+      {/* 3. Live Scanner Activity & Performance (Centralized Multi-Scanner Overview) */}
+      <div className="glass-card rounded-3xl p-6 sm:p-7 space-y-5 border border-white/10 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
+              <Smartphone className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white font-['Space_Grotesk'] flex items-center gap-2">
+                <span>Scanner Activity & Terminal Performance</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              </h2>
+              <p className="text-xs text-slate-400">
+                Real-time synchronized telemetry, active check-in output, and terminal operational status
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => onNavigateTab('scanners')}
+            className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 cursor-pointer self-start sm:self-auto group"
+          >
+            <span>Manage All Scanners</span>
+            <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+          </button>
+        </div>
+
+        {/* Scanner Activity Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-white/10 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                <th className="py-3 px-4">Scanner Name</th>
+                <th className="py-3 px-4 text-right">Total Successful Scans</th>
+                <th className="py-3 px-4">Last Scan Time</th>
+                <th className="py-3 px-4 text-center">Scanner Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.06]">
+              {(!s.scanner_activity || s.scanner_activity.length === 0) ? (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-slate-400 text-xs">
+                    No scanner activity recorded yet for this event.
+                  </td>
+                </tr>
+              ) : (
+                s.scanner_activity.map((item) => {
+                  const isActive = item.status === 'Active';
+                  const isIdle = item.status === 'Idle';
+                  const lastTimeFormatted = item.last_scan_time
+                    ? new Date(item.last_scan_time).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: true,
+                      })
+                    : 'No scans yet';
+
+                  return (
+                    <tr key={item.scanner_id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-indigo-300 font-bold text-xs shrink-0">
+                            {item.scanner_name.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-bold text-white text-sm">{item.scanner_name}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">ID: {item.scanner_id.slice(0, 8)}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <span className="font-mono font-bold text-base text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-xl border border-emerald-500/20 inline-flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>{item.total_successful_scans}</span>
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-mono text-slate-200">{lastTimeFormatted}</div>
+                        {item.last_scan_time && (
+                          <div className="text-[10px] text-slate-500">
+                            {new Date(item.last_scan_time).toLocaleDateString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold tracking-wider uppercase border ${
+                            isActive
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                              : isIdle
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                              : 'bg-slate-800 text-slate-400 border-white/10'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              isActive ? 'bg-emerald-400 animate-pulse' : isIdle ? 'bg-amber-400' : 'bg-slate-500'
+                            }`}
+                          />
+                          <span>{item.status}</span>
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 4. Branch Distributions & Live Activity Feed Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Col: Branch Breakdown Progress Bars */}
         <div className="lg:col-span-7 glass-card rounded-3xl p-6 sm:p-7 space-y-6">

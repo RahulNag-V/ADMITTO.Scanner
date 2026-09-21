@@ -252,6 +252,24 @@ export interface ActivityLog {
   timestamp: string;
 }
 
+export interface ScannerActivityItem {
+  scanner_id: string;
+  scanner_name: string;
+  total_successful_scans: number;
+  last_scan_time: string | null;
+  status: 'Active' | 'Idle' | 'Inactive';
+}
+
+export interface RealtimeScanBroadcast {
+  id: string;
+  eventId: string;
+  scan: ScanAttempt;
+  student?: Student;
+  scanner: { id: string; name: string };
+  isCheckIn: boolean;
+  timestamp: string;
+}
+
 export interface EventStats {
   total_events: number;
   total_attendees: number;
@@ -266,6 +284,7 @@ export interface EventStats {
   barcode_scans: number;
   branch_breakdown: { branch: string; total: number; checked_in: number }[];
   year_breakdown: { year: string; total: number; checked_in: number }[];
+  scanner_activity?: ScannerActivityItem[];
 }
 
 export interface ScanValidationResult {

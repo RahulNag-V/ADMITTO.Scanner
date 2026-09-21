@@ -38,6 +38,7 @@ import { toBrowserPath } from '../../lib/router';
 import { ScanAttempt } from '../../types';
 import { scanApi } from '../../lib/api';
 import { SkeletonTableRow, TabSkeletonView } from '../../components/common/Skeleton';
+import { subscribeToEventSync } from '../../lib/realtimeSync';
 
 interface ScansHistoryPageProps {
   eventId: string;
@@ -46,12 +47,14 @@ interface ScansHistoryPageProps {
 export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) => {
   const [scans, setScans] = useState<ScanAttempt[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [resultFilter, setResultFilter] = useState('ALL');
-  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
+  const [resultFilter, setResultFilter] = useState<string>('ALL');
   const [expandedScanIds, setExpandedScanIds] = useState<Set<string>>(new Set());
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Multi-Selection State for Selective Deletion
   const [selectedScanIds, setSelectedScanIds] = useState<Set<string>>(new Set());
   const [isClearing, setIsClearing] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -76,9 +79,28 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
   }, []);
 
   useEffect(() => {
-    if (eventId) {
-      loadScans();
-    }
+    if (!eventId) return;
+
+    loadScans();
+
+    const unsubscribe = subscribeToEventSync(eventId, {
+      onScan: (eventData) => {
+        setScans((prev) => {
+          if (prev.some((s) => s.id === eventData.scan.id)) return prev;
+          return [eventData.scan, ...prev];
+        });
+      },
+      onLogsCleared: (payload) => {
+        if (payload.scanIds && payload.scanIds.length > 0) {
+          const idSet = new Set(payload.scanIds);
+          setScans((prev) => prev.filter((s) => !idSet.has(s.id)));
+        } else {
+          setScans([]);
+        }
+      },
+    });
+
+    return () => unsubscribe();
   }, [eventId]);
 
   const loadScans = async (silent = false) => {
