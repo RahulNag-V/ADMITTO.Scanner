@@ -418,6 +418,22 @@ export default function App() {
       window.history.pushState({}, '', browserUrl);
     }
     setCurrentPath(appRoute);
+
+    if (appRoute.startsWith('/admin')) {
+      const queryString = path.includes('?') ? path.split('?')[1].split('#')[0] : '';
+      const urlParams = new URLSearchParams(queryString);
+      const tab = urlParams.get('tab');
+      if (tab && validAdminTabs.includes(tab)) {
+        setAdminActiveTab(tab);
+      }
+    }
+
+    if (appRoute.startsWith('/blog/')) {
+      setSelectedBlogSlug(appRoute.replace(/^\/blog\//, '').trim());
+    } else if (appRoute === '/blog') {
+      setSelectedBlogSlug(null);
+    }
+
     const mainEl = document.getElementById('app-main-viewport');
     if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -554,11 +570,10 @@ export default function App() {
     );
   }
 
-  // ─── ROUTE: /reset-password (Redirect to unified /forgot-password) ──
+  // ─── ROUTE: /reset-password ────────────────────────────────────────
   if (currentPath === '/reset-password') {
-    navigate('/forgot-password');
     return (
-      <ForgotPasswordPage
+      <ResetPasswordPage
         onNavigateLogin={() => navigate('/login')}
         onNavigateHome={() => navigate('/')}
       />
@@ -710,6 +725,7 @@ export default function App() {
           onDeleteAccount={() => setIsDeleteAccountModalOpen(true)}
           onOpenScanner={() => navigate('/scan')}
           onNavigateHome={() => navigate('/')}
+          onNavigate={navigate}
           selectedEventId={selectedEventId}
           onSelectEventId={handleSelectEventId}
         >

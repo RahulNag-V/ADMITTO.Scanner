@@ -43,6 +43,7 @@ interface AdminLayoutProps {
   onDeleteAccount?: () => void;
   onOpenScanner: () => void;
   onNavigateHome?: () => void;
+  onNavigate?: (path: string) => void;
   selectedEventId: string | null;
   onSelectEventId: (eventId: string) => void;
   children: React.ReactNode;
@@ -56,6 +57,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   onDeleteAccount,
   onOpenScanner,
   onNavigateHome,
+  onNavigate,
   selectedEventId,
   onSelectEventId,
   children,
@@ -792,7 +794,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 <div className="mt-16 -mx-4 sm:-mx-6 lg:-mx-8">
                   <Footer
                     onNavigate={(path) => {
-                      if (path === '/') {
+                      if (onNavigate) {
+                        onNavigate(path);
+                      } else if (path === '/') {
                         if (onNavigateHome) {
                           onNavigateHome();
                         } else {

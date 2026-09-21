@@ -42,11 +42,11 @@ export default defineConfig(({ command, mode }) => {
       {
         name: 'spa-github-pages-404',
         closeBundle() {
-          const indexPath = path.resolve(__dirname, 'dist/index.html');
-          const notFoundPath = path.resolve(__dirname, 'dist/404.html');
-          if (fs.existsSync(indexPath)) {
-            fs.copyFileSync(indexPath, notFoundPath);
-            console.log('[ADMITTO Build] Generated dist/404.html for GitHub Pages SPA fallback');
+          const source404 = path.resolve(__dirname, 'public/404.html');
+          const dest404 = path.resolve(__dirname, 'dist/404.html');
+          if (fs.existsSync(source404)) {
+            fs.copyFileSync(source404, dest404);
+            console.log('[ADMITTO Build] Verified dist/404.html GitHub Pages SPA fallback from public/404.html');
           }
         },
       },

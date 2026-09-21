@@ -105,8 +105,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           try {
             const adminFallback = await authApi.login(cleanInput, password, 'ADMIN');
             if (adminFallback.session) {
-              saveSession(adminFallback.session);
-              onLoginSuccess(adminFallback.session, returnTo || '/admin');
+              const sanitizedReturnTo = returnTo === '/events' ? '/admin' : returnTo;
+              onLoginSuccess(adminFallback.session, sanitizedReturnTo || '/admin');
               return;
             }
           } catch {
@@ -175,7 +175,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           }
         }
 
-        const targetDest = returnTo || (effectiveRole === 'SCANNER' ? '/scan' : '/admin');
+        const sanitizedReturnTo = returnTo === '/events' ? '/admin' : returnTo;
+        const targetDest = sanitizedReturnTo || (effectiveRole === 'SCANNER' ? '/scan' : '/admin');
         onLoginSuccess(session, targetDest);
       } else {
         // Scanner Login: ONLY admin-generated email and referral code
