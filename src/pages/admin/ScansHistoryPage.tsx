@@ -663,48 +663,32 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
                                   )}
                                 </div>
 
-                                {/* 2. Scanned Payload & Token Tokens */}
+                                {/* 2. Scan Input Medium */}
                                 <div className="glass-card rounded-2xl p-4 border border-white/[0.08] space-y-3">
                                   <div className="flex items-center gap-2 text-indigo-300 font-bold text-xs uppercase tracking-wider">
-                                    <Fingerprint className="w-3.5 h-3.5" />
-                                    <span>Scanned Token & Payload</span>
+                                    {scan.scan_type === 'BARCODE' ? (
+                                      <Barcode className="w-3.5 h-3.5 text-purple-400" />
+                                    ) : (
+                                      <QrCode className="w-3.5 h-3.5 text-indigo-400" />
+                                    )}
+                                    <span>Scan Input Medium</span>
                                   </div>
 
-                                  <div className="space-y-2.5 text-xs">
-                                    {!student?.qr_code && !student?.barcode && (
-                                      <div className="flex justify-between items-center py-1 border-b border-white/5 text-[11px]">
-                                        <span className="text-slate-400">Token Status</span>
-                                        <span className="font-mono text-slate-300">
-                                          {isSuccess ? 'Verified Token' : 'Unrecognized Token'}
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {student?.qr_code && (
-                                      <div className="flex justify-between items-center py-1 border-b border-white/5 text-[11px]">
-                                        <span className="text-slate-400">Registered QR Token</span>
-                                        <span className="font-mono text-slate-300 truncate max-w-[170px]">
-                                          {student.qr_code}
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {student?.barcode && (
-                                      <div className="flex justify-between items-center py-1 border-b border-white/5 text-[11px]">
-                                        <span className="text-slate-400">Registered Barcode</span>
-                                        <span className="font-mono text-slate-300">{student.barcode}</span>
-                                      </div>
-                                    )}
-
-                                    <div className="flex justify-between items-center py-1 text-[11px]">
+                                  <div className="space-y-2 text-xs">
+                                    <div className="flex justify-between items-center py-2 text-xs">
                                       <span className="text-slate-400">Scan Input Medium</span>
-                                      <span className="font-semibold text-slate-200 flex items-center gap-1">
+                                      <span className="font-semibold text-slate-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10">
                                         {scan.scan_type === 'BARCODE' ? (
-                                          <Barcode className="w-3.5 h-3.5 text-purple-400" />
+                                          <>
+                                            <Barcode className="w-4 h-4 text-purple-400" />
+                                            <span>BARCODE Scan</span>
+                                          </>
                                         ) : (
-                                          <QrCode className="w-3.5 h-3.5 text-indigo-400" />
+                                          <>
+                                            <QrCode className="w-4 h-4 text-indigo-400" />
+                                            <span>QR Code Scan</span>
+                                          </>
                                         )}
-                                        {scan.scan_type} Scan
                                       </span>
                                     </div>
                                   </div>
