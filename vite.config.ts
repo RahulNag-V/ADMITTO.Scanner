@@ -6,12 +6,16 @@ import { defineConfig, loadEnv } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ command, mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
+  const env = {
+    ...loadEnv(mode, path.resolve(__dirname, '..'), ''),
+    ...loadEnv(mode, __dirname, ''),
+    ...loadEnv(mode, process.cwd(), ''),
+  };
   const isProduction = mode === 'production' || process.env.NODE_ENV === 'production';
   const base = process.env.VITE_BASE || (command === 'build' || isProduction ? '/ADMITTO.Scanner/' : '/');
 
-  const sbUrl = (process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL || '').trim();
-  const sbKey = (process.env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || '').trim();
+  const sbUrl = (process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || env.SUPABASE_URL || '').trim();
+  const sbKey = (process.env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || '').trim();
   const apiUrl = (process.env.VITE_API_URL || env.VITE_API_URL || process.env.API_URL || env.API_URL || '').trim();
 
   if (command === 'build') {
