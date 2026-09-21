@@ -88,6 +88,8 @@ export interface Profile {
   email: string;
   name: string;
   role: 'ADMIN' | 'SCANNER';
+  auth_id?: string | null;
+  password_hash?: string | null;
   created_at: string;
   updated_at: string;
 }

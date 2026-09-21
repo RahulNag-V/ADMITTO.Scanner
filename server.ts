@@ -10,7 +10,7 @@ import { dbService, registerScannerInvalidationHook } from './src/lib/db';
 import { AuthSession, UserRole, ScanType } from './src/types';
 import { testServerSupabaseHealth, isServerSupabaseActive, getServerSupabaseAdmin, getServerSupabase } from './src/lib/supabase/server';
 
-const currentDir = import.meta.dirname || process.cwd();
+const currentDir = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 dotenv.config({ path: path.resolve(currentDir, '.env') });
 dotenv.config({ path: path.resolve(currentDir, '..', '.env') });
