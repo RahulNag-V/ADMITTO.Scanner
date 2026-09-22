@@ -749,8 +749,47 @@ export const HomePage: React.FC<HomePageProps> = ({
         </AppleScrollReveal>
       </section>
 
-      {/* 4. MOBILE SCANNER & APP DOWNLOAD SECTION (ABOVE FOOTER) */}
-      <section id="scanner-download-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4 space-y-6">
+      {/* 4. FINAL CTA BANNER */}
+      <section id="cta-banner" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <AppleScrollReveal direction="up" distance={35}>
+          <div className="relative rounded-[28px] glass-card p-6 sm:p-10 text-center text-white space-y-5 overflow-hidden border border-white/10 shadow-2xl">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/25 blur-[120px] rounded-full pointer-events-none" />
+
+            <div className="max-w-2xl mx-auto space-y-3 relative z-10">
+              <h2 className="text-3xl sm:text-4xl font-extrabold font-['Space_Grotesk'] tracking-tight">
+                Ready to eliminate entry congestion?
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 font-normal">
+                Create your organizer account and launch your event access system in minutes.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2 relative z-10">
+              <motion.button
+                whileHover={{ scale: 1.04, y: -2 }}
+                whileTap={{ scale: 0.97 }}
+                id="cta-start-btn"
+                onClick={onOpenStartNow}
+                className="px-8 py-4 rounded-2xl bg-white text-slate-900 hover:bg-slate-100 font-bold text-xs shadow-xl transition-all cursor-pointer"
+              >
+                Launch ADMITTO Portal
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.04, y: -2 }}
+                whileTap={{ scale: 0.97 }}
+                id="cta-learn-btn"
+                onClick={() => onNavigate('/features')}
+                className="px-7 py-4 rounded-2xl glass text-slate-200 hover:bg-white/10 hover:text-white font-semibold text-xs transition-all cursor-pointer"
+              >
+                Explore Full Features
+              </motion.button>
+            </div>
+          </div>
+        </AppleScrollReveal>
+      </section>
+
+      {/* 5. MOBILE SCANNER & APP DOWNLOAD SECTION (BELOW CTA BANNER, ABOVE FOOTER) */}
+      <section id="scanner-download-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-2 space-y-6">
         <AppleScrollReveal direction="up" distance={25}>
           <div className="text-center max-w-2xl mx-auto space-y-2.5">
             <div className="inline-flex items-center gap-1.5 text-xs uppercase font-bold tracking-widest text-orange-400 glass-pill px-3.5 py-1 rounded-full">
@@ -879,45 +918,6 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           </motion.div>
         </div>
-      </section>
-
-      {/* 5. FINAL CTA BANNER */}
-      <section id="cta-banner" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <AppleScrollReveal direction="up" distance={35}>
-          <div className="relative rounded-[28px] glass-card p-6 sm:p-10 text-center text-white space-y-5 overflow-hidden border border-white/10 shadow-2xl">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/25 blur-[120px] rounded-full pointer-events-none" />
-
-            <div className="max-w-2xl mx-auto space-y-3 relative z-10">
-              <h2 className="text-3xl sm:text-4xl font-extrabold font-['Space_Grotesk'] tracking-tight">
-                Ready to eliminate entry congestion?
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-300 font-normal">
-                Create your organizer account and launch your event access system in minutes.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2 relative z-10">
-              <motion.button
-                whileHover={{ scale: 1.04, y: -2 }}
-                whileTap={{ scale: 0.97 }}
-                id="cta-start-btn"
-                onClick={onOpenStartNow}
-                className="px-8 py-4 rounded-2xl bg-white text-slate-900 hover:bg-slate-100 font-bold text-xs shadow-xl transition-all cursor-pointer"
-              >
-                Launch ADMITTO Portal
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.04, y: -2 }}
-                whileTap={{ scale: 0.97 }}
-                id="cta-learn-btn"
-                onClick={() => onNavigate('/features')}
-                className="px-7 py-4 rounded-2xl glass text-slate-200 hover:bg-white/10 hover:text-white font-semibold text-xs transition-all cursor-pointer"
-              >
-                Explore Full Features
-              </motion.button>
-            </div>
-          </div>
-        </AppleScrollReveal>
       </section>
       </div>
     </div>
