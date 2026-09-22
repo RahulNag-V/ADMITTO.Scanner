@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import QRCode from 'qrcode';
 import {
   QrCode,
   Shield,
@@ -17,12 +18,15 @@ import {
   Scan,
   Eye,
   Check,
+  Download,
+  ExternalLink,
+  Copy,
 } from 'lucide-react';
-import { DigitalEventPassModal } from '../../components/common/DigitalEventPassModal';
 import { AppleScrollReveal, AppleScrollStagger, AppleScrollCard } from '../../components/common/AppleScrollReveal';
 import { ScrollingCautionTape } from '../../components/common/ScrollingCautionTape';
 import { Watermark3DGyroBanner } from '../../components/common/Watermark3DGyroBanner';
-import { Student, AuthSession } from '../../types';
+import { AuthSession } from '../../types';
+import { toBrowserPath } from '../../lib/router';
 
 interface HomePageProps {
   onNavigate: (path: string) => void;
@@ -52,22 +56,7 @@ const itemVariants = {
   },
 };
 
-const demoHeroPass: Student = {
-  id: 'demo-hero-student',
-  event_id: 'demo-event-01',
-  name: 'Alex Rivera',
-  usn: '1BH24CS042',
-  branch: 'Computer Science & AI',
-  year: '3rd Year',
-  section: 'A',
-  qr_code: 'ADMITTO-ALEX-RIVERA-1BH24CS042-VIP',
-  barcode: '1BH24CS042',
-  is_checked_in: true,
-  checked_in: true,
-  checked_in_at: new Date().toISOString(),
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-};
+const APK_DOWNLOAD_URL = 'https://github.com/RahulNag-V/ADMITTO.Scanner/releases/latest';
 
 export const HomePage: React.FC<HomePageProps> = ({
   onNavigate,
@@ -75,7 +64,72 @@ export const HomePage: React.FC<HomePageProps> = ({
   session,
   onSelectRole,
 }) => {
-  const [previewStudentPass, setPreviewStudentPass] = useState<Student | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
+  const [isStandaloneApp, setIsStandaloneApp] = useState<boolean>(false);
+  const [copiedLink, setCopiedLink] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Generate QR code pointing to scanner mobile terminal
+    const fullScanUrl = typeof window !== 'undefined'
+      ? `${window.location.origin}${toBrowserPath('/scan')}`
+      : 'https://admitto-scanner.onrender.com/scan';
+
+    QRCode.toDataURL(fullScanUrl, {
+      width: 240,
+      margin: 1,
+      color: {
+        dark: '#0a0f1d',
+        light: '#ffffff',
+      },
+      errorCorrectionLevel: 'M',
+    })
+      .then((url) => setQrDataUrl(url))
+      .catch((err) => console.error('Failed to generate Scanner QR:', err));
+
+    // Listen for PWA installation prompt
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Detect if running as standalone PWA already
+    if (
+      typeof window !== 'undefined' &&
+      (window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true)
+    ) {
+      setIsStandaloneApp(true);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsStandaloneApp(true);
+        setDeferredInstallPrompt(null);
+      }
+    } else {
+      handleOpenPortal('SCANNER');
+    }
+  };
+
+  const handleCopyScannerLink = () => {
+    const fullScanUrl = typeof window !== 'undefined'
+      ? `${window.location.origin}${toBrowserPath('/scan')}`
+      : 'https://admitto-scanner.onrender.com/scan';
+    navigator.clipboard.writeText(fullScanUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2200);
+  };
 
   const handleOpenPortal = (role: 'ADMIN' | 'SCANNER') => {
     if (onSelectRole) {
@@ -288,93 +342,120 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           </motion.div>
 
-          {/* Interactive Live Optical Scan & Digital Pass Simulator Card */}
+          {/* Downloadable Scanner App & Portable Mobile Terminal Card */}
           <motion.div
             variants={itemVariants}
-            className="w-full max-w-xl mx-auto pt-2"
+            className="w-full max-w-xl sm:max-w-2xl mx-auto pt-2"
           >
-            <div className="relative rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 glass-card border border-white/15 bg-[#12162b]/85 shadow-[0_20px_50px_-15px_rgba(99,102,241,0.25)] backdrop-blur-xl">
-              {/* Header */}
+            <div className="relative rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 glass-card border border-white/15 bg-[#12162b]/90 shadow-[0_20px_50px_-15px_rgba(99,102,241,0.25)] backdrop-blur-xl overflow-hidden text-left">
+              {/* Card Header Bar */}
               <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-white/10 text-[11px] font-mono">
                 <div className="flex items-center gap-2 text-slate-300">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                  <span className="font-bold text-white tracking-wider text-[11px]">GATE TERMINAL 01 // LIVE STREAM</span>
+                  <Smartphone className="w-3.5 h-3.5 text-orange-400" />
+                  <span className="font-bold text-white tracking-wider text-[11px]">PORTABLE SCANNER TERMINAL APP</span>
                 </div>
-                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold text-[10px]">
-                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                  <span>ONLINE • DUAL SYNC</span>
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-semibold text-[10px]">
+                  <Wifi className="w-3 h-3 text-indigo-400" />
+                  <span>100% OFFLINE READY</span>
                 </div>
               </div>
 
-              {/* Body */}
-              <div className="flex flex-col sm:flex-row items-center gap-3.5">
-                {/* Mini Viewfinder with Animated Laser Beam */}
-                <div
-                  className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-black/60 border border-indigo-500/30 flex items-center justify-center overflow-hidden shrink-0 shadow-inner group cursor-pointer hover:border-indigo-400 transition-colors"
-                  onClick={() => setPreviewStudentPass(demoHeroPass)}
-                  title="Click to inspect sample pass"
-                >
-                  {/* Reticles */}
-                  <div className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-t-2 border-l-2 border-indigo-400" />
-                  <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-t-2 border-r-2 border-indigo-400" />
-                  <div className="absolute bottom-1.5 left-1.5 w-2.5 h-2.5 border-b-2 border-l-2 border-indigo-400" />
-                  <div className="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 border-b-2 border-r-2 border-indigo-400" />
-
-                  {/* QR Code Icon */}
-                  <QrCode className="w-12 h-12 text-slate-300 group-hover:scale-105 transition-transform" />
-
-                  {/* Sweeping Laser Beam */}
-                  <motion.div
-                    animate={{ top: ['8%', '88%', '8%'] }}
-                    transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-                    className="absolute left-1 right-1 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_12px_#38bdf8] pointer-events-none"
-                  />
-
-                  <div className="absolute bottom-1 text-[8px] font-mono text-cyan-300 font-bold bg-black/80 px-1.5 py-0.5 rounded">
-                    OPTICAL SCAN
-                  </div>
+              {/* Card Body */}
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                {/* QR Code Container with Scanner Frame */}
+                <div className="relative p-2.5 rounded-2xl bg-white shadow-xl flex flex-col items-center justify-center shrink-0 group">
+                  {qrDataUrl ? (
+                    <img
+                      src={qrDataUrl}
+                      alt="Scan to open scanner on mobile"
+                      className="w-24 h-24 sm:w-26 sm:h-26 object-contain rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 sm:w-26 sm:h-26 flex items-center justify-center bg-slate-100 rounded-lg">
+                      <QrCode className="w-12 h-12 text-slate-400 animate-pulse" />
+                    </div>
+                  )}
+                  <span className="text-[9px] font-mono font-bold text-slate-800 uppercase tracking-tight mt-1">
+                    Scan with Phone
+                  </span>
                 </div>
 
-                {/* Verification Snippet */}
-                <div className="flex-1 text-left space-y-1.5 w-full">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs sm:text-sm font-bold text-white font-['Space_Grotesk']">
-                        Alex Rivera
-                      </div>
-                      <div className="text-[11px] font-mono text-orange-400 font-bold">
-                        1BH24CS042 • CSE &amp; AI
-                      </div>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono font-bold flex items-center gap-1 shadow-sm">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                      ADMITTED • 0.038s
-                    </span>
+                {/* Information & Download / Install Links */}
+                <div className="flex-1 space-y-2.5 w-full">
+                  <div>
+                    <h3 className="text-xs sm:text-sm md:text-base font-bold text-white font-['Space_Grotesk'] flex items-center gap-2">
+                      <span>Get ADMITTO Scanner App</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                        v2.4
+                      </span>
+                    </h3>
+                    <p className="text-[11px] sm:text-xs text-slate-300 leading-snug pt-0.5 font-normal">
+                      Equip gate staff with high-speed token scanning on Android, iOS, or handheld barcode terminals. Works uninterrupted without internet.
+                    </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-400 pt-0.5">
-                    <div className="bg-white/[0.04] p-1 rounded-lg border border-white/5">
-                      <span className="text-slate-500 block text-[8px] uppercase">Token</span>
-                      <span className="text-slate-200 font-bold truncate block">ADM-924-X1</span>
-                    </div>
-                    <div className="bg-white/[0.04] p-1 rounded-lg border border-white/5">
-                      <span className="text-slate-500 block text-[8px] uppercase">Gate</span>
-                      <span className="text-emerald-300 font-bold truncate block">Station 01 • Synced</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-0.5 flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                      <Activity className="w-3 h-3 text-indigo-400" />
-                      Instant offline cache ready
-                    </span>
+                  {/* Action Buttons: PWA Install & Direct Download APK */}
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    {/* 1. Install App / PWA */}
                     <button
-                      onClick={() => setPreviewStudentPass(demoHeroPass)}
-                      className="text-[10px] font-bold text-indigo-300 hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
+                      type="button"
+                      onClick={handleInstallApp}
+                      className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-lg shadow-orange-500/25 flex items-center gap-1.5 transition-all cursor-pointer group"
+                      title={isStandaloneApp ? 'Open installed app' : 'Install ADMITTO Scanner as an app on this device'}
                     >
-                      <Eye className="w-3 h-3" />
-                      <span>Inspect Digital Pass</span>
+                      <Download className="w-3.5 h-3.5 group-hover:-translate-y-0.5 transition-transform" />
+                      <span>{isStandaloneApp ? 'Open App' : 'Install App'}</span>
                     </button>
+
+                    {/* 2. Download Android APK */}
+                    <a
+                      href={APK_DOWNLOAD_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 hover:border-white/30 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                      title="Download Android APK Package (.apk)"
+                    >
+                      <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Download APK</span>
+                      <ExternalLink className="w-3 h-3 text-slate-400" />
+                    </a>
+
+                    {/* 3. Copy Direct Scanner Link */}
+                    <button
+                      type="button"
+                      onClick={handleCopyScannerLink}
+                      className="px-3 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-slate-300 hover:text-white font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                      title="Copy Mobile Scanner URL to clipboard to send to staff"
+                    >
+                      {copiedLink ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-emerald-400 font-bold">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Share Link</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Micro Specs / Capability Badges */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono text-slate-400 pt-1 border-t border-white/5">
+                    <span className="flex items-center gap-1">
+                      <Zap className="w-3 h-3 text-cyan-400" />
+                      Sub-50ms Optical Scan
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Database className="w-3 h-3 text-indigo-400" />
+                      IndexedDB Offline
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                      Zero Duplicates
+                    </span>
                   </div>
                 </div>
               </div>
@@ -815,12 +896,6 @@ export const HomePage: React.FC<HomePageProps> = ({
         </AppleScrollReveal>
       </section>
       </div>
-
-      {/* Digital Event Pass Modal Preview */}
-      <DigitalEventPassModal
-        student={previewStudentPass}
-        onClose={() => setPreviewStudentPass(null)}
-      />
     </div>
   );
 };
