@@ -302,6 +302,11 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
       alert(`Please enter both ${primaryKeyLabel} and ${singular} Full Name.`);
       return;
     }
+    const cleanBarcode = singleBarcode.trim();
+    if (cleanBarcode && cleanBarcode.length < 5) {
+      alert('Barcode must be at least 5 characters long (5 or more characters required).');
+      return;
+    }
     setIsAdding(true);
 
     try {
@@ -1494,14 +1499,21 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                       <span className="text-[10px] text-zinc-500 font-normal normal-case">(Optional)</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      {singleUsn && (
+                      {singleUsn.trim() && (
                         <button
                           type="button"
-                          onClick={() => setSingleBarcode(singleUsn)}
-                          className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold text-zinc-300 hover:text-white transition-all cursor-pointer"
-                          title="Mirror Primary Identifier to Barcode"
+                          onClick={() => {
+                            const trimmed = singleUsn.trim();
+                            const val = trimmed.length >= 5 ? trimmed.slice(-5) : trimmed;
+                            setSingleBarcode(val);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-[10px] font-bold text-amber-300 hover:text-white transition-all cursor-pointer flex items-center gap-1"
+                          title={`Set barcode to last 5 characters of ${primaryKeyLabel}`}
                         >
-                          Use {primaryKeyLabel}
+                          <span>Use Last 5 of {primaryKeyLabel}</span>
+                          <span className="font-mono text-amber-200">
+                            ({singleUsn.trim().length >= 5 ? singleUsn.trim().slice(-5) : singleUsn.trim()})
+                          </span>
                         </button>
                       )}
                       {singleBarcode && (
@@ -1522,7 +1534,12 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                       <Barcode className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
-                        placeholder="e.g. BAR-88902 or physical badge/wristband barcode (auto-generated if empty)"
+                        minLength={5}
+                        placeholder={
+                          singleUsn.trim()
+                            ? `e.g. ${singleUsn.trim().length >= 5 ? singleUsn.trim().slice(-5) : singleUsn.trim()} (5+ characters, or leave blank to auto-generate)`
+                            : "e.g. CS051 or badge ID (5+ characters, or leave blank to auto-generate)"
+                        }
                         value={singleBarcode}
                         onChange={(e) => setSingleBarcode(e.target.value)}
                         className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-white font-mono placeholder:font-sans focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-all placeholder:text-zinc-500"
@@ -1533,7 +1550,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                     <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px] leading-relaxed">
                       <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                       <span>
-                        <strong>Warning:</strong> The barcode will be scanned through this value. Ensure this matches the physical barcode printed on the attendee's badge or wristband.
+                        <strong>Warning:</strong> The barcode will be scanned through this value. It must be at least 5 characters long (e.g. last 5 characters of {primaryKeyLabel} or physical wristband code).
                       </span>
                     </div>
                   </div>

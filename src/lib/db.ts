@@ -2013,6 +2013,10 @@ class DatabaseService {
 
     const barcodeClean = (data.barcode || '').trim();
     if (barcodeClean) {
+      if (barcodeClean.length < 5) {
+        throw new Error('Barcode must be at least 5 characters long.');
+      }
+
       if (supabase) {
         const { data: existingBarcode, error: bErr } = await supabase
           .from('students')
