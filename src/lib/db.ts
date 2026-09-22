@@ -2011,6 +2011,31 @@ class DatabaseService {
       }
     }
 
+    const barcodeClean = (data.barcode || '').trim();
+    if (barcodeClean) {
+      if (supabase) {
+        const { data: existingBarcode, error: bErr } = await supabase
+          .from('students')
+          .select('id')
+          .eq('event_id', eventId)
+          .eq('barcode', barcodeClean)
+          .maybeSingle();
+
+        if (bErr) throw new Error(`Database error checking duplicate barcode: ${bErr.message}`);
+
+        if (existingBarcode) {
+          throw new Error(`Attendee with barcode "${barcodeClean}" already exists in this event.`);
+        }
+      } else {
+        const existingBarcode = this.inMemoryDB.students.find(
+          (s) => s.event_id === eventId && s.barcode === barcodeClean
+        );
+        if (existingBarcode) {
+          throw new Error(`Attendee with barcode "${barcodeClean}" already exists in this event.`);
+        }
+      }
+    }
+
     const id = generateId();
     // Cryptographically secure opaque token for QR code (non-guessable, 128-bit CSPRNG)
     const secureToken = `adm_sec_${crypto.randomBytes(16).toString('hex')}`;
@@ -2037,7 +2062,7 @@ class DatabaseService {
       section: data.section?.trim() || 'A',
       branch: data.branch?.trim() || 'General',
       qr_code: data.qr_code?.trim() || secureToken,
-      barcode: data.barcode?.trim() || barcodeRand,
+      barcode: barcodeClean || barcodeRand,
       meta: data.meta || {},
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

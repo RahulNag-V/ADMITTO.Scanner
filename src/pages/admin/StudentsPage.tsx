@@ -44,6 +44,9 @@ import {
   Shield,
   Sparkles,
   Save,
+  UserPlus,
+  Dices,
+  Layers,
 } from 'lucide-react';
 import { Student, StudentImportRow, QrMode, EventScanConfig, UniquenessValidationResult, EventItem } from '../../types';
 import { studentsApi, scanApi, eventsApi } from '../../lib/api';
@@ -136,7 +139,12 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const [singleBranch, setSingleBranch] = useState('Computer Science');
   const [singleYear, setSingleYear] = useState('2026');
   const [singleSection, setSingleSection] = useState('A');
+  const [singleBarcode, setSingleBarcode] = useState('');
+  const [customFields, setCustomFields] = useState<Array<{ id: string; key: string; value: string }>>([]);
+  const [batchAddedCount, setBatchAddedCount] = useState(0);
+  const [lastAddedAttendee, setLastAddedAttendee] = useState<{ name: string; usn: string } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const singleUsnInputRef = useRef<HTMLInputElement>(null);
 
   // 5-Step Attendee Identification & QR Configuration Wizard State
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -262,31 +270,94 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
     }, 2000);
   };
 
-  const handleCreateStudent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!singleUsn || !singleName) return;
+  const SUGGESTED_EXTRA_FIELDS = [
+    'Seat Number',
+    'Ticket Tier',
+    'Company',
+    'Food Preference',
+    'VIP Status',
+    'Emergency Contact',
+    'Hostel / Room',
+  ];
+
+  const handleAddCustomField = (defaultKey = '') => {
+    const id = `cf_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    setCustomFields((prev) => [...prev, { id, key: defaultKey, value: '' }]);
+  };
+
+  const handleRemoveCustomField = (id: string) => {
+    setCustomFields((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const handleCustomFieldChange = (id: string, field: 'key' | 'value', val: string) => {
+    setCustomFields((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, [field]: val } : f))
+    );
+  };
+
+  const handleCreateStudent = async (e?: React.FormEvent, continueAdding = false) => {
+    if (e) e.preventDefault();
+    const cleanUsn = (singleUsn || '').trim().toUpperCase();
+    const cleanName = (singleName || '').trim();
+    if (!cleanUsn || !cleanName) {
+      alert(`Please enter both ${primaryKeyLabel} and ${singular} Full Name.`);
+      return;
+    }
     setIsAdding(true);
 
     try {
+      // Build custom extra details metadata dictionary
+      const meta: Record<string, string> = {};
+      customFields.forEach((cf) => {
+        const k = cf.key.trim();
+        if (k && cf.value.trim()) {
+          meta[k] = cf.value.trim();
+        }
+      });
+
       const res = await studentsApi.create({
         event_id: eventId,
-        usn: (singleUsn || '').trim().toUpperCase(),
-        name: (singleName || '').trim(),
+        usn: cleanUsn,
+        name: cleanName,
         email: singleEmail?.trim() || undefined,
         phone_number: singlePhone?.trim() || undefined,
-        branch: singleBranch,
-        year: singleYear,
-        section: singleSection,
+        branch: singleBranch?.trim() || 'General',
+        year: singleYear?.trim() || 'General',
+        section: singleSection?.trim() || 'A',
+        barcode: singleBarcode?.trim() || undefined,
+        meta: Object.keys(meta).length > 0 ? meta : undefined,
       });
 
       if (res.student) {
-        setStudents([res.student, ...students]);
-        setIsAddModalOpen(false);
-        // Reset
-        setSingleUsn('');
-        setSingleName('');
-        setSingleEmail('');
-        setSinglePhone('');
+        setStudents((prev) => [res.student, ...prev]);
+
+        if (continueAdding) {
+          setBatchAddedCount((prev) => prev + 1);
+          setLastAddedAttendee({ name: res.student.name, usn: res.student.usn });
+          // Reset specific identity inputs for the next attendee
+          setSingleUsn('');
+          setSingleName('');
+          setSingleEmail('');
+          setSinglePhone('');
+          setSingleBarcode('');
+          // Clear custom field values while keeping custom field keys for rapid continuous entry
+          setCustomFields((prev) => prev.map((f) => ({ ...f, value: '' })));
+          
+          // Refocus on primary key input
+          setTimeout(() => {
+            singleUsnInputRef.current?.focus();
+          }, 60);
+        } else {
+          setIsAddModalOpen(false);
+          setBatchAddedCount(0);
+          setLastAddedAttendee(null);
+          setSingleUsn('');
+          setSingleName('');
+          setSingleEmail('');
+          setSinglePhone('');
+          setSingleBarcode('');
+          setCustomFields([]);
+        }
       }
     } catch (err: any) {
       alert(err.message || 'Failed to add attendee');
@@ -1093,6 +1164,42 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                                         {s.year || '4th Year'} • Sec {s.section || 'A'}
                                       </span>
                                     </div>
+
+                                    <div className="flex items-center justify-between text-zinc-400">
+                                      <span>Barcode:</span>
+                                      <div className="flex items-center gap-1">
+                                        <span className="font-mono text-amber-400 font-semibold">{s.barcode || 'N/A'}</span>
+                                        {s.barcode && (
+                                          <button
+                                            onClick={() => handleCopyText(`barcode-${s.id}`, s.barcode!)}
+                                            className="text-zinc-500 hover:text-white p-0.5 cursor-pointer"
+                                            title="Copy Barcode"
+                                          >
+                                            {copiedField === `barcode-${s.id}` ? (
+                                              <Check className="w-3 h-3 text-emerald-400" />
+                                            ) : (
+                                              <Copy className="w-3 h-3" />
+                                            )}
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Custom Extra Details */}
+                                    {s.meta && Object.keys(s.meta).length > 0 && (
+                                      <div className="pt-2 mt-2 border-t border-white/10 space-y-1.5">
+                                        <div className="text-[10px] font-bold text-orange-400 uppercase tracking-wider flex items-center gap-1">
+                                          <Sparkles className="w-3 h-3" />
+                                          <span>Custom Extra Details</span>
+                                        </div>
+                                        {Object.entries(s.meta).map(([k, v]) => (
+                                          <div key={k} className="flex items-center justify-between text-[11px] text-zinc-400">
+                                            <span className="capitalize">{k.replace(/_/g, ' ')}:</span>
+                                            <span className="text-zinc-200 font-medium">{String(v)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
 
@@ -1199,113 +1306,366 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         </div>
       </div>
 
-      {/* Single Add Modal via React Portal */}
+      {/* Enhanced Single Add Modal via React Portal */}
       {isAddModalOpen && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#151822] border border-zinc-700 rounded-3xl p-6 max-w-md w-full space-y-5 shadow-2xl my-auto">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white font-['Space_Grotesk']">
-                Add Single {singular}
-              </h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-zinc-400 hover:text-white cursor-pointer">
+        <div
+          className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+          onKeyDown={(e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+              e.preventDefault();
+              handleCreateStudent(undefined, true);
+            }
+          }}
+        >
+          <div className="bg-[#121520] border border-zinc-700/80 rounded-3xl max-w-2xl w-full flex flex-col shadow-2xl my-auto max-h-[92vh] overflow-hidden animate-fadeIn">
+            {/* Modal Header with glowing accent */}
+            <div className="p-5 sm:p-6 pb-4 border-b border-white/10 bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-transparent flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0 shadow-inner">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-white font-['Space_Grotesk'] tracking-tight">
+                      Add Single {singular}
+                    </h3>
+                    {batchAddedCount > 0 && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-[11px] font-bold text-emerald-400 flex items-center gap-1 shadow-sm">
+                        <CheckCircle2 className="w-3 h-3" />
+                        {batchAddedCount} Added
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Manual registration with physical barcode, credential tokens & custom extra details.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setBatchAddedCount(0);
+                  setLastAddedAttendee(null);
+                }}
+                className="text-zinc-400 hover:text-white p-1 rounded-xl hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                title="Close"
+              >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCreateStudent} className="space-y-3.5">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-zinc-300">{primaryKeyLabel}</label>
-                <input
-                  type="text"
-                  required
-                  placeholder={preset.primaryKeyPlaceholder || `Enter ${primaryKeyLabel}`}
-                  value={singleUsn}
-                  onChange={(e) => setSingleUsn(e.target.value.toUpperCase())}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3.5 py-2 text-xs text-white uppercase font-mono focus:outline-none focus:border-orange-500"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-zinc-300">{singular} Full Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder={`Full Name of ${singular}`}
-                  value={singleName}
-                  onChange={(e) => setSingleName(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-zinc-300">Email Address (Optional)</label>
-                  <input
-                    type="email"
-                    placeholder="attendee@domain.com"
-                    value={singleEmail}
-                    onChange={(e) => setSingleEmail(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                  />
+            {/* Continuous Success Flash Toast */}
+            {lastAddedAttendee && (
+              <div className="mx-5 sm:mx-6 mt-4 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs text-emerald-300 animate-fadeIn">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>
+                    Successfully added <strong>{lastAddedAttendee.name}</strong> (<span className="font-mono text-emerald-200">{lastAddedAttendee.usn}</span>). Ready for next entry!
+                  </span>
                 </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-zinc-300">Phone Number (Optional)</label>
-                  <input
-                    type="tel"
-                    placeholder="Phone number"
-                    value={singlePhone}
-                    onChange={(e) => setSinglePhone(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-zinc-300">Department</label>
-                  <input
-                    type="text"
-                    value={singleBranch}
-                    onChange={(e) => setSingleBranch(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-zinc-300">Year</label>
-                  <input
-                    type="text"
-                    value={singleYear}
-                    onChange={(e) => setSingleYear(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-zinc-300">Section</label>
-                  <input
-                    type="text"
-                    value={singleSection}
-                    onChange={(e) => setSingleSection(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-zinc-800 text-xs font-bold text-zinc-300 hover:text-white cursor-pointer"
+                  onClick={() => setLastAddedAttendee(null)}
+                  className="text-emerald-400 hover:text-emerald-200 text-xs px-2 py-0.5 rounded-lg cursor-pointer"
                 >
-                  Cancel
+                  Dismiss
                 </button>
-                <button
-                  type="submit"
-                  disabled={isAdding}
-                  className="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white shadow-md shadow-orange-500/20 cursor-pointer"
-                >
-                  {isAdding ? 'Adding...' : `Save ${singular}`}
-                </button>
+              </div>
+            )}
+
+            {/* Form Scrollable Body */}
+            <form onSubmit={(e) => handleCreateStudent(e, false)} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1">
+                {/* Section 1: Core Attendee Profile (All Types of Details) */}
+                <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3.5">
+                  <div className="flex items-center gap-2 text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                    <User className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Primary Information & Profile</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+                        <span>{primaryKeyLabel} <span className="text-orange-400">*</span></span>
+                        <span className="text-[10px] text-zinc-500 font-normal">Primary Identifier</span>
+                      </label>
+                      <input
+                        ref={singleUsnInputRef}
+                        type="text"
+                        required
+                        placeholder={preset.primaryKeyPlaceholder || `Enter ${primaryKeyLabel}`}
+                        value={singleUsn}
+                        onChange={(e) => setSingleUsn(e.target.value.toUpperCase())}
+                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white uppercase font-mono tracking-wider focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:normal-case placeholder:font-sans placeholder:text-zinc-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-zinc-300">
+                        {singular} Full Name <span className="text-orange-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder={`Full Name of ${singular}`}
+                        value={singleName}
+                        onChange={(e) => setSingleName(e.target.value)}
+                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:text-zinc-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                        <Mail className="w-3 h-3 text-zinc-400" />
+                        <span>Email Address (Optional)</span>
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="attendee@domain.com"
+                        value={singleEmail}
+                        onChange={(e) => setSingleEmail(e.target.value)}
+                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:text-zinc-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                        <Phone className="w-3 h-3 text-zinc-400" />
+                        <span>Phone Number (Optional)</span>
+                      </label>
+                      <input
+                        type="tel"
+                        placeholder="+91 98765 43210"
+                        value={singlePhone}
+                        onChange={(e) => setSinglePhone(e.target.value)}
+                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:text-zinc-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1">
+                        <Building className="w-3 h-3 text-zinc-400" />
+                        <span className="truncate">{preset.groupingLabel || 'Department'}</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={singleBranch}
+                        onChange={(e) => setSingleBranch(e.target.value)}
+                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1">
+                        <GraduationCap className="w-3 h-3 text-zinc-400" />
+                        <span className="truncate">Year / Batch</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={singleYear}
+                        onChange={(e) => setSingleYear(e.target.value)}
+                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1">
+                        <Layers className="w-3 h-3 text-zinc-400" />
+                        <span className="truncate">Section / Div</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={singleSection}
+                        onChange={(e) => setSingleSection(e.target.value)}
+                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: Barcode & Token Credentials */}
+                <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                      <Barcode className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Barcode & Physical Token Value</span>
+                      <span className="text-[10px] text-zinc-500 font-normal normal-case">(Optional)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {singleUsn && (
+                        <button
+                          type="button"
+                          onClick={() => setSingleBarcode(singleUsn)}
+                          className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold text-zinc-300 hover:text-white transition-all cursor-pointer"
+                          title="Mirror Primary Identifier to Barcode"
+                        >
+                          Use {primaryKeyLabel}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSingleBarcode(Math.floor(1000000000 + Math.random() * 9000000000).toString())}
+                        className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[10px] font-bold text-amber-300 transition-all cursor-pointer flex items-center gap-1"
+                        title="Generate a random 10-digit barcode"
+                      >
+                        <Dices className="w-3 h-3" />
+                        <span>Random</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="relative">
+                      <Barcode className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="e.g. BAR-88902 or physical badge/wristband barcode (auto-generated if empty)"
+                        value={singleBarcode}
+                        onChange={(e) => setSingleBarcode(e.target.value)}
+                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-white font-mono placeholder:font-sans focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-all placeholder:text-zinc-500"
+                      />
+                    </div>
+                    <p className="text-[10px] text-zinc-500 leading-relaxed">
+                      Scanners can verify this attendee instantly by scanning this exact barcode string or printed wristband.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Section 3: Customizable Extra Details (Custom Fields) */}
+                <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                      <Sparkles className="w-3.5 h-3.5 text-orange-400" />
+                      <span>Custom Extra Details</span>
+                      <span className="px-2 py-0.2 rounded-full bg-zinc-800 text-[10px] text-zinc-400 font-mono">
+                        {customFields.length}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleAddCustomField('')}
+                      className="px-3 py-1.5 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-xs font-bold text-orange-400 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Extra Detail</span>
+                    </button>
+                  </div>
+
+                  {/* Suggestion Chips */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] text-zinc-400 font-medium">Quick Suggestions:</span>
+                    {SUGGESTED_EXTRA_FIELDS.map((sug) => {
+                      const alreadyAdded = customFields.some((f) => f.key.toLowerCase() === sug.toLowerCase());
+                      return (
+                        <button
+                          key={sug}
+                          type="button"
+                          disabled={alreadyAdded}
+                          onClick={() => handleAddCustomField(sug)}
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-medium transition-all cursor-pointer ${
+                            alreadyAdded
+                              ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed'
+                              : 'bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white'
+                          }`}
+                        >
+                          + {sug}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Dynamic Fields List */}
+                  {customFields.length === 0 ? (
+                    <div className="p-4 rounded-xl border border-dashed border-zinc-700/80 bg-zinc-950/30 text-center space-y-1">
+                      <p className="text-xs text-zinc-400 font-medium">
+                        No extra custom fields added yet.
+                      </p>
+                      <p className="text-[10px] text-zinc-500">
+                        Add attributes like Seat Number, VIP Tier, Organization, or Dietary choices to tailor attendee passes.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {customFields.map((cf) => (
+                        <div key={cf.id} className="flex items-center gap-2 p-2 rounded-xl bg-zinc-950/60 border border-zinc-800 animate-fadeIn">
+                          <input
+                            type="text"
+                            placeholder="Detail Name (e.g. Seat No)"
+                            value={cf.key}
+                            onChange={(e) => handleCustomFieldChange(cf.id, 'key', e.target.value)}
+                            className="w-1/3 bg-zinc-900 border border-zinc-700/70 rounded-lg px-2.5 py-1.5 text-xs text-orange-300 placeholder:text-zinc-600 focus:outline-none focus:border-orange-500"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Value (e.g. Row A-12)"
+                            value={cf.value}
+                            onChange={(e) => handleCustomFieldChange(cf.id, 'value', e.target.value)}
+                            className="flex-1 bg-zinc-900 border border-zinc-700/70 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-orange-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCustomField(cf.id)}
+                            className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                            title="Remove field"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <p className="text-[10px] text-zinc-500 italic">
+                        💡 Extra detail templates are preserved during continuous entry so you only type the new values.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Footer Actions */}
+              <div className="p-4 sm:p-5 bg-zinc-950/90 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
+                <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                  <span>
+                    Press <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-mono text-[10px]">Ctrl+Enter</kbd> to Save & Add Another
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddModalOpen(false);
+                      setBatchAddedCount(0);
+                      setLastAddedAttendee(null);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-300 hover:text-white transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isAdding}
+                    onClick={() => handleCreateStudent(undefined, true)}
+                    className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-600/80 hover:border-zinc-500 text-xs font-bold text-white flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                    title="Save current attendee and immediately continue typing the next one"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Save & Add Another</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isAdding}
+                    className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white shadow-lg shadow-orange-500/25 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{isAdding ? 'Saving...' : `Save ${singular}`}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
