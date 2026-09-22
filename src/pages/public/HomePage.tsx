@@ -11,6 +11,12 @@ import {
   Layers,
   Database,
   Smartphone,
+  ShieldCheck,
+  Activity,
+  Wifi,
+  Scan,
+  Eye,
+  Check,
 } from 'lucide-react';
 import { DigitalEventPassModal } from '../../components/common/DigitalEventPassModal';
 import { AppleScrollReveal, AppleScrollStagger, AppleScrollCard } from '../../components/common/AppleScrollReveal';
@@ -44,6 +50,23 @@ const itemVariants = {
     filter: 'blur(0px)',
     transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] },
   },
+};
+
+const demoHeroPass: Student = {
+  id: 'demo-hero-student',
+  event_id: 'demo-event-01',
+  name: 'Alex Rivera',
+  usn: '1BH24CS042',
+  branch: 'Computer Science & AI',
+  year: '3rd Year',
+  section: 'A',
+  qr_code: 'ADMITTO-ALEX-RIVERA-1BH24CS042-VIP',
+  barcode: '1BH24CS042',
+  is_checked_in: true,
+  checked_in: true,
+  checked_in_at: new Date().toISOString(),
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
 };
 
 export const HomePage: React.FC<HomePageProps> = ({
@@ -100,17 +123,81 @@ export const HomePage: React.FC<HomePageProps> = ({
           className="absolute top-1/3 right-10 w-[450px] h-[350px] bg-purple-500/15 rounded-full blur-[120px] pointer-events-none"
         />
 
+        {/* Floating Left Telemetry Badge (Desktop only) */}
+        <div className="hidden xl:flex absolute left-8 top-1/3 -translate-y-1/2 z-10 flex-col gap-3 pointer-events-none select-none">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, duration: 0.8 }}
+            className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 backdrop-blur-xl shadow-2xl space-y-1 max-w-[200px]"
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="text-[10px] font-mono font-bold uppercase text-emerald-300">Live Telemetry</span>
+            </div>
+            <div className="text-xs font-bold text-white font-['Space_Grotesk']">Sub-50ms Optical Scan</div>
+            <div className="text-[10px] text-slate-400">Zero duplicate tickets allowed</div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.6, duration: 0.8 }}
+            className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 backdrop-blur-xl shadow-2xl space-y-1 max-w-[200px]"
+          >
+            <div className="flex items-center gap-1.5 text-indigo-400 text-[10px] font-mono font-bold">
+              <Database className="w-3 h-3" />
+              <span>DUAL ENGINE</span>
+            </div>
+            <div className="text-xs font-bold text-white font-['Space_Grotesk']">Supabase + Memory</div>
+            <div className="text-[10px] text-slate-400">Automatic failover & sync</div>
+          </motion.div>
+        </div>
+
+        {/* Floating Right Telemetry Badge (Desktop only) */}
+        <div className="hidden xl:flex absolute right-8 top-1/3 -translate-y-1/2 z-10 flex-col gap-3 pointer-events-none select-none">
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5, duration: 0.8 }}
+            className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 backdrop-blur-xl shadow-2xl space-y-1 max-w-[200px] text-right"
+          >
+            <div className="flex items-center justify-end gap-1.5 text-orange-400 text-[10px] font-mono font-bold">
+              <Wifi className="w-3 h-3" />
+              <span>OFFLINE FIRST</span>
+            </div>
+            <div className="text-xs font-bold text-white font-['Space_Grotesk']">IndexedDB PWA</div>
+            <div className="text-[10px] text-slate-400">Scans work without internet</div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.7, duration: 0.8 }}
+            className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 backdrop-blur-xl shadow-2xl space-y-1 max-w-[200px] text-right"
+          >
+            <div className="flex items-center justify-end gap-1.5 text-pink-400 text-[10px] font-mono font-bold">
+              <ShieldCheck className="w-3 h-3" />
+              <span>ATOMIC LOCK</span>
+            </div>
+            <div className="text-xs font-bold text-white font-['Space_Grotesk']">Multi-Gate Sync</div>
+            <div className="text-[10px] text-slate-400">Instant cross-terminal lock</div>
+          </motion.div>
+        </div>
+
         {/* Vertically Centered Main Hero Content */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="my-auto w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col items-center justify-center space-y-3 sm:space-y-4 md:space-y-5 py-2 sm:py-4"
+          className="my-auto w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col items-center justify-center space-y-3 sm:space-y-4 md:space-y-5 py-2 sm:py-4"
         >
-          {/* Frosted Pill badge */}
+          {/* Top Live System Status Pill */}
           <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3.5 py-1 sm:py-1.5 rounded-full glass-pill text-[11px] sm:text-xs font-semibold tracking-wide shadow-sm mx-auto">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-            <span>Production Event Access & Token Validation Engine</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="text-emerald-400 font-mono font-bold text-[10px] uppercase tracking-wider">Live System Active</span>
+            <span className="text-white/30">•</span>
+            <span>Zero-Queue Digital Token Validation Engine</span>
           </motion.div>
 
           {/* Headline */}
@@ -185,7 +272,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           {/* Feature check-marks */}
           <motion.div
             variants={itemVariants}
-            className="pt-1 sm:pt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 sm:gap-6 text-[11px] sm:text-xs text-slate-400 font-medium"
+            className="pt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 sm:gap-6 text-[11px] sm:text-xs text-slate-400 font-medium"
           >
             <div className="flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -198,6 +285,140 @@ export const HomePage: React.FC<HomePageProps> = ({
             <div className="flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>Atomic Duplicate Protection</span>
+            </div>
+          </motion.div>
+
+          {/* Interactive Live Optical Scan & Digital Pass Simulator Card */}
+          <motion.div
+            variants={itemVariants}
+            className="w-full max-w-xl mx-auto pt-2"
+          >
+            <div className="relative rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 glass-card border border-white/15 bg-[#12162b]/85 shadow-[0_20px_50px_-15px_rgba(99,102,241,0.25)] backdrop-blur-xl">
+              {/* Header */}
+              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-white/10 text-[11px] font-mono">
+                <div className="flex items-center gap-2 text-slate-300">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span className="font-bold text-white tracking-wider text-[11px]">GATE TERMINAL 01 // LIVE STREAM</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold text-[10px]">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                  <span>ONLINE • DUAL SYNC</span>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="flex flex-col sm:flex-row items-center gap-3.5">
+                {/* Mini Viewfinder with Animated Laser Beam */}
+                <div
+                  className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-black/60 border border-indigo-500/30 flex items-center justify-center overflow-hidden shrink-0 shadow-inner group cursor-pointer hover:border-indigo-400 transition-colors"
+                  onClick={() => setPreviewStudentPass(demoHeroPass)}
+                  title="Click to inspect sample pass"
+                >
+                  {/* Reticles */}
+                  <div className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-t-2 border-l-2 border-indigo-400" />
+                  <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-t-2 border-r-2 border-indigo-400" />
+                  <div className="absolute bottom-1.5 left-1.5 w-2.5 h-2.5 border-b-2 border-l-2 border-indigo-400" />
+                  <div className="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 border-b-2 border-r-2 border-indigo-400" />
+
+                  {/* QR Code Icon */}
+                  <QrCode className="w-12 h-12 text-slate-300 group-hover:scale-105 transition-transform" />
+
+                  {/* Sweeping Laser Beam */}
+                  <motion.div
+                    animate={{ top: ['8%', '88%', '8%'] }}
+                    transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                    className="absolute left-1 right-1 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_12px_#38bdf8] pointer-events-none"
+                  />
+
+                  <div className="absolute bottom-1 text-[8px] font-mono text-cyan-300 font-bold bg-black/80 px-1.5 py-0.5 rounded">
+                    OPTICAL SCAN
+                  </div>
+                </div>
+
+                {/* Verification Snippet */}
+                <div className="flex-1 text-left space-y-1.5 w-full">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs sm:text-sm font-bold text-white font-['Space_Grotesk']">
+                        Alex Rivera
+                      </div>
+                      <div className="text-[11px] font-mono text-orange-400 font-bold">
+                        1BH24CS042 • CSE &amp; AI
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono font-bold flex items-center gap-1 shadow-sm">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      ADMITTED • 0.038s
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-400 pt-0.5">
+                    <div className="bg-white/[0.04] p-1 rounded-lg border border-white/5">
+                      <span className="text-slate-500 block text-[8px] uppercase">Token</span>
+                      <span className="text-slate-200 font-bold truncate block">ADM-924-X1</span>
+                    </div>
+                    <div className="bg-white/[0.04] p-1 rounded-lg border border-white/5">
+                      <span className="text-slate-500 block text-[8px] uppercase">Gate</span>
+                      <span className="text-emerald-300 font-bold truncate block">Station 01 • Synced</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-0.5 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Activity className="w-3 h-3 text-indigo-400" />
+                      Instant offline cache ready
+                    </span>
+                    <button
+                      onClick={() => setPreviewStudentPass(demoHeroPass)}
+                      className="text-[10px] font-bold text-indigo-300 hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span>Inspect Digital Pass</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Quick Metrics Bar directly above caution tape */}
+          <motion.div
+            variants={itemVariants}
+            className="w-full max-w-3xl mx-auto pt-1 pb-1"
+          >
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-md text-center">
+                <div className="text-sm sm:text-base font-black text-white font-['Space_Grotesk']">
+                  &lt; 50ms
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium">
+                  Scan Latency
+                </div>
+              </div>
+              <div className="p-2 sm:p-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-md text-center">
+                <div className="text-sm sm:text-base font-black text-emerald-400 font-['Space_Grotesk']">
+                  Zero
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium">
+                  Duplicate Passes
+                </div>
+              </div>
+              <div className="p-2 sm:p-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-md text-center">
+                <div className="text-sm sm:text-base font-black text-indigo-300 font-['Space_Grotesk']">
+                  50,000+
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium">
+                  Roster Scaling
+                </div>
+              </div>
+              <div className="p-2 sm:p-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-md text-center">
+                <div className="text-sm sm:text-base font-black text-orange-400 font-['Space_Grotesk']">
+                  100%
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium">
+                  Offline-Resilient
+                </div>
+              </div>
             </div>
           </motion.div>
         </motion.div>
