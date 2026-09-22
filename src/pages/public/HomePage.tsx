@@ -25,8 +25,7 @@ import {
 import { AppleScrollReveal, AppleScrollStagger, AppleScrollCard } from '../../components/common/AppleScrollReveal';
 import { ScrollingCautionTape } from '../../components/common/ScrollingCautionTape';
 import { Watermark3DGyroBanner } from '../../components/common/Watermark3DGyroBanner';
-import { DigitalEventPassModal } from '../../components/common/DigitalEventPassModal';
-import { Student, AuthSession } from '../../types';
+import { AuthSession } from '../../types';
 import { toBrowserPath } from '../../lib/router';
 
 interface HomePageProps {
@@ -57,24 +56,8 @@ const itemVariants = {
   },
 };
 
-const demoHeroPass: Student = {
-  id: 'demo-hero-student',
-  event_id: 'demo-event-01',
-  name: 'Alex Rivera',
-  usn: '1BH24CS042',
-  branch: 'Computer Science & AI',
-  year: '3rd Year',
-  section: 'A',
-  qr_code: 'ADMITTO-ALEX-RIVERA-1BH24CS042-VIP',
-  barcode: '1BH24CS042',
-  is_checked_in: true,
-  checked_in: true,
-  checked_in_at: new Date().toISOString(),
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-};
-
 const APK_DOWNLOAD_URL = 'https://github.com/RahulNag-V/ADMITTO.Scanner/releases/latest';
+const GITHUB_REPO_URL = 'https://github.com/RahulNag-V/ADMITTO.Scanner';
 
 export const HomePage: React.FC<HomePageProps> = ({
   onNavigate,
@@ -82,7 +65,6 @@ export const HomePage: React.FC<HomePageProps> = ({
   session,
   onSelectRole,
 }) => {
-  const [previewStudentPass, setPreviewStudentPass] = useState<Student | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
   const [isStandaloneApp, setIsStandaloneApp] = useState<boolean>(false);
@@ -138,9 +120,9 @@ export const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleShareApkLink = async () => {
-    // Copy the APK download URL to clipboard
+    // Copy the repository link to clipboard
     try {
-      await navigator.clipboard.writeText(APK_DOWNLOAD_URL);
+      await navigator.clipboard.writeText(GITHUB_REPO_URL);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2200);
     } catch {
@@ -152,17 +134,13 @@ export const HomePage: React.FC<HomePageProps> = ({
       try {
         await navigator.share({
           title: 'ADMITTO Scanner App',
-          text: 'Download the ADMITTO Scanner APK for Android:',
-          url: APK_DOWNLOAD_URL,
+          text: 'ADMITTO — Digital Event Access & Token Scanning Platform:',
+          url: GITHUB_REPO_URL,
         });
-        return;
       } catch {
         // Fall through if user dismisses share dialog
       }
     }
-
-    // Redirect to the download APK location
-    window.open(APK_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
   };
 
   const handleOpenPortal = (role: 'ADMIN' | 'SCANNER') => {
@@ -788,96 +766,8 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </AppleScrollReveal>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto items-stretch">
-          {/* Left: Optical Scanner Terminal Simulation */}
-          <motion.div
-            whileHover={{ y: -3 }}
-            transition={{ duration: 0.2 }}
-            className="rounded-3xl p-5 sm:p-7 glass-card border border-indigo-500/25 bg-[#12162b]/90 shadow-2xl backdrop-blur-xl flex flex-col justify-between space-y-4"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 text-[11px] font-mono">
-              <div className="flex items-center gap-2 text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span className="font-bold text-white tracking-wider text-[11px]">GATE TERMINAL 01 // LIVE STREAM</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold text-[10px]">
-                <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                <span>ONLINE • DUAL SYNC</span>
-              </div>
-            </div>
-
-            {/* Viewfinder + verification */}
-            <div className="flex flex-col sm:flex-row items-center gap-4 py-2">
-              <div
-                className="relative w-24 h-24 rounded-2xl bg-black/60 border border-indigo-500/30 flex items-center justify-center overflow-hidden shrink-0 shadow-inner group cursor-pointer hover:border-indigo-400 transition-colors"
-                onClick={() => setPreviewStudentPass(demoHeroPass)}
-                title="Click to inspect sample pass"
-              >
-                <div className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-t-2 border-l-2 border-indigo-400" />
-                <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-t-2 border-r-2 border-indigo-400" />
-                <div className="absolute bottom-1.5 left-1.5 w-2.5 h-2.5 border-b-2 border-l-2 border-indigo-400" />
-                <div className="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 border-b-2 border-r-2 border-indigo-400" />
-
-                <QrCode className="w-12 h-12 text-slate-300 group-hover:scale-105 transition-transform" />
-
-                <motion.div
-                  animate={{ top: ['8%', '88%', '8%'] }}
-                  transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-                  className="absolute left-1 right-1 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_12px_#38bdf8] pointer-events-none"
-                />
-
-                <div className="absolute bottom-1 text-[8px] font-mono text-cyan-300 font-bold bg-black/80 px-1.5 py-0.5 rounded">
-                  OPTICAL SCAN
-                </div>
-              </div>
-
-              <div className="flex-1 text-left space-y-2 w-full">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-bold text-white font-['Space_Grotesk']">
-                      Alex Rivera
-                    </div>
-                    <div className="text-[11px] font-mono text-orange-400 font-bold">
-                      1BH24CS042 • CSE &amp; AI
-                    </div>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono font-bold flex items-center gap-1 shadow-sm">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                    ADMITTED • 0.038s
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-400">
-                  <div className="bg-white/[0.04] p-1.5 rounded-lg border border-white/5">
-                    <span className="text-slate-500 block text-[8px] uppercase">Token</span>
-                    <span className="text-slate-200 font-bold truncate block">ADM-924-X1</span>
-                  </div>
-                  <div className="bg-white/[0.04] p-1.5 rounded-lg border border-white/5">
-                    <span className="text-slate-500 block text-[8px] uppercase">Gate</span>
-                    <span className="text-emerald-300 font-bold truncate block">Station 01 • Synced</span>
-                  </div>
-                </div>
-
-                <div className="pt-1 flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400 flex items-center gap-1 text-[10px]">
-                    <Activity className="w-3 h-3 text-indigo-400" />
-                    Instant offline cache ready
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewStudentPass(demoHeroPass)}
-                    className="text-[10px] font-bold text-indigo-300 hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    <Eye className="w-3 h-3" />
-                    <span>Inspect Sample Pass</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Right: Download APK, PWA & QR Code */}
+        <div className="max-w-2xl sm:max-w-3xl mx-auto">
+          {/* Download APK, PWA & QR Code Card */}
           <motion.div
             whileHover={{ y: -3 }}
             transition={{ duration: 0.2 }}
@@ -954,12 +844,12 @@ export const HomePage: React.FC<HomePageProps> = ({
                     type="button"
                     onClick={handleShareApkLink}
                     className="px-3 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-slate-300 hover:text-white font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                    title="Redirect to download APK location & copy APK link to share"
+                    title="Copy GitHub repository link to clipboard"
                   >
                     {copiedLink ? (
                       <>
                         <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400 font-bold">APK Link Copied!</span>
+                        <span className="text-emerald-400 font-bold">Link Copied!</span>
                       </>
                     ) : (
                       <>
@@ -1030,12 +920,6 @@ export const HomePage: React.FC<HomePageProps> = ({
         </AppleScrollReveal>
       </section>
       </div>
-
-      {/* Digital Event Pass Modal Preview */}
-      <DigitalEventPassModal
-        student={previewStudentPass}
-        onClose={() => setPreviewStudentPass(null)}
-      />
     </div>
   );
 };
