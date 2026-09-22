@@ -43,7 +43,8 @@ import { eventsApi, getStoredSession } from '../../lib/api';
 import { ATTENDEE_TYPE_PRESETS, getPresetByType } from '../../lib/attendeeTypes';
 import { TabSkeletonView } from '../../components/common/Skeleton';
 import { compressImageFile } from '../../lib/imageCompression';
-import { broadcastEventUpdated } from '../../lib/realtimeSync';
+import { broadcastEventUpdated, broadcastEventDeleted } from '../../lib/realtimeSync';
+import { purgeEventOfflineData } from '../../lib/offline/idb';
 
 interface EventSettingsPageProps {
   eventId: string;
@@ -269,6 +270,17 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
     setIsDeletingEvent(true);
     try {
       await eventsApi.delete(eventId, true);
+      // Broadcast deletion across all connected scanners and admin peers
+      await broadcastEventDeleted(eventId);
+      try {
+        const bc = new BroadcastChannel('admitto_sync');
+        bc.postMessage({ type: 'EVENT_DELETED', eventId });
+        bc.close();
+      } catch {}
+      try {
+        await purgeEventOfflineData(eventId, true);
+      } catch {}
+
       window.dispatchEvent(new CustomEvent('admitto:events-changed'));
 
       // Refresh event list

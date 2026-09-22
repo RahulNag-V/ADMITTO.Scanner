@@ -28,6 +28,8 @@ import {
 import { AuthSession, EventItem, AttendeeType } from '../../types';
 import { eventsApi, authApi } from '../../lib/api';
 import { ATTENDEE_TYPE_PRESETS, getPresetByType } from '../../lib/attendeeTypes';
+import { broadcastEventDeleted } from '../../lib/realtimeSync';
+import { purgeEventOfflineData } from '../../lib/offline/idb';
 import { LiquidBackground } from '../common/LiquidBackground';
 import { TabSkeletonView } from '../common/Skeleton';
 import { NetworkErrorView } from '../common/NetworkErrorView';
@@ -40,7 +42,6 @@ interface AdminLayoutProps {
   currentTab: string;
   onSelectTab: (tab: string) => void;
   onLogout: () => void;
-  onDeleteAccount?: () => void;
   onOpenScanner: () => void;
   onNavigateHome?: () => void;
   onNavigate?: (path: string) => void;
@@ -54,7 +55,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   currentTab,
   onSelectTab,
   onLogout,
-  onDeleteAccount,
   onOpenScanner,
   onNavigateHome,
   onNavigate,
@@ -212,7 +212,25 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       loadEvents();
     };
     window.addEventListener('admitto:events-changed', handleEventsChanged);
-    return () => window.removeEventListener('admitto:events-changed', handleEventsChanged);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('admitto_sync');
+      bc.onmessage = (msg) => {
+        if (msg.data?.type === 'EVENT_DELETED') {
+          loadEvents();
+        }
+      };
+    } catch {}
+
+    return () => {
+      window.removeEventListener('admitto:events-changed', handleEventsChanged);
+      if (bc) {
+        try {
+          bc.close();
+        } catch {}
+      }
+    };
   }, [selectedEventId]);
 
   const loadEvents = async () => {
@@ -240,6 +258,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     if (!confirmed) return;
     try {
       await eventsApi.delete(ev.id, true);
+      await broadcastEventDeleted(ev.id);
+      try {
+        const bc = new BroadcastChannel('admitto_sync');
+        bc.postMessage({ type: 'EVENT_DELETED', eventId: ev.id });
+        bc.close();
+      } catch {}
+      try {
+        await purgeEventOfflineData(ev.id, true);
+      } catch {}
+
       window.dispatchEvent(new CustomEvent('admitto:events-changed'));
       await loadEvents();
     } catch (err: any) {
@@ -652,21 +680,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                   <LogOut className="w-4 h-4" />
                   <span>Sign Out of Admin Console</span>
                 </button>
-
-                {/* Delete Account Button in Drawer (below Sign Out button) */}
-                {onDeleteAccount && (
-                  <button
-                    id="drawer-delete-account-btn"
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      onDeleteAccount();
-                    }}
-                    className="w-full py-2.5 px-4 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 hover:text-red-300 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-400" />
-                    <span>Delete Account</span>
-                  </button>
-                )}
               </div>
             </motion.div>
           </div>

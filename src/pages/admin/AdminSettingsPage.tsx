@@ -13,19 +13,19 @@ import {
 } from 'lucide-react';
 import { AuthSession, EventItem } from '../../types';
 import { eventsApi } from '../../lib/api';
+import { broadcastEventDeleted } from '../../lib/realtimeSync';
+import { purgeEventOfflineData } from '../../lib/offline/idb';
 
 interface AdminSettingsPageProps {
   session: AuthSession;
   eventId: string;
   onLogout: () => void;
-  onDeleteAccount?: () => void;
 }
 
 export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = ({
   session,
   eventId,
   onLogout,
-  onDeleteAccount,
 }) => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
@@ -36,8 +36,19 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = ({
     setIsDeleting(true);
 
     try {
-      await eventsApi.delete(eventId);
-      alert('Event and associated check-in records were permanently deleted.');
+      await eventsApi.delete(eventId, true);
+      await broadcastEventDeleted(eventId);
+      try {
+        const bc = new BroadcastChannel('admitto_sync');
+        bc.postMessage({ type: 'EVENT_DELETED', eventId });
+        bc.close();
+      } catch {}
+      try {
+        await purgeEventOfflineData(eventId, true);
+      } catch {}
+
+      alert('Event and all associated records were permanently deleted.');
+      window.dispatchEvent(new CustomEvent('admitto:events-changed'));
       window.location.reload();
     } catch (err: any) {
       alert(`Error purging event: ${err.message}`);
@@ -107,15 +118,6 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = ({
               <LogOut className="w-4 h-4" />
               <span>Sign Out</span>
             </button>
-            {onDeleteAccount && (
-              <button
-                onClick={onDeleteAccount}
-                className="px-4 py-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 hover:text-red-200 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer backdrop-blur-md"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>Delete Account</span>
-              </button>
-            )}
           </div>
         </div>
       </div>

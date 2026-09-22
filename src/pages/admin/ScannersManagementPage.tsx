@@ -983,7 +983,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
                       <button
                         onClick={() => handleDeleteStation(station.id)}
                         className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition"
-                        title="Delete Account"
+                        title="Delete Scanner Station"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

@@ -5,11 +5,13 @@ import { RealtimeScanBroadcast, EventItem } from '../types';
 export type ScanEventCallback = (data: RealtimeScanBroadcast) => void;
 export type LogsClearedCallback = (payload: { scanIds?: string[] }) => void;
 export type EventUpdatedCallback = (event: EventItem) => void;
+export type EventDeletedCallback = (payload: { eventId: string }) => void;
 
 interface SubscriptionCallbacks {
   onScan: ScanEventCallback;
   onLogsCleared?: LogsClearedCallback;
   onEventUpdated?: EventUpdatedCallback;
+  onEventDeleted?: EventDeletedCallback;
 }
 
 // Rolling deduplication cache to prevent processing the same scan event multiple times
@@ -98,6 +100,22 @@ export function subscribeToEventSync(
               callbacks.onEventUpdated?.(payload.payload.event);
             }
           })
+          .on('broadcast', { event: 'event_deleted' }, (payload: any) => {
+            const deletedId = payload?.payload?.eventId || eventId;
+            callbacks.onEventDeleted?.({ eventId: deletedId });
+          })
+          .on(
+            'postgres_changes',
+            {
+              event: 'DELETE',
+              schema: 'public',
+              table: 'events',
+              filter: `id=eq.${eventId}`,
+            },
+            () => {
+              callbacks.onEventDeleted?.({ eventId });
+            }
+          )
           .on(
             'postgres_changes',
             {
@@ -108,7 +126,11 @@ export function subscribeToEventSync(
             },
             (payload: any) => {
               if (payload?.new) {
-                callbacks.onEventUpdated?.(payload.new as EventItem);
+                if (payload.new.status === 'DELETED') {
+                  callbacks.onEventDeleted?.({ eventId });
+                } else {
+                  callbacks.onEventUpdated?.(payload.new as EventItem);
+                }
               }
             }
           )
@@ -179,6 +201,8 @@ export function subscribeToEventSync(
             handleIncomingClear({ scanIds: parsed.scanIds });
           } else if (parsed.type === 'EVENT_UPDATED' && parsed.event) {
             callbacks.onEventUpdated?.(parsed.event);
+          } else if (parsed.type === 'EVENT_DELETED') {
+            callbacks.onEventDeleted?.({ eventId: parsed.eventId || eventId });
           }
         } catch {
           // Heartbeats or ping frames are ignored
@@ -300,3 +324,33 @@ export async function broadcastEventUpdated(
     console.warn('[RealtimeSync] Failed to broadcast event update via Supabase:', err);
   }
 }
+
+/**
+ * Broadcasts an event deletion to all connected scanners and peer clients.
+ */
+export async function broadcastEventDeleted(eventId: string): Promise<void> {
+  if (!eventId) return;
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  try {
+    const channelName = `event-sync-${eventId}`;
+    let channel = activeSupabaseChannels.get(channelName);
+    if (!channel) {
+      channel = supabase.channel(channelName, {
+        config: { broadcast: { ack: true } },
+      });
+      channel.subscribe();
+      activeSupabaseChannels.set(channelName, channel);
+    }
+
+    await channel.send({
+      type: 'broadcast',
+      event: 'event_deleted',
+      payload: { eventId },
+    });
+  } catch (err) {
+    console.warn('[RealtimeSync] Failed to broadcast event deletion via Supabase:', err);
+  }
+}
+

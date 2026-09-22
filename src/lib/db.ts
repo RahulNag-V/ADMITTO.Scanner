@@ -962,39 +962,43 @@ class DatabaseService {
     };
   }
 
-  async deleteEvent(eventId: string, adminId: string, permanentPurge: boolean = false): Promise<boolean> {
+  async deleteEvent(eventId: string, adminId: string, _permanentPurge: boolean = true): Promise<boolean> {
     const event = await this.getEventById(eventId, adminId);
     if (!event) return false;
 
     const supabase = this.getClient();
 
-    if (permanentPurge) {
-      if (supabase) {
-        const { error } = await supabase.from('events').delete().eq('id', eventId).eq('admin_id', adminId);
-        if (error) throw new Error(`Failed to delete event: ${error.message}`);
-      }
-      this.inMemoryDB.students = this.inMemoryDB.students.filter((s) => s.event_id !== eventId);
-      this.inMemoryDB.scanner_accounts = this.inMemoryDB.scanner_accounts.filter((sc) => sc.event_id !== eventId);
-      this.inMemoryDB.check_ins = this.inMemoryDB.check_ins.filter((c) => c.event_id !== eventId);
-      this.inMemoryDB.scan_attempts = this.inMemoryDB.scan_attempts.filter((a) => a.event_id !== eventId);
-      this.inMemoryDB.activity_logs = this.inMemoryDB.activity_logs.filter((al) => al.event_id !== eventId);
-      this.inMemoryDB.scanner_referral_codes = this.inMemoryDB.scanner_referral_codes.filter((r) => r.event_id !== eventId);
-      this.inMemoryDB.scanner_access_requests = this.inMemoryDB.scanner_access_requests.filter((r) => r.event_id !== eventId);
-      this.inMemoryDB.events = this.inMemoryDB.events.filter((e) => e.id !== eventId);
-    } else {
-      const now = new Date().toISOString();
-      if (supabase) {
-        const { error } = await supabase.from('events').update({ status: 'DELETED', deleted_at: now }).eq('id', eventId).eq('admin_id', adminId);
-        if (error) throw new Error(`Failed to archive event: ${error.message}`);
+    if (supabase) {
+      try {
         await supabase.from('scanner_access_requests').delete().eq('event_id', eventId);
         await supabase.from('scanner_referral_codes').delete().eq('event_id', eventId);
+        await supabase.from('scan_attempts').delete().eq('event_id', eventId);
+        await supabase.from('check_ins').delete().eq('event_id', eventId);
+        await supabase.from('scanner_accounts').delete().eq('event_id', eventId);
+        await supabase.from('students').delete().eq('event_id', eventId);
+        await supabase.from('activity_logs').delete().eq('event_id', eventId);
+        const { error } = await supabase.from('events').delete().eq('id', eventId).eq('admin_id', adminId);
+        if (error) {
+          // If hard delete failed due to external constraint or soft-delete preference, update status
+          await supabase.from('events').update({ status: 'DELETED', deleted_at: new Date().toISOString() }).eq('id', eventId).eq('admin_id', adminId);
+        }
+      } catch (err: any) {
+        console.warn('[DBService] Notice during Supabase event deletion cascade:', err.message);
       }
-      event.status = 'DELETED';
-      event.deleted_at = now;
-      this.inMemoryDB.scanner_access_requests = this.inMemoryDB.scanner_access_requests.filter((r) => r.event_id !== eventId);
-      this.inMemoryDB.scanner_referral_codes = this.inMemoryDB.scanner_referral_codes.filter((r) => r.event_id !== eventId);
-      await this.logActivity(eventId, adminId, event.admin_name, 'event_deleted', `Event "${event.title}" was deleted.`);
     }
+
+    // Unconditionally purge all event data from in-memory cache
+    this.inMemoryDB.students = this.inMemoryDB.students.filter((s) => s.event_id !== eventId);
+    this.inMemoryDB.scanner_accounts = this.inMemoryDB.scanner_accounts.filter((sc) => sc.event_id !== eventId);
+    this.inMemoryDB.check_ins = this.inMemoryDB.check_ins.filter((c) => c.event_id !== eventId);
+    this.inMemoryDB.scan_attempts = this.inMemoryDB.scan_attempts.filter((a) => a.event_id !== eventId);
+    this.inMemoryDB.activity_logs = this.inMemoryDB.activity_logs.filter((al) => al.event_id !== eventId);
+    this.inMemoryDB.scanner_referral_codes = this.inMemoryDB.scanner_referral_codes.filter((r) => r.event_id !== eventId);
+    this.inMemoryDB.scanner_access_requests = this.inMemoryDB.scanner_access_requests.filter((r) => r.event_id !== eventId);
+    if ((this.inMemoryDB as any).scanner_tokens) {
+      (this.inMemoryDB as any).scanner_tokens = (this.inMemoryDB as any).scanner_tokens.filter((t: any) => t.event_id !== eventId);
+    }
+    this.inMemoryDB.events = this.inMemoryDB.events.filter((e) => e.id !== eventId);
 
     return true;
   }

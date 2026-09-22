@@ -291,6 +291,13 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
 
       if (eventRes.status === 'fulfilled' && eventRes.value?.event) {
         if (eventRes.value.event.status === 'DELETED') {
+          try {
+            await purgeEventOfflineData(eventId, true);
+          } catch {}
+          setEvent(null);
+          setStudents([]);
+          setLogs([]);
+          setStats(null);
           alert('This event has been deleted by the administrator. Please enter a referral code to connect to an active event.');
           handleSafeLogout();
           return;
@@ -299,6 +306,13 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
       } else if (eventRes.status === 'rejected') {
         const errMsg = (eventRes.reason?.message || '').toLowerCase();
         if (errMsg.includes('not found') || errMsg.includes('deleted') || errMsg.includes('forbidden') || errMsg.includes('unauthorized')) {
+          try {
+            await purgeEventOfflineData(eventId, true);
+          } catch {}
+          setEvent(null);
+          setStudents([]);
+          setLogs([]);
+          setStats(null);
           alert('This event is no longer active or was deleted by the administrator.');
           handleSafeLogout();
           return;
@@ -490,13 +504,29 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
           // ignore
         }
       },
+      onEventDeleted: async (payload) => {
+        if (payload.eventId === eventId) {
+          console.warn('[ScannerPage] Event was deleted by administrator. Purging local data.');
+          try {
+            await purgeEventOfflineData(eventId, true);
+          } catch (e) {
+            console.warn('[ScannerPage] Failed to purge event offline data:', e);
+          }
+          setEvent(null);
+          setStudents([]);
+          setLogs([]);
+          setStats(null);
+          alert('This event has been deleted by the administrator. All associated data has been purged.');
+          handleSafeLogout();
+        }
+      },
     });
 
     // Cross-tab BroadcastChannel synchronization for instant local multi-window sync
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel('admitto_sync');
-      bc.onmessage = (msg) => {
+      bc.onmessage = async (msg) => {
         if (msg.data?.type === 'EVENT_UPDATED' && msg.data?.eventId === eventId && msg.data?.event) {
           console.log('[ScannerPage] BroadcastChannel event update received:', msg.data.event);
           setEvent((prev) => (prev ? { ...prev, ...msg.data.event } : msg.data.event));
@@ -505,6 +535,17 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
           } catch {
             // ignore
           }
+        } else if (msg.data?.type === 'EVENT_DELETED' && msg.data?.eventId === eventId) {
+          console.warn('[ScannerPage] BroadcastChannel event deleted received:', eventId);
+          try {
+            await purgeEventOfflineData(eventId, true);
+          } catch {}
+          setEvent(null);
+          setStudents([]);
+          setLogs([]);
+          setStats(null);
+          alert('This event has been deleted by the administrator. All associated data has been purged.');
+          handleSafeLogout();
         }
       };
     } catch {

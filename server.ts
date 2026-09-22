@@ -1334,17 +1334,19 @@ app.post('/api/events/:id/validate-uniqueness', requireAdminAuth, async (req: Re
   }
 });
 
-// Delete Event (or Permanent Purge with ?purge=true)
+// Delete Event (Permanently purges all associated event data across DB and clients)
 app.delete('/api/events/:id', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const admin = (req as any).user as SessionData;
-    const permanentPurge = req.query.purge === 'true';
-    const success = await dbService.deleteEvent(req.params.id, admin.userId, permanentPurge);
+    const eventId = req.params.id;
+    const success = await dbService.deleteEvent(eventId, admin.userId, true);
     if (!success) {
       res.status(403).json({ error: 'FORBIDDEN', message: 'Access denied or event not found.' });
       return;
     }
-    res.json({ success: true, message: permanentPurge ? 'Event and all associated data permanently purged.' : 'Event marked as deleted.' });
+    // Broadcast EVENT_DELETED immediately to all connected scanners and admins
+    broadcastToEventStream(eventId, { type: 'EVENT_DELETED', eventId });
+    res.json({ success: true, message: 'Event and all associated data permanently purged.' });
   } catch (err: any) {
     res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message });
   }

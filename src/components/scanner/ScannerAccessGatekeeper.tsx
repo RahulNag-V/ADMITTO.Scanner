@@ -26,7 +26,6 @@ interface ScannerAccessGatekeeperProps {
   onStartScanner: (request: ScannerAccessRequest) => void;
   onLogout: () => void;
   onNavigateHome?: () => void;
-  onDeleteAccount?: () => void;
 }
 
 export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = ({
@@ -34,7 +33,6 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
   onStartScanner,
   onLogout,
   onNavigateHome,
-  onDeleteAccount,
 }) => {
   const [accessRequest, setAccessRequest] = useState<ScannerAccessRequest | null>(null);
   const [loading, setLoading] = useState(true);

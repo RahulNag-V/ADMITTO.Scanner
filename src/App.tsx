@@ -687,7 +687,6 @@ export default function App() {
           session={session}
           onStartScanner={(req) => handleStartScanner(req)}
           onLogout={handleLogout}
-          onDeleteAccount={() => setIsDeleteAccountModalOpen(true)}
           onNavigateHome={() => navigate('/')}
         />
       </>
@@ -732,7 +731,6 @@ export default function App() {
           currentTab={adminActiveTab}
           onSelectTab={handleSelectAdminTab}
           onLogout={handleLogout}
-          onDeleteAccount={() => setIsDeleteAccountModalOpen(true)}
           onOpenScanner={() => navigate('/scan')}
           onNavigateHome={() => navigate('/')}
           onNavigate={navigate}
@@ -765,7 +763,6 @@ export default function App() {
                   session={session}
                   eventId={selectedEventId}
                   onLogout={handleLogout}
-                  onDeleteAccount={() => setIsDeleteAccountModalOpen(true)}
                 />
               )}
             </>
