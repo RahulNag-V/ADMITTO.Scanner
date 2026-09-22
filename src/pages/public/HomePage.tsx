@@ -70,12 +70,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
 
   useEffect(() => {
-    // Generate QR code pointing to scanner mobile terminal
-    const fullScanUrl = typeof window !== 'undefined'
-      ? `${window.location.origin}${toBrowserPath('/scan')}`
-      : 'https://admitto-scanner.onrender.com/scan';
-
-    QRCode.toDataURL(fullScanUrl, {
+    // Generate QR code pointing directly to download APK location
+    QRCode.toDataURL(APK_DOWNLOAD_URL, {
       width: 240,
       margin: 1,
       color: {
@@ -85,7 +81,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       errorCorrectionLevel: 'M',
     })
       .then((url) => setQrDataUrl(url))
-      .catch((err) => console.error('Failed to generate Scanner QR:', err));
+      .catch((err) => console.error('Failed to generate APK Download QR:', err));
 
     // Listen for PWA installation prompt
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -122,13 +118,32 @@ export const HomePage: React.FC<HomePageProps> = ({
     }
   };
 
-  const handleCopyScannerLink = () => {
-    const fullScanUrl = typeof window !== 'undefined'
-      ? `${window.location.origin}${toBrowserPath('/scan')}`
-      : 'https://admitto-scanner.onrender.com/scan';
-    navigator.clipboard.writeText(fullScanUrl);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2200);
+  const handleShareApkLink = async () => {
+    // Copy the APK download URL to clipboard
+    try {
+      await navigator.clipboard.writeText(APK_DOWNLOAD_URL);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2200);
+    } catch {
+      // ignore
+    }
+
+    // On mobile devices with native share support, open system share sheet
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: 'ADMITTO Scanner App',
+          text: 'Download the ADMITTO Scanner APK for Android:',
+          url: APK_DOWNLOAD_URL,
+        });
+        return;
+      } catch {
+        // Fall through if user dismisses share dialog
+      }
+    }
+
+    // Redirect to the download APK location
+    window.open(APK_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
   };
 
   const handleOpenPortal = (role: 'ADMIN' | 'SCANNER') => {
@@ -368,7 +383,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   {qrDataUrl ? (
                     <img
                       src={qrDataUrl}
-                      alt="Scan to open scanner on mobile"
+                      alt="Scan to download APK on mobile"
                       className="w-24 h-24 sm:w-26 sm:h-26 object-contain rounded-lg"
                     />
                   ) : (
@@ -377,7 +392,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                     </div>
                   )}
                   <span className="text-[9px] font-mono font-bold text-slate-800 uppercase tracking-tight mt-1">
-                    Scan with Phone
+                    Scan for APK
                   </span>
                 </div>
 
@@ -395,7 +410,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                     </p>
                   </div>
 
-                  {/* Action Buttons: PWA Install & Direct Download APK */}
+                  {/* Action Buttons: PWA Install, Direct Download APK & Share Link */}
                   <div className="flex flex-wrap items-center gap-2 pt-0.5">
                     {/* 1. Install App / PWA */}
                     <button
@@ -421,22 +436,23 @@ export const HomePage: React.FC<HomePageProps> = ({
                       <ExternalLink className="w-3 h-3 text-slate-400" />
                     </a>
 
-                    {/* 3. Copy Direct Scanner Link */}
+                    {/* 3. Share Link / Redirect to Download APK Location */}
                     <button
                       type="button"
-                      onClick={handleCopyScannerLink}
+                      onClick={handleShareApkLink}
                       className="px-3 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-slate-300 hover:text-white font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                      title="Copy Mobile Scanner URL to clipboard to send to staff"
+                      title="Redirect to download APK location & copy APK link to share"
                     >
                       {copiedLink ? (
                         <>
                           <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span className="text-emerald-400 font-bold">Copied!</span>
+                          <span className="text-emerald-400 font-bold">APK Link Copied!</span>
                         </>
                       ) : (
                         <>
                           <Copy className="w-3.5 h-3.5 text-slate-400" />
                           <span>Share Link</span>
+                          <ExternalLink className="w-3 h-3 text-slate-500" />
                         </>
                       )}
                     </button>

@@ -90,6 +90,13 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [currentPath, selectedBlogSlug]);
 
+  // Direct APK Download Redirect Route
+  useEffect(() => {
+    if (currentPath === '/download' || currentPath === '/apk' || currentPath === '/download-apk') {
+      window.location.href = 'https://github.com/RahulNag-V/ADMITTO.Scanner/releases/latest';
+    }
+  }, [currentPath]);
+
   const validAdminTabs = ['dashboard', 'students', 'scans', 'scanners', 'event', 'activity', 'settings'];
 
   // Admin Selected Event ID (Restored from URL query or localStorage)
