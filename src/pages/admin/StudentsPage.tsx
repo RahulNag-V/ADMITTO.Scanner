@@ -1664,15 +1664,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
               </div>
 
               {/* Modal Footer Actions */}
-              <div className="p-4 sm:p-5 bg-zinc-950/90 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
-                <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                  <span>
-                    Press <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-mono text-[10px]">Ctrl+Enter</kbd> to Save & Add Another
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 ml-auto">
+              <div className="p-4 sm:p-5 bg-zinc-950/90 border-t border-white/10 flex items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -1705,7 +1697,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                     <span>{isAdding ? 'Saving...' : `Save ${singular}`}</span>
                   </button>
                 </div>
-              </div>
             </form>
           </div>
         </div>,
