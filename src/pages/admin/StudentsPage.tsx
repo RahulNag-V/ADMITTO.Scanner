@@ -45,7 +45,6 @@ import {
   Sparkles,
   Save,
   UserPlus,
-  Dices,
   Layers,
 } from 'lucide-react';
 import { Student, StudentImportRow, QrMode, EventScanConfig, UniquenessValidationResult, EventItem } from '../../types';
@@ -1505,19 +1504,20 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                           Use {primaryKeyLabel}
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => setSingleBarcode(Math.floor(1000000000 + Math.random() * 9000000000).toString())}
-                        className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[10px] font-bold text-amber-300 transition-all cursor-pointer flex items-center gap-1"
-                        title="Generate a random 10-digit barcode"
-                      >
-                        <Dices className="w-3 h-3" />
-                        <span>Random</span>
-                      </button>
+                      {singleBarcode && (
+                        <button
+                          type="button"
+                          onClick={() => setSingleBarcode('')}
+                          className="px-2 py-1 rounded-lg bg-white/5 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-300 border border-white/10 text-[10px] font-medium transition-all cursor-pointer"
+                          title="Clear barcode"
+                        >
+                          Clear
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     <div className="relative">
                       <Barcode className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
@@ -1528,9 +1528,14 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                         className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-white font-mono placeholder:font-sans focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-all placeholder:text-zinc-500"
                       />
                     </div>
-                    <p className="text-[10px] text-zinc-500 leading-relaxed">
-                      Scanners can verify this attendee instantly by scanning this exact barcode string or printed wristband.
-                    </p>
+
+                    {/* Barcode scan warning notice */}
+                    <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px] leading-relaxed">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Warning:</strong> The barcode will be scanned through this value. Ensure this matches the physical barcode printed on the attendee's badge or wristband.
+                      </span>
+                    </div>
                   </div>
                 </div>
 
