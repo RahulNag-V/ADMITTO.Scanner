@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'motion/react';
-import QRCode from 'qrcode';
 import {
-  QrCode,
   Shield,
   Zap,
   ArrowRight,
@@ -56,92 +54,12 @@ const itemVariants = {
   },
 };
 
-const APK_DOWNLOAD_URL = 'https://github.com/RahulNag-V/ADMITTO.Scanner/releases/latest';
-const GITHUB_REPO_URL = 'https://github.com/RahulNag-V/ADMITTO.Scanner';
-
 export const HomePage: React.FC<HomePageProps> = ({
   onNavigate,
   onOpenStartNow,
   session,
   onSelectRole,
 }) => {
-  const [qrDataUrl, setQrDataUrl] = useState<string>('');
-  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
-  const [isStandaloneApp, setIsStandaloneApp] = useState<boolean>(false);
-  const [copiedLink, setCopiedLink] = useState<boolean>(false);
-
-  useEffect(() => {
-    // Generate QR code pointing directly to download APK location
-    QRCode.toDataURL(APK_DOWNLOAD_URL, {
-      width: 240,
-      margin: 1,
-      color: {
-        dark: '#0a0f1d',
-        light: '#ffffff',
-      },
-      errorCorrectionLevel: 'M',
-    })
-      .then((url) => setQrDataUrl(url))
-      .catch((err) => console.error('Failed to generate APK Download QR:', err));
-
-    // Listen for PWA installation prompt
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredInstallPrompt(e);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    // Detect if running as standalone PWA already
-    if (
-      typeof window !== 'undefined' &&
-      (window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone === true)
-    ) {
-      setIsStandaloneApp(true);
-    }
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, []);
-
-  const handleInstallApp = async () => {
-    if (deferredInstallPrompt) {
-      deferredInstallPrompt.prompt();
-      const { outcome } = await deferredInstallPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setIsStandaloneApp(true);
-        setDeferredInstallPrompt(null);
-      }
-    } else {
-      handleOpenPortal('SCANNER');
-    }
-  };
-
-  const handleShareApkLink = async () => {
-    // Copy the repository link to clipboard
-    try {
-      await navigator.clipboard.writeText(GITHUB_REPO_URL);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2200);
-    } catch {
-      // ignore
-    }
-
-    // On mobile devices with native share support, open system share sheet
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({
-          title: 'ADMITTO Scanner App',
-          text: 'ADMITTO — Digital Event Access & Token Scanning Platform:',
-          url: GITHUB_REPO_URL,
-        });
-      } catch {
-        // Fall through if user dismisses share dialog
-      }
-    }
-  };
 
   const handleOpenPortal = (role: 'ADMIN' | 'SCANNER') => {
     if (onSelectRole) {
@@ -786,138 +704,6 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           </div>
         </AppleScrollReveal>
-      </section>
-
-      {/* 5. MOBILE SCANNER & APP DOWNLOAD SECTION (BELOW CTA BANNER, ABOVE FOOTER) */}
-      <section id="scanner-download-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-2 space-y-6">
-        <AppleScrollReveal direction="up" distance={25}>
-          <div className="text-center max-w-2xl mx-auto space-y-2.5">
-            <div className="inline-flex items-center gap-1.5 text-xs uppercase font-bold tracking-widest text-orange-400 glass-pill px-3.5 py-1 rounded-full">
-              <Smartphone className="w-3.5 h-3.5 text-orange-400" />
-              <span>Mobile Gate Terminal &amp; App Download</span>
-            </div>
-            <h2 className="text-2xl sm:text-4xl font-black text-white font-['Space_Grotesk'] tracking-tight">
-              Equip Gate Scanners On Any Device
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-400">
-              Download the standalone Android APK or install the offline Progressive Web App for sub-50ms ticket validation at every entry gate.
-            </p>
-          </div>
-        </AppleScrollReveal>
-
-        <div className="max-w-2xl sm:max-w-3xl mx-auto">
-          {/* Download APK, PWA & QR Code Card */}
-          <motion.div
-            whileHover={{ y: -3 }}
-            transition={{ duration: 0.2 }}
-            className="rounded-3xl p-5 sm:p-7 glass-card border border-orange-500/25 bg-[#12162b]/90 shadow-2xl backdrop-blur-xl flex flex-col justify-between space-y-4"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 text-[11px] font-mono">
-              <div className="flex items-center gap-2 text-slate-300">
-                <Smartphone className="w-3.5 h-3.5 text-orange-400" />
-                <span className="font-bold text-white tracking-wider text-[11px]">DOWNLOAD SCANNER APP</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-semibold text-[10px]">
-                <Wifi className="w-3 h-3 text-indigo-400" />
-                <span>100% OFFLINE READY</span>
-              </div>
-            </div>
-
-            {/* QR + Actions */}
-            <div className="flex flex-col sm:flex-row items-center gap-4 py-2">
-              <div className="relative p-2.5 rounded-2xl bg-white shadow-xl flex flex-col items-center justify-center shrink-0 group">
-                {qrDataUrl ? (
-                  <img
-                    src={qrDataUrl}
-                    alt="Scan to download APK on mobile"
-                    className="w-24 h-24 sm:w-26 sm:h-26 object-contain rounded-lg"
-                  />
-                ) : (
-                  <div className="w-24 h-24 sm:w-26 sm:h-26 flex items-center justify-center bg-slate-100 rounded-lg">
-                    <QrCode className="w-12 h-12 text-slate-400 animate-pulse" />
-                  </div>
-                )}
-                <span className="text-[9px] font-mono font-bold text-slate-800 uppercase tracking-tight mt-1">
-                  Scan for APK
-                </span>
-              </div>
-
-              <div className="flex-1 space-y-2.5 w-full text-left">
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-white font-['Space_Grotesk'] flex items-center gap-2">
-                    <span>Get ADMITTO Scanner App</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                      v2.4
-                    </span>
-                  </h3>
-                  <p className="text-xs text-slate-300 leading-snug pt-0.5 font-normal">
-                    Equip gate volunteers with sub-50ms token verification on Android, iOS, or handheld barcode scanners.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleInstallApp}
-                    className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-lg shadow-orange-500/25 flex items-center gap-1.5 transition-all cursor-pointer group"
-                    title={isStandaloneApp ? 'Open installed app' : 'Install ADMITTO Scanner as an app on this device'}
-                  >
-                    <Download className="w-3.5 h-3.5 group-hover:-translate-y-0.5 transition-transform" />
-                    <span>{isStandaloneApp ? 'Open App' : 'Install App'}</span>
-                  </button>
-
-                  <a
-                    href={APK_DOWNLOAD_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 hover:border-white/30 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-                    title="Download Android APK Package (.apk)"
-                  >
-                    <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Download APK</span>
-                    <ExternalLink className="w-3 h-3 text-slate-400" />
-                  </a>
-
-                  <button
-                    type="button"
-                    onClick={handleShareApkLink}
-                    className="px-3 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-slate-300 hover:text-white font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                    title="Copy GitHub repository link to clipboard"
-                  >
-                    {copiedLink ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400 font-bold">Link Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5 text-slate-400" />
-                        <span>Share Link</span>
-                        <ExternalLink className="w-3 h-3 text-slate-500" />
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono text-slate-400 pt-1 border-t border-white/5">
-                  <span className="flex items-center gap-1">
-                    <Zap className="w-3 h-3 text-cyan-400" />
-                    &lt;50ms Scan
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Database className="w-3 h-3 text-indigo-400" />
-                    IndexedDB Offline
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                    Zero Duplicates
-                  </span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
       </section>
       </div>
     </div>
