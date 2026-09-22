@@ -102,6 +102,21 @@ export const eventBundleService = {
   },
 
   /**
+   * Update cached event in IndexedDB when event settings/banner changes
+   */
+  updateCachedEvent: async (event: Partial<CachedEvent> & { id: string }): Promise<void> => {
+    try {
+      const db = await getAdmittoDB();
+      const existing = await db.get('cached_event', event.id);
+      if (existing) {
+        await db.put('cached_event', { ...existing, ...event });
+      }
+    } catch (err) {
+      console.warn('[eventBundleService] Failed to update cached event in IndexedDB:', err);
+    }
+  },
+
+  /**
    * Get active bundle metadata summary
    */
   getActiveBundleMeta: async () => {

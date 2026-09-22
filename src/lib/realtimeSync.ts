@@ -1,13 +1,15 @@
 import { getSupabaseClient } from './supabase/client';
 import { getApiBaseUrl } from './api';
-import { RealtimeScanBroadcast } from '../types';
+import { RealtimeScanBroadcast, EventItem } from '../types';
 
 export type ScanEventCallback = (data: RealtimeScanBroadcast) => void;
 export type LogsClearedCallback = (payload: { scanIds?: string[] }) => void;
+export type EventUpdatedCallback = (event: EventItem) => void;
 
 interface SubscriptionCallbacks {
   onScan: ScanEventCallback;
   onLogsCleared?: LogsClearedCallback;
+  onEventUpdated?: EventUpdatedCallback;
 }
 
 // Rolling deduplication cache to prevent processing the same scan event multiple times
@@ -91,6 +93,25 @@ export function subscribeToEventSync(
           .on('broadcast', { event: 'logs_cleared' }, (payload: any) => {
             handleIncomingClear(payload?.payload || {});
           })
+          .on('broadcast', { event: 'event_updated' }, (payload: any) => {
+            if (payload?.payload?.event) {
+              callbacks.onEventUpdated?.(payload.payload.event);
+            }
+          })
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'events',
+              filter: `id=eq.${eventId}`,
+            },
+            (payload: any) => {
+              if (payload?.new) {
+                callbacks.onEventUpdated?.(payload.new as EventItem);
+              }
+            }
+          )
           .on(
             'postgres_changes',
             {
@@ -156,6 +177,8 @@ export function subscribeToEventSync(
             handleIncomingScan(parsed as RealtimeScanBroadcast);
           } else if (parsed.type === 'LOGS_CLEARED') {
             handleIncomingClear({ scanIds: parsed.scanIds });
+          } else if (parsed.type === 'EVENT_UPDATED' && parsed.event) {
+            callbacks.onEventUpdated?.(parsed.event);
           }
         } catch {
           // Heartbeats or ping frames are ignored
@@ -243,5 +266,37 @@ export async function broadcastEventLogsCleared(
     }
   } catch (err) {
     console.warn('[RealtimeSync] Failed to broadcast logs cleared event:', err);
+  }
+}
+
+/**
+ * Broadcasts an event update (e.g. banner image, title) to all connected scanners and admins.
+ */
+export async function broadcastEventUpdated(
+  eventId: string,
+  event: EventItem
+): Promise<void> {
+  if (!eventId || !event) return;
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  try {
+    const channelName = `event-sync-${eventId}`;
+    let channel = activeSupabaseChannels.get(channelName);
+    if (!channel) {
+      channel = supabase.channel(channelName, {
+        config: { broadcast: { ack: true } },
+      });
+      channel.subscribe();
+      activeSupabaseChannels.set(channelName, channel);
+    }
+
+    await channel.send({
+      type: 'broadcast',
+      event: 'event_updated',
+      payload: { event },
+    });
+  } catch (err) {
+    console.warn('[RealtimeSync] Failed to broadcast event update via Supabase:', err);
   }
 }

@@ -799,6 +799,14 @@ class DatabaseService {
       }
     }
 
+    // Always keep inMemoryDB synchronized
+    const inMemEvent = this.inMemoryDB.events.find((e) => e.id === eventId);
+    if (inMemEvent) {
+      Object.assign(inMemEvent, updatedData);
+    } else {
+      this.inMemoryDB.events.push({ ...event, ...updatedData });
+    }
+
     Object.assign(event, updatedData);
 
     await this.logActivity(

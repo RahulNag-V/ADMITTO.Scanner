@@ -481,15 +481,50 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
           setLogs([]);
         }
       },
+      onEventUpdated: (updatedEv) => {
+        console.log('[ScannerPage] Real-time event update received:', updatedEv);
+        setEvent((prev) => (prev ? { ...prev, ...updatedEv } : updatedEv));
+        try {
+          eventBundleService.updateCachedEvent(updatedEv);
+        } catch {
+          // ignore
+        }
+      },
     });
+
+    // Cross-tab BroadcastChannel synchronization for instant local multi-window sync
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('admitto_sync');
+      bc.onmessage = (msg) => {
+        if (msg.data?.type === 'EVENT_UPDATED' && msg.data?.eventId === eventId && msg.data?.event) {
+          console.log('[ScannerPage] BroadcastChannel event update received:', msg.data.event);
+          setEvent((prev) => (prev ? { ...prev, ...msg.data.event } : msg.data.event));
+          try {
+            eventBundleService.updateCachedEvent(msg.data.event);
+          } catch {
+            // ignore
+          }
+        }
+      };
+    } catch {
+      // ignore
+    }
 
     return () => {
       unsubscribe();
+      if (bc) {
+        try {
+          bc.close();
+        } catch {
+          // ignore
+        }
+      }
       if (peerNotificationTimerRef.current) clearTimeout(peerNotificationTimerRef.current);
     };
   }, [eventId, session.user.id]);
 
-  // Periodic event liveness check: If admin deletes event, safely terminate
+  // Periodic event liveness check: If admin deletes event, safely terminate. Also reconcile live banner/title.
   useEffect(() => {
     if (!eventId) return;
     const checkTimer = setInterval(async () => {
@@ -498,6 +533,19 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
         if (!res.event || res.event.status === 'DELETED') {
           alert('This event has been deleted by the administrator. Returning to referral code section.');
           handleSafeLogout();
+        } else if (res.event) {
+          // Keep banner and event details synced even across network interruptions
+          setEvent((prev) => {
+            if (!prev) return res.event;
+            if (
+              prev.banner_url !== res.event.banner_url ||
+              prev.title !== res.event.title ||
+              prev.venue !== res.event.venue
+            ) {
+              return { ...prev, ...res.event };
+            }
+            return prev;
+          });
         }
       } catch (err: any) {
         const errMsg = (err.message || '').toLowerCase();
@@ -1171,7 +1219,17 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
           className={`flex items-center gap-2.5 sm:gap-3 min-w-0 ${onNavigateHome ? 'cursor-pointer group select-none' : ''}`}
           title={onNavigateHome ? 'Return to Home Page' : undefined}
         >
-          <AppLogo size="sm" className="shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform" />
+          {event?.banner_url ? (
+            <div className="relative w-9 h-9 rounded-xl overflow-hidden border border-white/20 shrink-0 shadow-md bg-zinc-900 group-hover:scale-105 transition-transform">
+              <img
+                src={event.banner_url}
+                alt={event.title || 'Event Poster'}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <AppLogo size="sm" className="shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform" />
+          )}
           <div className="min-w-0">
             <h1 className="text-sm font-extrabold text-white tracking-tight leading-tight truncate group-hover:text-orange-400 transition-colors">
               {scannerName}
@@ -1372,6 +1430,7 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
                     students={students}
                     eventId={eventId}
                     onSelectStudent={handleSelectStudentFromSearch}
+                    event={event}
                   />
                 )}
 

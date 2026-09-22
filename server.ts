@@ -1273,6 +1273,13 @@ app.put('/api/events/:id', requireAdminAuth, async (req: Request, res: Response)
       res.status(403).json({ error: 'FORBIDDEN', message: 'Access denied or event not found.' });
       return;
     }
+
+    // Broadcast real-time update to all connected scanner terminals & admins
+    broadcastToEventStream(req.params.id, {
+      type: 'EVENT_UPDATED',
+      event: updated,
+    });
+
     res.json({ success: true, event: updated });
   } catch (err: any) {
     res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message });
@@ -1297,6 +1304,12 @@ app.patch('/api/events/:id/scan-config', requireAdminAuth, async (req: Request, 
       barcode_field: barcode_field || 'usn',
       available_fields: available_fields || [],
       is_uniqueness_verified: is_uniqueness_verified ?? true,
+    });
+
+    // Broadcast real-time update to all connected scanner terminals & admins
+    broadcastToEventStream(req.params.id, {
+      type: 'EVENT_UPDATED',
+      event: updatedEvent,
     });
 
     res.json({ success: true, event: updatedEvent });

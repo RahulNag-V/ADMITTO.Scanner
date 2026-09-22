@@ -26,7 +26,7 @@ import {
   X,
   User,
 } from 'lucide-react';
-import { ScanType, ScanValidationResult, Student } from '../../types';
+import { ScanType, ScanValidationResult, Student, EventItem } from '../../types';
 import { ScannerPreferences } from './ScannerSettingsTab';
 import { getCachedAttendees } from '../../lib/offline/idb';
 
@@ -59,6 +59,7 @@ interface AdmittoScannerTerminalProps {
   students?: Student[];
   eventId?: string;
   onSelectStudent?: (student: Student) => void;
+  event?: EventItem | null;
 }
 
 export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
@@ -90,6 +91,7 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
   students = [],
   eventId,
   onSelectStudent,
+  event,
 }) => {
   // Live Search State
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -233,6 +235,47 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
             <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
           </button>
+        </div>
+      )}
+
+      {/* Official Synced Event Poster / Banner Strip */}
+      {event?.banner_url && (
+        <div className="relative rounded-2xl overflow-hidden border border-white/15 bg-zinc-950 p-2 sm:p-2.5 flex items-center justify-between gap-3 shadow-lg shrink-0 backdrop-blur-md">
+          <div className="absolute inset-0 z-0">
+            <img
+              src={event.banner_url}
+              alt={event.title || 'Event Poster'}
+              className="w-full h-full object-cover opacity-25 filter blur-[1px]"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/95 via-zinc-950/80 to-zinc-950/60" />
+          </div>
+          <div className="relative z-10 flex items-center gap-2.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/20 shrink-0 shadow-md bg-zinc-900">
+              <img
+                src={event.banner_url}
+                alt={event.title || 'Event Poster'}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30 uppercase tracking-wider">
+                  Official Poster
+                </span>
+                <span className="text-[10px] text-zinc-300 font-mono truncate">
+                  {event.venue || 'Active Terminal'}
+                </span>
+              </div>
+              <h2 className="text-xs sm:text-sm font-bold text-white truncate font-['Space_Grotesk'] leading-tight mt-0.5">
+                {event.title || 'Event Scanner'}
+              </h2>
+            </div>
+          </div>
+          <span className="relative z-10 px-2 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/25 text-emerald-300 text-[10px] font-bold uppercase tracking-wider shrink-0 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="hidden xs:inline sm:inline">Live</span>
+            <span>Synced</span>
+          </span>
         </div>
       )}
 

@@ -42,6 +42,8 @@ import { EventItem, QrMode, EventScanConfig, AttendeeType } from '../../types';
 import { eventsApi, getStoredSession } from '../../lib/api';
 import { ATTENDEE_TYPE_PRESETS, getPresetByType } from '../../lib/attendeeTypes';
 import { TabSkeletonView } from '../../components/common/Skeleton';
+import { compressImageFile } from '../../lib/imageCompression';
+import { broadcastEventUpdated } from '../../lib/realtimeSync';
 
 interface EventSettingsPageProps {
   eventId: string;
@@ -154,6 +156,8 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
   const [isColorDropdownOpen, setIsColorDropdownOpen] = useState(false);
   const [colorCategoryFilter, setColorCategoryFilter] = useState<'All' | 'Warm' | 'Cyber' | 'Nature' | 'Dark'>('All');
   const [colorSearchQuery, setColorSearchQuery] = useState('');
+  const [isSavingBanner, setIsSavingBanner] = useState(false);
+  const [bannerSavedSuccess, setBannerSavedSuccess] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const colorDropdownRef = useRef<HTMLDivElement>(null);
@@ -291,27 +295,80 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
     }
   };
 
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSaveBanner = async (newUrl?: string) => {
+    const urlToPersist = newUrl !== undefined ? newUrl : bannerUrl;
+    setIsSavingBanner(true);
+    setBannerSavedSuccess(false);
+
+    try {
+      const res = await eventsApi.update(eventId, {
+        banner_url: urlToPersist,
+        title: (customBannerText.trim() || title).trim(),
+        description: (customBannerSubtext.trim() || description).trim(),
+      });
+
+      if (res.event) {
+        setEvent(res.event);
+        setEvents((prev) => prev.map((ev) => (ev.id === res.event.id ? res.event : ev)));
+
+        // Broadcast in real-time to all connected scanner terminals & admins
+        await broadcastEventUpdated(eventId, res.event);
+        window.dispatchEvent(new CustomEvent('admitto:events-changed'));
+
+        try {
+          const bc = new BroadcastChannel('admitto_sync');
+          bc.postMessage({ type: 'EVENT_UPDATED', eventId, event: res.event });
+          bc.close();
+        } catch {
+          // ignore
+        }
+
+        setBannerSavedSuccess(true);
+        setTimeout(() => setBannerSavedSuccess(false), 3500);
+      }
+    } catch (err: any) {
+      console.error('Failed to save banner:', err);
+      alert(`Failed to save banner: ${err.message || 'Network error'}`);
+    } finally {
+      setIsSavingBanner(false);
+    }
+  };
+
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Image file size must be less than 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image file size must be less than 10MB');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setBannerUrl(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      setIsSavingBanner(true);
+      // Compress client-side to ensure ultra-fast synchronization and bypass payload size limits
+      const compressedDataUrl = await compressImageFile(file, 1280, 720, 0.82);
+      setBannerUrl(compressedDataUrl);
+      // Automatically save and sync live to all scanners!
+      await handleSaveBanner(compressedDataUrl);
+    } catch (err: any) {
+      console.warn('Image compression fallback:', err);
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const raw = reader.result as string;
+        setBannerUrl(raw);
+        await handleSaveBanner(raw);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  const handleApplyUrl = () => {
+  const handleApplyUrl = async () => {
     if (!tempUrl.trim()) return;
-    setBannerUrl(tempUrl.trim());
+    const url = tempUrl.trim();
+    setBannerUrl(url);
     setTempUrl('');
     setShowUrlInput(false);
+    await handleSaveBanner(url);
   };
 
   const hasOrganizer = adminName.trim() !== '';
@@ -433,7 +490,19 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
       if (updatedEv) {
         setEvent(updatedEv);
         setEvents((prev) => prev.map((ev) => (ev.id === updatedEv.id ? updatedEv : ev)));
+
+        // Broadcast to all scanners in real-time
+        await broadcastEventUpdated(eventId, updatedEv);
         window.dispatchEvent(new CustomEvent('admitto:events-changed'));
+
+        try {
+          const bc = new BroadcastChannel('admitto_sync');
+          bc.postMessage({ type: 'EVENT_UPDATED', eventId, event: updatedEv });
+          bc.close();
+        } catch {
+          // ignore
+        }
+
         setSuccessMsg('Event details & scan configuration saved successfully.');
         setTimeout(() => setSuccessMsg(null), 3500);
       }
@@ -610,7 +679,8 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-xs font-bold text-white bg-white/[0.1] hover:bg-white/[0.18] active:scale-95 px-3 py-2 rounded-xl border border-white/20 flex items-center gap-1.5 cursor-pointer transition-all shadow-sm backdrop-blur-md"
+                disabled={isSavingBanner}
+                className="text-xs font-bold text-white bg-white/[0.1] hover:bg-white/[0.18] active:scale-95 px-3 py-2 rounded-xl border border-white/20 flex items-center gap-1.5 cursor-pointer transition-all shadow-sm backdrop-blur-md disabled:opacity-50"
               >
                 <UploadCloud className="w-3.5 h-3.5 text-orange-400" />
                 <span>Upload Image</span>
@@ -626,17 +696,43 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
               {bannerUrl && (
                 <button
                   type="button"
-                  onClick={() => {
+                  disabled={isSavingBanner}
+                  onClick={async () => {
                     setBannerUrl('');
                     if (fileInputRef.current) fileInputRef.current.value = '';
+                    await handleSaveBanner('');
                   }}
-                  className="text-xs font-semibold text-rose-300 hover:text-rose-200 px-3 py-2 rounded-xl bg-rose-500/15 border border-rose-500/25 flex items-center gap-1.5 cursor-pointer transition-all backdrop-blur-md"
+                  className="text-xs font-semibold text-rose-300 hover:text-rose-200 px-3 py-2 rounded-xl bg-rose-500/15 border border-rose-500/25 flex items-center gap-1.5 cursor-pointer transition-all backdrop-blur-md disabled:opacity-50"
                   title="Remove uploaded image and return to custom gradient"
                 >
                   <X className="w-3.5 h-3.5" />
                   <span>Use Gradient</span>
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => handleSaveBanner()}
+                disabled={isSavingBanner}
+                className="text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-95 px-3.5 py-2 rounded-xl shadow-lg shadow-orange-500/25 flex items-center gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+                title="Save banner poster and sync live across all connected scanners"
+              >
+                {isSavingBanner ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Syncing...</span>
+                  </>
+                ) : bannerSavedSuccess ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                    <span className="text-emerald-100 font-semibold">Synced to Scanners!</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Save & Sync Banner</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
@@ -901,7 +997,10 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                 type="text"
                 placeholder={title || 'e.g. TechSprint 2026'}
                 value={customBannerText}
-                onChange={(e) => setCustomBannerText(e.target.value)}
+                onChange={(e) => {
+                  setCustomBannerText(e.target.value);
+                  setTitle(e.target.value);
+                }}
                 className="w-full h-11 bg-white/[0.08] border border-white/15 hover:border-white/25 rounded-xl px-3.5 text-xs text-white placeholder-zinc-400 focus:outline-none focus:border-orange-400 font-medium backdrop-blur-md transition-colors"
               />
             </div>
@@ -915,7 +1014,10 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                 type="text"
                 placeholder={description || 'e.g. Flagship engineering hackathon'}
                 value={customBannerSubtext}
-                onChange={(e) => setCustomBannerSubtext(e.target.value)}
+                onChange={(e) => {
+                  setCustomBannerSubtext(e.target.value);
+                  setDescription(e.target.value);
+                }}
                 className="w-full h-11 bg-white/[0.08] border border-white/15 hover:border-white/25 rounded-xl px-3.5 text-xs text-white placeholder-zinc-400 focus:outline-none focus:border-orange-400 font-medium backdrop-blur-md transition-colors"
               />
             </div>
@@ -945,7 +1047,10 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
               type="text"
               required
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setCustomBannerText(e.target.value);
+              }}
               placeholder="e.g. TechSprint 2026 National Hackathon & Summit"
               className="w-full bg-white/[0.08] border border-white/15 hover:border-white/25 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-orange-400 font-medium shadow-inner backdrop-blur-md transition-colors"
             />
@@ -957,7 +1062,10 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
             <textarea
               rows={3}
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                setCustomBannerSubtext(e.target.value);
+              }}
               placeholder="Annual flagship engineering hackathon, workshops, and recruitment keynote..."
               className="w-full bg-white/[0.08] border border-white/15 hover:border-white/25 rounded-xl p-3.5 text-xs text-white focus:outline-none focus:border-orange-400 font-medium shadow-inner resize-none backdrop-blur-md transition-colors"
             />
