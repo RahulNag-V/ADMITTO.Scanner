@@ -9,17 +9,17 @@ export const Watermark3DGyroBanner: React.FC = () => {
   const [glarePosition, setGlarePosition] = useState({ x: 50, y: 50 });
   const [isSensorActive, setIsSensorActive] = useState(false);
 
-  // 1. Ultra-Responsive Gyroscope Lerp (0.28) + Ambient Drift
+  // 1. Smooth, Gentle 3D Lerp (0.10) + Soft Ambient Drift
   useEffect(() => {
     let animationFrameId: number;
-    let startTime = Date.now();
+    const startTime = Date.now();
 
     const updateRotation = () => {
       const elapsed = (Date.now() - startTime) / 1000;
 
-      // Subtle ambient 3D breathing when at rest
-      const ambientX = !isSensorActive ? Math.sin(elapsed * 1.5) * 5 : 0;
-      const ambientY = !isSensorActive ? Math.cos(elapsed * 1.2) * 7 : 0;
+      // Soft ambient 3D breathing when at rest (subtle and calm: max ~1.2° - 1.5°)
+      const ambientX = !isSensorActive ? Math.sin(elapsed * 0.8) * 1.2 : 0;
+      const ambientY = !isSensorActive ? Math.cos(elapsed * 0.6) * 1.6 : 0;
 
       setRotation((prev) => {
         const finalTargetX = (Number.isFinite(targetRotation.x) ? targetRotation.x : 0) + ambientX;
@@ -30,17 +30,18 @@ export const Watermark3DGyroBanner: React.FC = () => {
         const dx = finalTargetX - prevX;
         const dy = finalTargetY - prevY;
 
+        // Gentle, fluid easing (0.10) prevents jitter or hypersensitive snapping
         return {
-          x: prevX + dx * 0.28,
-          y: prevY + dy * 0.28,
+          x: prevX + dx * 0.10,
+          y: prevY + dy * 0.10,
         };
       });
 
-      // Ambient glare shimmer when gyro is not active
+      // Ambient glare shimmer when gyro/hover is not active
       if (!isSensorActive) {
         setGlarePosition({
-          x: 50 + Math.sin(elapsed * 1.2) * 35,
-          y: 50 + Math.cos(elapsed * 1.5) * 35,
+          x: 50 + Math.sin(elapsed * 0.7) * 20,
+          y: 50 + Math.cos(elapsed * 0.9) * 20,
         });
       }
 
@@ -51,7 +52,7 @@ export const Watermark3DGyroBanner: React.FC = () => {
     return () => cancelAnimationFrame(animationFrameId);
   }, [targetRotation, isSensorActive]);
 
-  // 2. Pure Hardware Gyroscope & Accelerometer Listener (High Sensitivity)
+  // 2. Hardware Gyroscope & Accelerometer Listener (Gentle, Low-Gain Sensitivity)
   useEffect(() => {
     try {
       if (typeof window === 'undefined') return;
@@ -64,21 +65,21 @@ export const Watermark3DGyroBanner: React.FC = () => {
           if (typeof beta === 'number' && typeof gamma === 'number' && (beta !== 0 || gamma !== 0)) {
             setIsSensorActive(true);
 
-            // Ultra-Sensitive Gyro Mapping (High Gain)
-            const clampedGamma = Math.max(-30, Math.min(30, gamma));
-            const clampedBeta = Math.max(10, Math.min(65, beta)) - 38;
+            // Gentle Gyro Mapping (Capped at subtle ±5° to ±7°)
+            const clampedGamma = Math.max(-25, Math.min(25, gamma));
+            const clampedBeta = Math.max(15, Math.min(65, beta)) - 40;
 
-            const rotY = (clampedGamma / 22) * 38;
-            const rotX = -(clampedBeta / 16) * 32;
+            const rotY = (clampedGamma / 25) * 6.5;
+            const rotX = -(clampedBeta / 25) * 4.5;
 
             setTargetRotation({
-              x: Number.isFinite(rotX) ? Math.max(-35, Math.min(35, rotX)) : 0,
-              y: Number.isFinite(rotY) ? Math.max(-42, Math.min(42, rotY)) : 0,
+              x: Number.isFinite(rotX) ? Math.max(-5, Math.min(5, rotX)) : 0,
+              y: Number.isFinite(rotY) ? Math.max(-7, Math.min(7, rotY)) : 0,
             });
 
             setGlarePosition({
-              x: Math.max(5, Math.min(95, 50 + (clampedGamma / 22) * 50)),
-              y: Math.max(5, Math.min(95, 50 + (clampedBeta / 16) * 50)),
+              x: Math.max(15, Math.min(85, 50 + (clampedGamma / 25) * 35)),
+              y: Math.max(15, Math.min(85, 50 + (clampedBeta / 25) * 35)),
             });
           }
         } catch {
@@ -86,18 +87,18 @@ export const Watermark3DGyroBanner: React.FC = () => {
         }
       };
 
-      // Accelerometer Fallback via DeviceMotion (High Gain)
+      // Accelerometer Fallback via DeviceMotion (Gentle, Low Gain)
       const handleMotion = (e: DeviceMotionEvent) => {
         try {
           if (!isSensorActive && e.accelerationIncludingGravity) {
             const { x, y } = e.accelerationIncludingGravity;
             if (typeof x === 'number' && typeof y === 'number') {
               setIsSensorActive(true);
-              const rotY = -(x / 5.0) * 36;
-              const rotX = (y / 5.0) * 30;
+              const rotY = -(x / 9.8) * 5;
+              const rotX = (y / 9.8) * 3.5;
               setTargetRotation({
-                x: Number.isFinite(rotX) ? Math.max(-34, Math.min(34, rotX)) : 0,
-                y: Number.isFinite(rotY) ? Math.max(-40, Math.min(40, rotY)) : 0,
+                x: Number.isFinite(rotX) ? Math.max(-4, Math.min(4, rotX)) : 0,
+                y: Number.isFinite(rotY) ? Math.max(-6, Math.min(6, rotY)) : 0,
               });
             }
           }
@@ -118,6 +119,31 @@ export const Watermark3DGyroBanner: React.FC = () => {
     }
   }, [isSensorActive]);
 
+  // 3. Smooth, Gentle Desktop Mouse Hover Tilt
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    const normX = (e.clientX - rect.left) / rect.width - 0.5; // -0.5 to +0.5
+    const normY = (e.clientY - rect.top) / rect.height - 0.5; // -0.5 to +0.5
+
+    // Subtle, luxurious tilt: max ~5° on Y, ~4° on X
+    setTargetRotation({
+      x: -normY * 6,
+      y: normX * 8,
+    });
+
+    setGlarePosition({
+      x: Math.max(10, Math.min(90, (normX + 0.5) * 100)),
+      y: Math.max(10, Math.min(90, (normY + 0.5) * 100)),
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setTargetRotation({ x: 0, y: 0 });
+  };
+
   const safeRotX = Number.isFinite(rotation.x) ? rotation.x.toFixed(2) : '0';
   const safeRotY = Number.isFinite(rotation.y) ? rotation.y.toFixed(2) : '0';
 
@@ -125,21 +151,23 @@ export const Watermark3DGyroBanner: React.FC = () => {
     <div
       id="watermark-3d-gyro-section"
       className="relative max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 pt-6 sm:pt-10 pb-4 my-6 sm:my-10 select-none w-full"
-      style={{ perspective: 850 }}
+      style={{ perspective: 1400 }}
     >
       <div
         ref={containerRef}
-        className="relative w-full rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-10 lg:p-12 transition-transform duration-75 ease-out overflow-hidden border border-white/20 bg-gradient-to-b from-[#181d3d] via-[#10142e] to-[#090c20] shadow-[0_25px_70px_-15px_rgba(99,102,241,0.45)] group"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        className="relative w-full rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-10 lg:p-12 transition-transform duration-100 ease-out overflow-hidden border border-white/20 bg-gradient-to-b from-[#181d3d] via-[#10142e] to-[#090c20] shadow-[0_25px_70px_-15px_rgba(99,102,241,0.45)] group"
         style={{
           transform: `rotateX(${safeRotX}deg) rotateY(${safeRotY}deg)`,
           willChange: 'transform',
         }}
       >
-        {/* Dynamic Holographic Glare Shimmer Driven by Gyroscope */}
+        {/* Dynamic Holographic Glare Shimmer */}
         <div
-          className="absolute inset-0 pointer-events-none transition-opacity duration-200 rounded-3xl sm:rounded-[2.5rem] opacity-50 z-20"
+          className="absolute inset-0 pointer-events-none transition-opacity duration-300 rounded-3xl sm:rounded-[2.5rem] opacity-40 z-20"
           style={{
-            background: `radial-gradient(circle 520px at ${glarePosition.x}% ${glarePosition.y}%, rgba(255, 255, 255, 0.26), rgba(99, 102, 241, 0.18) 40%, transparent 80%)`,
+            background: `radial-gradient(circle 500px at ${glarePosition.x}% ${glarePosition.y}%, rgba(255, 255, 255, 0.22), rgba(99, 102, 241, 0.12) 40%, transparent 80%)`,
           }}
         />
 
