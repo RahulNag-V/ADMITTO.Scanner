@@ -99,7 +99,7 @@ interface StudentsPageProps {
 
 export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) => {
   const [eventDetails, setEventDetails] = useState<EventItem | null>(event || null);
-  const { singular, plural, primaryKeyLabel, preset } = getAttendeeLabels(eventDetails || undefined);
+  const { singular, plural, primaryKeyLabel, preset, groupingLabel, subGroupingLabel, divisionLabel } = getAttendeeLabels(eventDetails || undefined);
 
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,15 +135,29 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const [singleName, setSingleName] = useState('');
   const [singleEmail, setSingleEmail] = useState('');
   const [singlePhone, setSinglePhone] = useState('');
-  const [singleBranch, setSingleBranch] = useState('Computer Science');
-  const [singleYear, setSingleYear] = useState('2026');
-  const [singleSection, setSingleSection] = useState('A');
+  const [singleBranch, setSingleBranch] = useState(preset.defaultGroupingValue || 'General');
+  const [singleYear, setSingleYear] = useState(preset.defaultSubGroupingValue || 'General');
+  const [singleSection, setSingleSection] = useState(preset.defaultDivisionValue || 'A');
   const [singleBarcode, setSingleBarcode] = useState('');
   const [customFields, setCustomFields] = useState<Array<{ id: string; key: string; value: string }>>([]);
   const [batchAddedCount, setBatchAddedCount] = useState(0);
   const [lastAddedAttendee, setLastAddedAttendee] = useState<{ name: string; usn: string } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const singleUsnInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (preset) {
+      if (preset.defaultGroupingValue && (!singleBranch || singleBranch === 'Computer Science' || singleBranch === 'General')) {
+        setSingleBranch(preset.defaultGroupingValue);
+      }
+      if (preset.defaultSubGroupingValue && (!singleYear || singleYear === '2026' || singleYear === 'General')) {
+        setSingleYear(preset.defaultSubGroupingValue);
+      }
+      if (preset.defaultDivisionValue && (!singleSection || singleSection === 'A')) {
+        setSingleSection(preset.defaultDivisionValue);
+      }
+    }
+  }, [preset]);
 
   // 5-Step Attendee Identification & QR Configuration Wizard State
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -882,7 +896,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
             <thead>
               <tr className="border-b border-white/15 bg-white/[0.06] backdrop-blur-md text-zinc-300 font-semibold uppercase tracking-wider text-[11px]">
                 <th className="w-14 py-3.5 pl-4 pr-1 text-center"></th>
-                <th className="py-3.5 px-4 tracking-wider">ATTENDEE / USN</th>
+                <th className="py-3.5 px-4 tracking-wider">{singular.toUpperCase()} / {primaryKeyLabel.toUpperCase()}</th>
                 <th className="py-3 px-4 pr-4 sm:pr-6 text-right whitespace-nowrap align-middle">
                   <div className="flex flex-col items-end gap-1.5 float-right">
                     {/* Top: Select All Toggle Button */}
@@ -1158,14 +1172,14 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                                     </div>
 
                                     <div className="flex items-center justify-between text-zinc-400">
-                                      <span>Department:</span>
+                                      <span>{groupingLabel}:</span>
                                       <span className="text-zinc-200 font-medium">{s.branch || 'General'}</span>
                                     </div>
 
                                     <div className="flex items-center justify-between text-zinc-400">
-                                      <span>Year & Section:</span>
+                                      <span>{subGroupingLabel} & {divisionLabel}:</span>
                                       <span className="text-zinc-200 font-medium">
-                                        {s.year || '4th Year'} • Sec {s.section || 'A'}
+                                        {s.year || '-'} • {s.section || '-'}
                                       </span>
                                     </div>
 
@@ -1454,37 +1468,40 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1">
                         <Building className="w-3 h-3 text-zinc-400" />
-                        <span className="truncate">{preset.groupingLabel || 'Department'}</span>
+                        <span className="truncate">{groupingLabel || 'Department'}</span>
                       </label>
                       <input
                         type="text"
+                        placeholder={preset.groupingPlaceholder || `e.g. ${groupingLabel}`}
                         value={singleBranch}
                         onChange={(e) => setSingleBranch(e.target.value)}
-                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all"
+                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:text-zinc-600"
                       />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1">
                         <GraduationCap className="w-3 h-3 text-zinc-400" />
-                        <span className="truncate">Year / Batch</span>
+                        <span className="truncate">{subGroupingLabel || 'Year / Batch'}</span>
                       </label>
                       <input
                         type="text"
+                        placeholder={preset.subGroupingPlaceholder || `e.g. ${subGroupingLabel}`}
                         value={singleYear}
                         onChange={(e) => setSingleYear(e.target.value)}
-                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all"
+                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:text-zinc-600"
                       />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1">
                         <Layers className="w-3 h-3 text-zinc-400" />
-                        <span className="truncate">Section / Div</span>
+                        <span className="truncate">{divisionLabel || 'Section / Div'}</span>
                       </label>
                       <input
                         type="text"
+                        placeholder={preset.divisionPlaceholder || `e.g. ${divisionLabel}`}
                         value={singleSection}
                         onChange={(e) => setSingleSection(e.target.value)}
-                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all"
+                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:text-zinc-600"
                       />
                     </div>
                   </div>
