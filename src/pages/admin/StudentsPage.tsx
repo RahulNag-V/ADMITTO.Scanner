@@ -46,8 +46,34 @@ import {
   Save,
   UserPlus,
   Layers,
+  Sliders,
+  ArrowUp,
+  ArrowDown,
+  Database,
+  Type,
+  Hash,
+  Calendar,
+  ListFilter,
 } from 'lucide-react';
-import { Student, StudentImportRow, QrMode, EventScanConfig, UniquenessValidationResult, EventItem } from '../../types';
+import {
+  Student,
+  StudentImportRow,
+  QrMode,
+  EventScanConfig,
+  UniquenessValidationResult,
+  EventItem,
+  ColumnConfig,
+  ColumnType,
+} from '../../types';
+import {
+  DEFAULT_COLUMNS,
+  detectSchemaFromRows,
+  validateRecordAgainstSchema,
+  mapFormToStudent,
+  formatCellValue,
+  saveLocalSchema,
+  loadLocalSchema,
+} from '../../lib/attendeeSchema';
 import { studentsApi, scanApi, eventsApi } from '../../lib/api';
 import { getAttendeeLabels } from '../../lib/attendeeTypes';
 import { DigitalEventPassModal } from '../../components/common/DigitalEventPassModal';
@@ -130,20 +156,19 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedStudentForBadge, setSelectedStudentForBadge] = useState<Student | null>(null);
 
-  // Single Add Form
-  const [singleUsn, setSingleUsn] = useState('');
-  const [singleName, setSingleName] = useState('');
-  const [singleEmail, setSingleEmail] = useState('');
-  const [singlePhone, setSinglePhone] = useState('');
-  const [singleBranch, setSingleBranch] = useState('');
-  const [singleYear, setSingleYear] = useState('');
-  const [singleSection, setSingleSection] = useState('');
-  const [singleBarcode, setSingleBarcode] = useState('');
-  const [customFields, setCustomFields] = useState<Array<{ id: string; key: string; value: string }>>([]);
+  // Dynamic Schema & Columns Management
+  const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
+  const [uploadedDatasetName, setUploadedDatasetName] = useState<string | null>(null);
+  const [isCustomizeColumnsOpen, setIsCustomizeColumnsOpen] = useState(false);
+  const [editingColumns, setEditingColumns] = useState<ColumnConfig[]>([]);
+  const [customizeError, setCustomizeError] = useState<string | null>(null);
+
+  // Dynamic Add Form State
+  const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [batchAddedCount, setBatchAddedCount] = useState(0);
   const [lastAddedAttendee, setLastAddedAttendee] = useState<{ name: string; usn: string } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const singleUsnInputRef = useRef<HTMLInputElement>(null);
 
   // 5-Step Attendee Identification & QR Configuration Wizard State
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -228,11 +253,88 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         new Promise((r) => setTimeout(r, 250)),
       ]);
       setStudents(res.students);
+
+      const localCached = loadLocalSchema(eventId);
+
       if (eventRes?.event) {
         setEventDetails(eventRes.event);
         if (eventRes.event.primary_scan_field) {
           setPrimaryKeyField(eventRes.event.primary_scan_field.toUpperCase());
         }
+
+        const scanCfg = eventRes.event.scan_config;
+        if (scanCfg?.column_configs && scanCfg.column_configs.length > 0) {
+          setColumns(scanCfg.column_configs);
+          if (scanCfg.dataset_name) {
+            setUploadedDatasetName(scanCfg.dataset_name);
+          } else if (res.students.length > 0) {
+            setUploadedDatasetName('Uploaded Dataset');
+          }
+        } else if (scanCfg?.available_fields && scanCfg.available_fields.length > 0) {
+          const derived: ColumnConfig[] = scanCfg.available_fields.map((field, idx) => ({
+            id: `col_loaded_${idx}`,
+            name: field,
+            type: field.toLowerCase().includes('email')
+              ? 'email'
+              : field.toLowerCase().includes('date')
+              ? 'date'
+              : field.toLowerCase().includes('age')
+              ? 'number'
+              : 'text',
+            required: idx === 0 || field.toLowerCase().includes('name') || field.toLowerCase().includes('usn'),
+          }));
+          setColumns(derived);
+          if (scanCfg.dataset_name) setUploadedDatasetName(scanCfg.dataset_name);
+          else if (res.students.length > 0) setUploadedDatasetName('Uploaded Dataset');
+        } else if (localCached?.columns && localCached.columns.length > 0) {
+          setColumns(localCached.columns);
+          if (localCached.datasetName) setUploadedDatasetName(localCached.datasetName);
+          else if (res.students.length > 0) setUploadedDatasetName('Uploaded Dataset');
+        } else if (res.students.length > 0) {
+          // Derive schema from existing students
+          const first = res.students[0];
+          const detectedNames: string[] = [];
+          if (first.meta && Object.keys(first.meta).length > 0) {
+            detectedNames.push(...Object.keys(first.meta));
+          } else {
+            if (first.name) detectedNames.push('Name');
+            if (first.usn) detectedNames.push('USN');
+            if (first.email) detectedNames.push('Email');
+            if (first.branch && first.branch !== 'General') detectedNames.push('Department');
+            if (first.year && first.year !== 'General') detectedNames.push('Year');
+            if (first.section && first.section !== 'A') detectedNames.push('Section');
+          }
+          if (detectedNames.length > 0) {
+            const derived: ColumnConfig[] = detectedNames.map((name, idx) => ({
+              id: `col_st_${idx}`,
+              name,
+              type: name.toLowerCase().includes('email')
+                ? 'email'
+                : name.toLowerCase().includes('date')
+                ? 'date'
+                : name.toLowerCase().includes('age')
+                ? 'number'
+                : 'text',
+              required: idx === 0 || name.toLowerCase().includes('name') || name.toLowerCase().includes('usn'),
+            }));
+            setColumns(derived);
+            setUploadedDatasetName('Uploaded Dataset');
+          } else {
+            setColumns(DEFAULT_COLUMNS);
+          }
+        } else {
+          setColumns(DEFAULT_COLUMNS);
+          setUploadedDatasetName(null);
+        }
+      } else if (localCached?.columns && localCached.columns.length > 0) {
+        setColumns(localCached.columns);
+        if (localCached.datasetName) setUploadedDatasetName(localCached.datasetName);
+        else if (res.students.length > 0) setUploadedDatasetName('Uploaded Dataset');
+      } else if (res.students.length > 0) {
+        setUploadedDatasetName('Uploaded Dataset');
+      } else {
+        setColumns(DEFAULT_COLUMNS);
+        setUploadedDatasetName(null);
       }
     } catch (err) {
       console.error('Failed to load attendees:', err);
@@ -269,105 +371,156 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
     }, 2000);
   };
 
-  const SUGGESTED_EXTRA_FIELDS = [
-    'Seat Number',
-    'Ticket Tier',
-    'Company',
-    'Food Preference',
-    'VIP Status',
-    'Emergency Contact',
-    'Hostel / Room',
-  ];
-
-  const handleAddCustomField = (defaultKey = '') => {
-    const id = `cf_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    setCustomFields((prev) => [...prev, { id, key: defaultKey, value: '' }]);
+  const openCustomizeColumnsModal = () => {
+    setEditingColumns(JSON.parse(JSON.stringify(columns)));
+    setCustomizeError(null);
+    setIsCustomizeColumnsOpen(true);
   };
 
-  const handleRemoveCustomField = (id: string) => {
-    setCustomFields((prev) => prev.filter((f) => f.id !== id));
+  const handleAddColumnToEditing = (name = '', type: ColumnType = 'text') => {
+    const id = `col_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const colName = name.trim() || `New Column ${editingColumns.length + 1}`;
+    setEditingColumns((prev) => [
+      ...prev,
+      { id, name: colName, type, required: false },
+    ]);
   };
 
-  const handleCustomFieldChange = (id: string, field: 'key' | 'value', val: string) => {
-    setCustomFields((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, [field]: val } : f))
+  const handleRemoveColumnFromEditing = (id: string) => {
+    if (editingColumns.length <= 1) {
+      alert('You must retain at least one column.');
+      return;
+    }
+    setEditingColumns((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  const handleRenameColumnInEditing = (id: string, newName: string) => {
+    setEditingColumns((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, name: newName } : c))
     );
+  };
+
+  const handleChangeTypeInEditing = (id: string, newType: ColumnType) => {
+    setEditingColumns((prev) =>
+      prev.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              type: newType,
+              options:
+                newType === 'dropdown'
+                  ? c.options && c.options.length > 0
+                    ? c.options
+                    : ['Option 1', 'Option 2']
+                  : undefined,
+            }
+          : c
+      )
+    );
+  };
+
+  const handleToggleRequiredInEditing = (id: string) => {
+    setEditingColumns((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, required: !c.required } : c))
+    );
+  };
+
+  const handleMoveColumnInEditing = (index: number, direction: 'up' | 'down') => {
+    setEditingColumns((prev) => {
+      const next = [...prev];
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= next.length) return prev;
+      const temp = next[index];
+      next[index] = next[targetIndex];
+      next[targetIndex] = temp;
+      return next;
+    });
+  };
+
+  const handleApplyCustomizeColumns = async () => {
+    const trimmed = editingColumns.map((c) => ({ ...c, name: c.name.trim() }));
+    if (trimmed.some((c) => !c.name)) {
+      setCustomizeError('Column names cannot be empty.');
+      return;
+    }
+
+    const nameCounts = new Map<string, number>();
+    for (const c of trimmed) {
+      const lower = c.name.toLowerCase();
+      nameCounts.set(lower, (nameCounts.get(lower) || 0) + 1);
+      if (nameCounts.get(lower)! > 1) {
+        setCustomizeError(`Duplicate column name detected: "${c.name}". Column names must be unique.`);
+        return;
+      }
+    }
+
+    setColumns(trimmed);
+    setIsCustomizeColumnsOpen(false);
+    saveLocalSchema(eventId, trimmed, uploadedDatasetName || undefined);
+
+    try {
+      await eventsApi.updateScanConfig(eventId, {
+        primary_scan_field: primaryKeyField || 'usn',
+        qr_mode: qrMode || 'SECURE_TOKEN',
+        barcode_field: barcodeField || 'usn',
+        available_fields: trimmed.map((c) => c.name),
+        column_configs: trimmed,
+        dataset_name: uploadedDatasetName || undefined,
+      });
+    } catch (e) {
+      console.warn('Could not sync customized columns to server:', e);
+    }
   };
 
   const handleCreateStudent = async (e?: React.FormEvent, continueAdding = false) => {
     if (e) e.preventDefault();
-    const cleanUsn = (singleUsn || '').trim().toUpperCase();
-    const cleanName = (singleName || '').trim();
-    if (!cleanUsn || !cleanName) {
-      alert(`Please enter both ${primaryKeyLabel} and ${singular} Full Name.`);
+
+    const validation = validateRecordAgainstSchema(formValues, columns);
+    if (!validation.isValid) {
+      setFormErrors(validation.errors);
+      const firstErr = Object.values(validation.errors)[0];
+      alert(`Validation error: ${firstErr}`);
       return;
     }
-    const cleanBarcode = singleBarcode.trim();
-    if (cleanBarcode && cleanBarcode.length < 5) {
-      alert('Barcode must be at least 5 characters long (5 or more characters required).');
-      return;
-    }
+    setFormErrors({});
     setIsAdding(true);
 
     try {
-      // Build custom extra details metadata dictionary
-      const meta: Record<string, string> = {};
-      customFields.forEach((cf) => {
-        const k = cf.key.trim();
-        if (k && cf.value.trim()) {
-          meta[k] = cf.value.trim();
-        }
-      });
-
-      const res = await studentsApi.create({
-        event_id: eventId,
-        usn: cleanUsn,
-        name: cleanName,
-        email: singleEmail?.trim() || undefined,
-        phone_number: singlePhone?.trim() || undefined,
-        branch: singleBranch?.trim() || 'General',
-        year: singleYear?.trim() || 'General',
-        section: singleSection?.trim() || 'A',
-        barcode: singleBarcode?.trim() || undefined,
-        meta: Object.keys(meta).length > 0 ? meta : undefined,
-      });
+      const studentPayload = mapFormToStudent(formValues, columns, students.length, eventId);
+      const res = await studentsApi.create(studentPayload);
 
       if (res.student) {
         setStudents((prev) => [res.student, ...prev]);
 
+        if (!uploadedDatasetName) {
+          const dsName = 'Custom Records';
+          setUploadedDatasetName(dsName);
+          saveLocalSchema(eventId, columns, dsName);
+          eventsApi
+            .updateScanConfig(eventId, {
+              primary_scan_field: primaryKeyField || 'usn',
+              qr_mode: qrMode || 'SECURE_TOKEN',
+              barcode_field: barcodeField || 'usn',
+              available_fields: columns.map((c) => c.name),
+              column_configs: columns,
+              dataset_name: dsName,
+            })
+            .catch(console.warn);
+        }
+
         if (continueAdding) {
           setBatchAddedCount((prev) => prev + 1);
           setLastAddedAttendee({ name: res.student.name, usn: res.student.usn });
-          // Reset specific identity inputs for the next attendee
-          setSingleUsn('');
-          setSingleName('');
-          setSingleEmail('');
-          setSinglePhone('');
-          setSingleBarcode('');
-          // Clear custom field values while keeping custom field keys for rapid continuous entry
-          setCustomFields((prev) => prev.map((f) => ({ ...f, value: '' })));
-          
-          // Refocus on primary key input
-          setTimeout(() => {
-            singleUsnInputRef.current?.focus();
-          }, 60);
+          setFormValues({});
         } else {
           setIsAddModalOpen(false);
           setBatchAddedCount(0);
           setLastAddedAttendee(null);
-          setSingleUsn('');
-          setSingleName('');
-          setSingleEmail('');
-          setSinglePhone('');
-          setSingleBranch('');
-          setSingleYear('');
-          setSingleSection('');
-          setSingleBarcode('');
-          setCustomFields([]);
+          setFormValues({});
         }
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to add attendee');
+      alert(err.message || 'Failed to add record');
     } finally {
       setIsAdding(false);
     }
@@ -580,6 +733,12 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
       setDetectedColumns(rawHeaders);
       setRawSpreadsheetRows(rows);
 
+      const detected = detectSchemaFromRows(rawHeaders, rows);
+      setColumns(detected);
+      const dsName = file.name;
+      setUploadedDatasetName(dsName);
+      saveLocalSchema(eventId, detected, dsName);
+
       // Best default key guess
       const guessedPrimary =
         rawHeaders.find((h) => {
@@ -648,12 +807,15 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         secondary_scan_field: secondaryKeyField || null,
         qr_mode: qrMode,
         barcode_field: barcodeField,
-        available_fields: detectedColumns,
+        available_fields: columns.map((c) => c.name),
+        column_configs: columns,
+        dataset_name: uploadedDatasetName || csvFile?.name || 'Uploaded Dataset',
         is_uniqueness_verified: uniquenessResult?.is_unique ?? true,
       };
 
       const res = await studentsApi.importCsv(eventId, preparedAttendees, scanConfig);
       setImportSummary({ imported: res.imported, duplicates: res.duplicates, errors: res.errors || [] });
+      saveLocalSchema(eventId, columns, scanConfig.dataset_name);
       loadStudents();
     } catch (err: any) {
       alert(err.message || 'Import failed');
@@ -700,10 +862,10 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
           </p>
         </div>
 
-        {/* Action Buttons: 2 on top (Expand + CSV Import), Add Attendee below */}
+        {/* Action Buttons: Expand, Columns, Import, and Add New Data */}
         <div className="flex flex-col gap-2 w-full sm:w-auto shrink-0">
-          {/* Top Row: Expand Details + CSV Import */}
-          <div className="grid grid-cols-2 gap-2 w-full sm:w-auto">
+          {/* Top Row: Expand Details, Manage Columns, CSV Import */}
+          <div className="grid grid-cols-3 gap-2 w-full sm:w-auto">
             <button
               id="expand-all-btn"
               onClick={toggleExpandAll}
@@ -712,14 +874,23 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
               {expandedStudentIds.size === filteredStudents.length && filteredStudents.length > 0 ? (
                 <>
                   <ChevronsDownUp className="w-4 h-4 text-orange-400 shrink-0" />
-                  <span>Collapse ({filteredStudents.length})</span>
+                  <span>Collapse</span>
                 </>
               ) : (
                 <>
                   <ChevronsUpDown className="w-4 h-4 text-orange-400 shrink-0" />
-                  <span>Expand Details ({filteredStudents.length})</span>
+                  <span>Expand</span>
                 </>
               )}
+            </button>
+
+            <button
+              onClick={openCustomizeColumnsModal}
+              className="px-3 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-xs font-bold text-zinc-200 hover:text-white flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer whitespace-nowrap backdrop-blur-md"
+              title="Customize data columns and input types"
+            >
+              <Sliders className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+              <span>Columns</span>
             </button>
 
             <button
@@ -732,20 +903,83 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
               className="px-3 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-xs font-bold text-zinc-200 hover:text-white flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer whitespace-nowrap backdrop-blur-md"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-              <span>Import {plural}</span>
+              <span>Import</span>
             </button>
           </div>
 
-          {/* Bottom Row: Add Attendee Primary Button */}
+          {/* Bottom Row: Add New Data Primary Button */}
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={() => {
+              setFormValues({});
+              setFormErrors({});
+              setIsAddModalOpen(true);
+            }}
             className="w-full px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white flex items-center justify-center gap-1.5 shadow-lg shadow-orange-500/25 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Add {singular}</span>
+            <span>Add New Data</span>
           </button>
         </div>
       </div>
+
+      {/* Uploaded Dataset Schema Banner (When data HAS been uploaded) */}
+      {students.length > 0 && (
+        <div className="p-4 rounded-2xl bg-zinc-950/70 border border-white/15 backdrop-blur-xl shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-3 animate-fadeIn">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                <FileSpreadsheet className="w-3.5 h-3.5 text-orange-400" />
+                <span>Uploaded Dataset:</span>
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/30 text-xs font-bold text-orange-300 font-mono">
+                {uploadedDatasetName || `${singular} Roster`}
+              </span>
+              <span className="text-[11px] text-zinc-400 font-medium">
+                ({students.length} record{students.length === 1 ? '' : 's'})
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              <span className="text-zinc-400 font-medium">Detected Columns:</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {columns.map((c, i) => (
+                  <React.Fragment key={c.id}>
+                    {i > 0 && <span className="text-zinc-600">|</span>}
+                    <span className="font-semibold text-zinc-200">
+                      {c.name}
+                    </span>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={openCustomizeColumnsModal}
+              className="px-3 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-xs font-bold text-zinc-300 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+              title="Manage schema columns"
+            >
+              <Sliders className="w-3.5 h-3.5 text-orange-400" />
+              <span>Manage Columns</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setFormValues({});
+                setFormErrors({});
+                setIsAddModalOpen(true);
+              }}
+              className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white flex items-center gap-1.5 shadow-md shadow-orange-500/25 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add New Data</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filters & Search Toolbar */}
       <div className="bg-[#242b4d]/45 border border-white/20 backdrop-blur-2xl rounded-3xl p-3.5 sm:p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative z-30 overflow-visible shadow-xl">
@@ -947,37 +1181,92 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                 <tr>
                   <td colSpan={3} className="py-16 text-center">
                     {students.length === 0 ? (
-                      <div className="max-w-md mx-auto space-y-4 px-4">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center justify-center mx-auto">
-                          <Users className="w-6 h-6" />
-                        </div>
-                        <div className="space-y-1">
-                          <h3 className="text-base font-bold text-white font-['Space_Grotesk']">
-                            No attendees registered yet
-                          </h3>
-                          <p className="text-xs text-slate-400 leading-relaxed">
-                            Import your attendee roster via CSV or Excel (XLSX/XLS) spreadsheet or add attendees manually to generate QR & barcode tokens.
-                          </p>
-                        </div>
-                        <div className="flex items-center justify-center gap-2.5 pt-1">
+                      <div className="max-w-md mx-auto space-y-5 px-4 text-left py-2">
+                        {/* Status & Customize Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+                          <div className="space-y-1">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-800 text-[11px] font-medium text-zinc-300 border border-white/10">
+                              <Database className="w-3 h-3 text-orange-400" />
+                              <span>No data uploaded</span>
+                            </div>
+                            <h3 className="text-base font-bold text-white font-['Space_Grotesk']">
+                              Attendee Dataset & Schema
+                            </h3>
+                          </div>
+
                           <button
+                            type="button"
+                            onClick={openCustomizeColumnsModal}
+                            className="px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] border border-white/15 text-xs font-bold text-white inline-flex items-center gap-1.5 transition-all shadow-sm cursor-pointer whitespace-nowrap"
+                          >
+                            <Sliders className="w-3.5 h-3.5 text-orange-400" />
+                            <span>Customize Columns</span>
+                          </button>
+                        </div>
+
+                        {/* Configured Columns Preview */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+                            <span>Columns:</span>
+                            <span className="text-[10px] text-zinc-500 font-normal lowercase">{columns.length} active fields</span>
+                          </div>
+
+                          <div className="rounded-2xl bg-zinc-950/60 border border-white/10 p-2 divide-y divide-white/5 space-y-1">
+                            {columns.map((col, idx) => (
+                              <div key={col.id} className="flex items-center justify-between px-3 py-2 text-xs">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-zinc-500 font-mono text-[11px]">{idx + 1}.</span>
+                                  <span className="font-semibold text-white">{col.name}</span>
+                                  {col.required && <span className="text-orange-400 font-bold">*</span>}
+                                </div>
+                                <span className="px-2 py-0.5 rounded-lg bg-zinc-800/80 border border-zinc-700/60 text-[10px] font-mono text-zinc-300 uppercase">
+                                  {col.type}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Action Buttons: Add Column + Add New Data + Upload File */}
+                        <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              openCustomizeColumnsModal();
+                              setTimeout(() => handleAddColumnToEditing(), 50);
+                            }}
+                            className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-xs font-bold text-zinc-200 hover:text-white inline-flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+                          >
+                            <Plus className="w-3.5 h-3.5 text-orange-400" />
+                            <span>Add Column</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormValues({});
+                              setFormErrors({});
+                              setIsAddModalOpen(true);
+                            }}
+                            className="w-full sm:flex-1 px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white inline-flex items-center justify-center gap-1.5 shadow-lg shadow-orange-500/25 transition-all cursor-pointer whitespace-nowrap"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>Add New Data</span>
+                          </button>
+
+                          <button
+                            type="button"
                             onClick={() => {
                               setIsImportModalOpen(true);
                               setParsedRows([]);
                               setImportSummary(null);
                               setCsvFile(null);
                             }}
-                            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+                            className="w-full sm:w-auto px-3 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-medium text-zinc-300 hover:text-white inline-flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+                            title="Upload CSV or Excel file"
                           >
-                            <FileSpreadsheet className="w-3.5 h-3.5" />
-                            <span>Import {plural}</span>
-                          </button>
-                          <button
-                            onClick={() => setIsAddModalOpen(true)}
-                            className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-slate-200 hover:text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Add {singular}</span>
+                            <FileSpreadsheet className="w-3.5 h-3.5 text-zinc-400" />
+                            <span>Upload File</span>
                           </button>
                         </div>
                       </div>
@@ -1095,88 +1384,69 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                                   </div>
 
                                   <div className="space-y-1.5 text-[11px]">
-                                    <div className="flex items-center justify-between text-zinc-400">
-                                      <span>Full Name:</span>
-                                      <span className="font-semibold text-white">{s.name}</span>
-                                    </div>
+                                    {columns.map((col) => {
+                                      const rawVal =
+                                        s.meta?.[col.name] ??
+                                        s.meta?.[col.name.toLowerCase()] ??
+                                        (s as any)[col.name.toLowerCase()] ??
+                                        (col.name.toLowerCase() === 'name' ? s.name : undefined) ??
+                                        (col.name.toLowerCase() === 'email' ? s.email : undefined) ??
+                                        (col.name.toLowerCase() === 'department' ? s.branch : undefined) ??
+                                        (col.name.toLowerCase() === 'usn' ? s.usn : undefined);
+                                      const displayVal = formatCellValue(rawVal);
 
-                                    <div className="flex items-center justify-between text-zinc-400">
-                                      <span>{primaryKeyLabel}:</span>
-                                      <div className="flex items-center gap-1">
-                                        <span className="font-mono text-orange-400 font-semibold">{s.usn}</span>
-                                        <button
-                                          onClick={() => handleCopyText(`usn-${s.id}`, s.usn)}
-                                          className="text-zinc-500 hover:text-white p-0.5 cursor-pointer"
-                                          title="Copy USN"
-                                        >
-                                          {copiedField === `usn-${s.id}` ? (
-                                            <Check className="w-3 h-3 text-emerald-400" />
-                                          ) : (
-                                            <Copy className="w-3 h-3" />
-                                          )}
-                                        </button>
-                                      </div>
-                                    </div>
+                                      return (
+                                        <div key={col.id} className="flex items-center justify-between text-zinc-400">
+                                          <span className="capitalize">{col.name}:</span>
+                                          <div className="flex items-center gap-1 max-w-[65%]">
+                                            <span className="font-semibold text-white truncate text-right">
+                                              {displayVal}
+                                            </span>
+                                            {rawVal && (
+                                              <button
+                                                onClick={() => handleCopyText(`${col.name}-${s.id}`, String(rawVal))}
+                                                className="text-zinc-500 hover:text-white p-0.5 cursor-pointer shrink-0"
+                                                title={`Copy ${col.name}`}
+                                              >
+                                                {copiedField === `${col.name}-${s.id}` ? (
+                                                  <Check className="w-3 h-3 text-emerald-400" />
+                                                ) : (
+                                                  <Copy className="w-3 h-3" />
+                                                )}
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
 
-                                    <div className="flex items-center justify-between text-zinc-400">
-                                      <span>Email:</span>
-                                      <div className="flex items-center gap-1">
-                                        <span className="text-zinc-300 truncate max-w-[130px]">
-                                          {s.email || 'Not provided'}
-                                        </span>
-                                        {s.email && (
+                                    {/* Primary Key / USN row if not already in columns */}
+                                    {!columns.some((c) => c.name.toLowerCase() === 'usn' || c.name.toLowerCase() === primaryKeyLabel.toLowerCase()) && (
+                                      <div className="flex items-center justify-between text-zinc-400 pt-1 border-t border-white/5">
+                                        <span>{primaryKeyLabel}:</span>
+                                        <div className="flex items-center gap-1">
+                                          <span className="font-mono text-orange-400 font-semibold">{s.usn}</span>
                                           <button
-                                            onClick={() => handleCopyText(`email-${s.id}`, s.email!)}
+                                            onClick={() => handleCopyText(`usn-${s.id}`, s.usn)}
                                             className="text-zinc-500 hover:text-white p-0.5 cursor-pointer"
-                                            title="Copy Email"
+                                            title="Copy ID"
                                           >
-                                            {copiedField === `email-${s.id}` ? (
+                                            {copiedField === `usn-${s.id}` ? (
                                               <Check className="w-3 h-3 text-emerald-400" />
                                             ) : (
                                               <Copy className="w-3 h-3" />
                                             )}
                                           </button>
-                                        )}
+                                        </div>
                                       </div>
-                                    </div>
+                                    )}
 
-                                    <div className="flex items-center justify-between text-zinc-400">
-                                      <span>Phone:</span>
-                                      <div className="flex items-center gap-1">
-                                        <span className="text-zinc-300">{s.phone_number || '+91 Not specified'}</span>
-                                        {s.phone_number && (
-                                          <button
-                                            onClick={() => handleCopyText(`phone-${s.id}`, s.phone_number!)}
-                                            className="text-zinc-500 hover:text-white p-0.5 cursor-pointer"
-                                            title="Copy Phone"
-                                          >
-                                            {copiedField === `phone-${s.id}` ? (
-                                              <Check className="w-3 h-3 text-emerald-400" />
-                                            ) : (
-                                              <Copy className="w-3 h-3" />
-                                            )}
-                                          </button>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-zinc-400">
-                                      <span>{groupingLabel}:</span>
-                                      <span className="text-zinc-200 font-medium">{s.branch || 'General'}</span>
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-zinc-400">
-                                      <span>{subGroupingLabel} & {divisionLabel}:</span>
-                                      <span className="text-zinc-200 font-medium">
-                                        {s.year || '-'} • {s.section || '-'}
-                                      </span>
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-zinc-400">
-                                      <span>Barcode:</span>
-                                      <div className="flex items-center gap-1">
-                                        <span className="font-mono text-amber-400 font-semibold">{s.barcode || 'N/A'}</span>
-                                        {s.barcode && (
+                                    {/* Barcode row if present and not in columns */}
+                                    {s.barcode && !columns.some((c) => c.name.toLowerCase() === 'barcode') && (
+                                      <div className="flex items-center justify-between text-zinc-400">
+                                        <span>Barcode:</span>
+                                        <div className="flex items-center gap-1">
+                                          <span className="font-mono text-amber-400 font-semibold">{s.barcode}</span>
                                           <button
                                             onClick={() => handleCopyText(`barcode-${s.id}`, s.barcode!)}
                                             className="text-zinc-500 hover:text-white p-0.5 cursor-pointer"
@@ -1188,25 +1458,30 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                                               <Copy className="w-3 h-3" />
                                             )}
                                           </button>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    {/* Custom Extra Details */}
-                                    {s.meta && Object.keys(s.meta).length > 0 && (
-                                      <div className="pt-2 mt-2 border-t border-white/10 space-y-1.5">
-                                        <div className="text-[10px] font-bold text-orange-400 uppercase tracking-wider flex items-center gap-1">
-                                          <Sparkles className="w-3 h-3" />
-                                          <span>Custom Extra Details</span>
                                         </div>
-                                        {Object.entries(s.meta).map(([k, v]) => (
-                                          <div key={k} className="flex items-center justify-between text-[11px] text-zinc-400">
-                                            <span className="capitalize">{k.replace(/_/g, ' ')}:</span>
-                                            <span className="text-zinc-200 font-medium">{String(v)}</span>
-                                          </div>
-                                        ))}
                                       </div>
                                     )}
+
+                                    {/* Any extra meta fields not in configured columns */}
+                                    {s.meta &&
+                                      Object.entries(s.meta).filter(
+                                        ([k]) => !columns.some((c) => c.name.toLowerCase() === k.toLowerCase())
+                                      ).length > 0 && (
+                                        <div className="pt-2 mt-2 border-t border-white/10 space-y-1.5">
+                                          <div className="text-[10px] font-bold text-orange-400 uppercase tracking-wider flex items-center gap-1">
+                                            <Sparkles className="w-3 h-3" />
+                                            <span>Additional Metadata</span>
+                                          </div>
+                                          {Object.entries(s.meta)
+                                            .filter(([k]) => !columns.some((c) => c.name.toLowerCase() === k.toLowerCase()))
+                                            .map(([k, v]) => (
+                                              <div key={k} className="flex items-center justify-between text-[11px] text-zinc-400">
+                                                <span className="capitalize">{k.replace(/_/g, ' ')}:</span>
+                                                <span className="text-zinc-200 font-medium">{formatCellValue(v)}</span>
+                                              </div>
+                                            ))}
+                                        </div>
+                                      )}
                                   </div>
                                 </div>
 
@@ -1313,7 +1588,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         </div>
       </div>
 
-      {/* Enhanced Single Add Modal via React Portal */}
+      {/* Dynamic Add New Record Modal via React Portal */}
       {isAddModalOpen && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
@@ -1324,8 +1599,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
             }
           }}
         >
-          <div className="bg-[#121520] border border-zinc-700/80 rounded-3xl max-w-2xl w-full flex flex-col shadow-2xl my-auto max-h-[92vh] overflow-hidden animate-fadeIn">
-            {/* Modal Header with glowing accent */}
+          <div className="bg-[#121520] border border-zinc-700/80 rounded-3xl max-w-xl w-full flex flex-col shadow-2xl my-auto max-h-[92vh] overflow-hidden animate-fadeIn">
+            {/* Modal Header */}
             <div className="p-5 sm:p-6 pb-4 border-b border-white/10 bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-transparent flex items-start justify-between gap-3">
               <div className="flex items-center gap-3.5">
                 <div className="w-11 h-11 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0 shadow-inner">
@@ -1334,7 +1609,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-lg font-bold text-white font-['Space_Grotesk'] tracking-tight">
-                      Add Single {singular}
+                      Add New Record
                     </h3>
                     {batchAddedCount > 0 && (
                       <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-[11px] font-bold text-emerald-400 flex items-center gap-1 shadow-sm">
@@ -1344,7 +1619,9 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                     )}
                   </div>
                   <p className="text-xs text-zinc-400 mt-0.5">
-                    Manual registration with physical barcode, credential tokens & custom extra details.
+                    {uploadedDatasetName
+                      ? `Schema derived from: ${uploadedDatasetName} (${columns.length} columns)`
+                      : `Configured Schema (${columns.length} columns)`}
                   </p>
                 </div>
               </div>
@@ -1354,6 +1631,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                   setIsAddModalOpen(false);
                   setBatchAddedCount(0);
                   setLastAddedAttendee(null);
+                  setFormValues({});
+                  setFormErrors({});
                 }}
                 className="text-zinc-400 hover:text-white p-1 rounded-xl hover:bg-white/10 transition-colors cursor-pointer shrink-0"
                 title="Close"
@@ -1383,310 +1662,343 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
             {/* Form Scrollable Body */}
             <form onSubmit={(e) => handleCreateStudent(e, false)} className="flex flex-col flex-1 overflow-hidden">
-              <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1">
-                {/* Section 1: Core Attendee Profile (All Types of Details) */}
-                <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3.5">
-                  <div className="flex items-center gap-2 text-xs font-bold text-zinc-300 uppercase tracking-wider">
-                    <User className="w-3.5 h-3.5 text-orange-400" />
-                    <span>Primary Information & Profile</span>
-                  </div>
+              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+                {columns.map((col) => {
+                  const val = formValues[col.name] ?? '';
+                  const err = formErrors[col.name];
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
-                        <span>{primaryKeyLabel} <span className="text-orange-400">*</span></span>
-                        <span className="text-[10px] text-zinc-500 font-normal">Primary Identifier</span>
-                      </label>
-                      <input
-                        ref={singleUsnInputRef}
-                        type="text"
-                        required
-                        placeholder={preset.primaryKeyPlaceholder || `Enter ${primaryKeyLabel}`}
-                        value={singleUsn}
-                        onChange={(e) => setSingleUsn(e.target.value.toUpperCase())}
-                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white uppercase font-mono tracking-wider focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:normal-case placeholder:font-sans placeholder:text-zinc-500"
-                      />
-                    </div>
+                  return (
+                    <div key={col.id} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <label className="font-semibold text-zinc-300 flex items-center gap-1">
+                          <span>{col.name}</span>
+                          {col.required && <span className="text-orange-400 font-bold">*</span>}
+                        </label>
+                        <span className="text-[10px] font-mono text-zinc-500 uppercase">
+                          {col.type}
+                        </span>
+                      </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-zinc-300">
-                        {singular} Full Name <span className="text-orange-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder={`Full Name of ${singular}`}
-                        value={singleName}
-                        onChange={(e) => setSingleName(e.target.value)}
-                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:text-zinc-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                        <Mail className="w-3 h-3 text-zinc-400" />
-                        <span>Email Address (Optional)</span>
-                      </label>
-                      <input
-                        type="email"
-                        placeholder="attendee@domain.com"
-                        value={singleEmail}
-                        onChange={(e) => setSingleEmail(e.target.value)}
-                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:text-zinc-500"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                        <Phone className="w-3 h-3 text-zinc-400" />
-                        <span>Phone Number (Optional)</span>
-                      </label>
-                      <input
-                        type="tel"
-                        placeholder="+91 98765 43210"
-                        value={singlePhone}
-                        onChange={(e) => setSinglePhone(e.target.value)}
-                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:text-zinc-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2.5">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1">
-                        <Building className="w-3 h-3 text-zinc-400" />
-                        <span className="truncate">{groupingLabel || 'Department'}</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={preset.groupingPlaceholder || `e.g. ${groupingLabel}`}
-                        value={singleBranch}
-                        onChange={(e) => setSingleBranch(e.target.value)}
-                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:text-zinc-600"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1">
-                        <GraduationCap className="w-3 h-3 text-zinc-400" />
-                        <span className="truncate">{subGroupingLabel || 'Year / Batch'}</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={preset.subGroupingPlaceholder || `e.g. ${subGroupingLabel}`}
-                        value={singleYear}
-                        onChange={(e) => setSingleYear(e.target.value)}
-                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:text-zinc-600"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1">
-                        <Layers className="w-3 h-3 text-zinc-400" />
-                        <span className="truncate">{divisionLabel || 'Section / Div'}</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={preset.divisionPlaceholder || `e.g. ${divisionLabel}`}
-                        value={singleSection}
-                        onChange={(e) => setSingleSection(e.target.value)}
-                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:text-zinc-600"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section 2: Barcode & Token Credentials */}
-                <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs font-bold text-zinc-300 uppercase tracking-wider">
-                      <Barcode className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Barcode & Physical Token Value</span>
-                      <span className="text-[10px] text-zinc-500 font-normal normal-case">(Optional)</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {singleUsn.trim() && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const trimmed = singleUsn.trim();
-                            const val = trimmed.length >= 5 ? trimmed.slice(-5) : trimmed;
-                            setSingleBarcode(val);
+                      {col.type === 'dropdown' ? (
+                        <select
+                          value={val}
+                          onChange={(e) => {
+                            setFormValues((prev) => ({ ...prev, [col.name]: e.target.value }));
+                            if (formErrors[col.name]) {
+                              setFormErrors((prev) => {
+                                const next = { ...prev };
+                                delete next[col.name];
+                                return next;
+                              });
+                            }
                           }}
-                          className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-[10px] font-bold text-amber-300 hover:text-white transition-all cursor-pointer flex items-center gap-1"
-                          title={`Set barcode to last 5 characters of ${primaryKeyLabel}`}
-                        >
-                          <span>Use Last 5 of {primaryKeyLabel}</span>
-                          <span className="font-mono text-amber-200">
-                            ({singleUsn.trim().length >= 5 ? singleUsn.trim().slice(-5) : singleUsn.trim()})
-                          </span>
-                        </button>
-                      )}
-                      {singleBarcode && (
-                        <button
-                          type="button"
-                          onClick={() => setSingleBarcode('')}
-                          className="px-2 py-1 rounded-lg bg-white/5 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-300 border border-white/10 text-[10px] font-medium transition-all cursor-pointer"
-                          title="Clear barcode"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <Barcode className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        minLength={5}
-                        placeholder={
-                          singleUsn.trim()
-                            ? `e.g. ${singleUsn.trim().length >= 5 ? singleUsn.trim().slice(-5) : singleUsn.trim()} (5+ characters, or leave blank to auto-generate)`
-                            : "e.g. CS051 or badge ID (5+ characters, or leave blank to auto-generate)"
-                        }
-                        value={singleBarcode}
-                        onChange={(e) => setSingleBarcode(e.target.value)}
-                        className="w-full bg-zinc-950/70 border border-zinc-700/80 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-white font-mono placeholder:font-sans focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-all placeholder:text-zinc-500"
-                      />
-                    </div>
-
-                    {/* Barcode scan warning notice */}
-                    <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px] leading-relaxed">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                      <span>
-                        <strong>Warning:</strong> The barcode will be scanned through this value. It must be at least 5 characters long (e.g. last 5 characters of {primaryKeyLabel} or physical wristband code).
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section 3: Customizable Extra Details (Custom Fields) */}
-                <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3.5">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-2 text-xs font-bold text-zinc-300 uppercase tracking-wider">
-                      <Sparkles className="w-3.5 h-3.5 text-orange-400" />
-                      <span>Custom Extra Details</span>
-                      <span className="px-2 py-0.2 rounded-full bg-zinc-800 text-[10px] text-zinc-400 font-mono">
-                        {customFields.length}
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleAddCustomField('')}
-                      className="px-3 py-1.5 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-xs font-bold text-orange-400 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Extra Detail</span>
-                    </button>
-                  </div>
-
-                  {/* Suggestion Chips */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] text-zinc-400 font-medium">Quick Suggestions:</span>
-                    {SUGGESTED_EXTRA_FIELDS.map((sug) => {
-                      const alreadyAdded = customFields.some((f) => f.key.toLowerCase() === sug.toLowerCase());
-                      return (
-                        <button
-                          key={sug}
-                          type="button"
-                          disabled={alreadyAdded}
-                          onClick={() => handleAddCustomField(sug)}
-                          className={`px-2 py-0.5 rounded-lg text-[10px] font-medium transition-all cursor-pointer ${
-                            alreadyAdded
-                              ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed'
-                              : 'bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white'
+                          className={`w-full bg-zinc-950/70 border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all ${
+                            err ? 'border-rose-500 ring-1 ring-rose-500/30' : 'border-zinc-700/80'
                           }`}
                         >
-                          + {sug}
-                        </button>
-                      );
-                    })}
-                  </div>
+                          <option value="">Select {col.name}...</option>
+                          {(col.options || []).map((opt) => (
+                            <option key={opt} value={opt} className="bg-zinc-900 text-white">
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type={
+                            col.type === 'email'
+                              ? 'email'
+                              : col.type === 'number'
+                              ? 'number'
+                              : col.type === 'date'
+                              ? 'date'
+                              : 'text'
+                          }
+                          placeholder={`Enter ${col.name}`}
+                          value={val}
+                          onChange={(e) => {
+                            setFormValues((prev) => ({ ...prev, [col.name]: e.target.value }));
+                            if (formErrors[col.name]) {
+                              setFormErrors((prev) => {
+                                const next = { ...prev };
+                                delete next[col.name];
+                                return next;
+                              });
+                            }
+                          }}
+                          className={`w-full bg-zinc-950/70 border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all placeholder:text-zinc-600 ${
+                            err ? 'border-rose-500 ring-1 ring-rose-500/30' : 'border-zinc-700/80'
+                          }`}
+                        />
+                      )}
 
-                  {/* Dynamic Fields List */}
-                  {customFields.length === 0 ? (
-                    <div className="p-4 rounded-xl border border-dashed border-zinc-700/80 bg-zinc-950/30 text-center space-y-1">
-                      <p className="text-xs text-zinc-400 font-medium">
-                        No extra custom fields added yet.
-                      </p>
-                      <p className="text-[10px] text-zinc-500">
-                        Add attributes like Seat Number, VIP Tier, Organization, or Dietary choices to tailor attendee passes.
-                      </p>
+                      {err && (
+                        <p className="text-[11px] text-rose-400 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                          <span>{err}</span>
+                        </p>
+                      )}
                     </div>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {customFields.map((cf) => (
-                        <div key={cf.id} className="flex items-center gap-2 p-2 rounded-xl bg-zinc-950/60 border border-zinc-800 animate-fadeIn">
-                          <input
-                            type="text"
-                            placeholder="Detail Name (e.g. Seat No)"
-                            value={cf.key}
-                            onChange={(e) => handleCustomFieldChange(cf.id, 'key', e.target.value)}
-                            className="w-1/3 bg-zinc-900 border border-zinc-700/70 rounded-lg px-2.5 py-1.5 text-xs text-orange-300 placeholder:text-zinc-600 focus:outline-none focus:border-orange-500"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Value (e.g. Row A-12)"
-                            value={cf.value}
-                            onChange={(e) => handleCustomFieldChange(cf.id, 'value', e.target.value)}
-                            className="flex-1 bg-zinc-900 border border-zinc-700/70 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-orange-500"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveCustomField(cf.id)}
-                            className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
-                            title="Remove field"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                      <p className="text-[10px] text-zinc-500 italic">
-                        💡 Extra detail templates are preserved during continuous entry so you only type the new values.
-                      </p>
-                    </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
 
-              {/* Modal Footer Actions */}
-              <div className="p-4 sm:p-5 bg-zinc-950/90 border-t border-white/10 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddModalOpen(false);
-                      setBatchAddedCount(0);
-                      setLastAddedAttendee(null);
-                    }}
-                    className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-300 hover:text-white transition-all cursor-pointer"
-                  >
-                    Cancel
-                  </button>
+              {/* Modal Footer */}
+              <div className="p-4 sm:p-5 border-t border-white/10 bg-zinc-900/60 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    setBatchAddedCount(0);
+                    setLastAddedAttendee(null);
+                    setFormValues({});
+                    setFormErrors({});
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white text-xs font-semibold transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
 
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     disabled={isAdding}
                     onClick={() => handleCreateStudent(undefined, true)}
-                    className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-600/80 hover:border-zinc-500 text-xs font-bold text-white flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
-                    title="Save current attendee and immediately continue typing the next one"
+                    className="hidden sm:flex px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 text-zinc-200 hover:text-white text-xs font-bold items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                   >
-                    <Plus className="w-3.5 h-3.5 text-orange-400" />
                     <span>Save & Add Another</span>
+                    <span className="text-[10px] text-zinc-500 font-mono">Ctrl+Enter</span>
                   </button>
 
                   <button
                     type="submit"
                     disabled={isAdding}
-                    className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white shadow-lg shadow-orange-500/25 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-orange-500/25 transition-all cursor-pointer disabled:opacity-50"
                   >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{isAdding ? 'Saving...' : `Save ${singular}`}</span>
+                    <Save className="w-4 h-4" />
+                    <span>{isAdding ? 'Saving...' : 'Save Record'}</span>
                   </button>
                 </div>
+              </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Customize Columns & Schema Management Modal via React Portal */}
+      {isCustomizeColumnsOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+        >
+          <div className="bg-[#121520] border border-zinc-700/80 rounded-3xl max-w-2xl w-full flex flex-col shadow-2xl my-auto max-h-[92vh] overflow-hidden animate-fadeIn">
+            {/* Header */}
+            <div className="p-5 sm:p-6 pb-4 border-b border-white/10 bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-transparent flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0 shadow-inner">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white font-['Space_Grotesk'] tracking-tight">
+                    Customize Columns & Schema
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Configure columns, change input types, and reorder data fields for your records.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCustomizeColumnsOpen(false)}
+                className="text-zinc-400 hover:text-white p-1 rounded-xl hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Error Banner */}
+            {customizeError && (
+              <div className="mx-5 sm:mx-6 mt-4 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between text-xs text-rose-300">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{customizeError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCustomizeError(null)}
+                  className="text-rose-400 hover:text-rose-200 text-xs px-1.5 py-0.5"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Column List Body */}
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+              {/* Quick suggestions */}
+              <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
+                <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+                  Quick Add Suggested Columns:
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {[
+                    { name: 'Name', type: 'text' },
+                    { name: 'Email', type: 'email' },
+                    { name: 'Age', type: 'number' },
+                    { name: 'Department', type: 'text' },
+                    { name: 'Phone', type: 'text' },
+                    { name: 'Date of Birth', type: 'date' },
+                    { name: 'Status', type: 'dropdown' },
+                  ].map((sug) => {
+                    const alreadyExists = editingColumns.some(
+                      (c) => c.name.toLowerCase() === sug.name.toLowerCase()
+                    );
+                    return (
+                      <button
+                        key={sug.name}
+                        type="button"
+                        disabled={alreadyExists}
+                        onClick={() => handleAddColumnToEditing(sug.name, sug.type as ColumnType)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                          alreadyExists
+                            ? 'bg-zinc-800 text-zinc-600 border border-zinc-800 cursor-not-allowed'
+                            : 'bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white'
+                        }`}
+                      >
+                        + {sug.name} ({sug.type})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Column Rows */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-zinc-400 uppercase tracking-wider px-1">
+                  <span>Columns ({editingColumns.length})</span>
+                  <span>Type / Controls</span>
+                </div>
+
+                <div className="space-y-2">
+                  {editingColumns.map((col, index) => (
+                    <div
+                      key={col.id}
+                      className="p-3 rounded-2xl bg-zinc-950/70 border border-zinc-700/70 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 transition-all hover:border-zinc-600"
+                    >
+                      {/* Left: Reorder & Name input */}
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {/* Reorder Buttons */}
+                        <div className="flex flex-col gap-0.5 shrink-0">
+                          <button
+                            type="button"
+                            disabled={index === 0}
+                            onClick={() => handleMoveColumnInEditing(index, 'up')}
+                            className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-white disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                            title="Move Up"
+                          >
+                            <ArrowUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={index === editingColumns.length - 1}
+                            onClick={() => handleMoveColumnInEditing(index, 'down')}
+                            className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-white disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                            title="Move Down"
+                          >
+                            <ArrowDown className="w-3 h-3" />
+                          </button>
+                        </div>
+
+                        {/* Column Index */}
+                        <span className="text-zinc-500 font-mono text-xs w-5 shrink-0">
+                          {index + 1}.
+                        </span>
+
+                        {/* Column Name Input */}
+                        <input
+                          type="text"
+                          value={col.name}
+                          onChange={(e) => handleRenameColumnInEditing(col.id, e.target.value)}
+                          placeholder="Column Name"
+                          className="flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500 transition-colors"
+                        />
+                      </div>
+
+                      {/* Right: Type selector, Required toggle, Delete */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Type Selector */}
+                        <select
+                          value={col.type}
+                          onChange={(e) => handleChangeTypeInEditing(col.id, e.target.value as ColumnType)}
+                          className="bg-zinc-900 border border-zinc-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500 cursor-pointer"
+                        >
+                          <option value="text">Text</option>
+                          <option value="number">Number</option>
+                          <option value="date">Date</option>
+                          <option value="email">Email</option>
+                          <option value="dropdown">Dropdown</option>
+                        </select>
+
+                        {/* Required toggle */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleRequiredInEditing(col.id)}
+                          className={`px-2 py-1.5 rounded-xl text-[10px] font-bold transition-all cursor-pointer border ${
+                            col.required
+                              ? 'bg-orange-500/20 text-orange-300 border-orange-500/40'
+                              : 'bg-white/5 text-zinc-500 border-white/10 hover:text-zinc-300'
+                          }`}
+                          title="Toggle required validation"
+                        >
+                          {col.required ? 'Required' : 'Optional'}
+                        </button>
+
+                        {/* Delete column button */}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveColumnFromEditing(col.id)}
+                          className="p-1.5 rounded-xl hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
+                          title="Delete Column"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add New Column Button */}
+                <button
+                  type="button"
+                  onClick={() => handleAddColumnToEditing()}
+                  className="w-full py-2.5 rounded-xl border border-dashed border-zinc-700 hover:border-orange-500/50 bg-white/[0.02] hover:bg-orange-500/5 text-xs font-bold text-zinc-300 hover:text-orange-400 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Column</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 sm:p-5 border-t border-white/10 bg-zinc-900/60 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setIsCustomizeColumnsOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white text-xs font-semibold transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleApplyCustomizeColumns}
+                className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-orange-500/25 transition-all cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                <span>Apply & Save Schema</span>
+              </button>
+            </div>
           </div>
         </div>,
         document.body

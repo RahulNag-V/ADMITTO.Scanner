@@ -99,6 +99,16 @@ export interface Profile {
 
 export type QrMode = 'SECURE_TOKEN' | 'FULL_DATA';
 
+export type ColumnType = 'text' | 'number' | 'date' | 'email' | 'dropdown';
+
+export interface ColumnConfig {
+  id: string;
+  name: string;
+  type: ColumnType;
+  options?: string[];
+  required?: boolean;
+}
+
 export interface EventScanConfig {
   primary_scan_field: string;
   secondary_scan_field?: string | null;
@@ -106,6 +116,8 @@ export interface EventScanConfig {
   barcode_field: string;
   available_fields?: string[];
   is_uniqueness_verified?: boolean;
+  column_configs?: ColumnConfig[];
+  dataset_name?: string;
 }
 
 export interface UniquenessValidationResult {

@@ -1290,20 +1290,28 @@ app.put('/api/events/:id', requireAdminAuth, async (req: Request, res: Response)
 app.patch('/api/events/:id/scan-config', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const admin = (req as any).user as SessionData;
-    const { primary_scan_field, secondary_scan_field, qr_mode, barcode_field, available_fields, is_uniqueness_verified } = req.body;
+    const {
+      primary_scan_field,
+      secondary_scan_field,
+      qr_mode,
+      barcode_field,
+      available_fields,
+      is_uniqueness_verified,
+      column_configs,
+      dataset_name,
+    } = req.body;
 
-    if (!primary_scan_field) {
-      res.status(422).json({ error: 'VALIDATION_ERROR', message: 'Primary scanning key is required.' });
-      return;
-    }
+    const primaryKey = primary_scan_field || 'usn';
 
     const updatedEvent = await dbService.updateScanConfig(req.params.id, admin.userId, {
-      primary_scan_field,
+      primary_scan_field: primaryKey,
       secondary_scan_field: secondary_scan_field || null,
       qr_mode: qr_mode || 'SECURE_TOKEN',
       barcode_field: barcode_field || 'usn',
       available_fields: available_fields || [],
       is_uniqueness_verified: is_uniqueness_verified ?? true,
+      column_configs: column_configs || undefined,
+      dataset_name: dataset_name || undefined,
     });
 
     // Broadcast real-time update to all connected scanner terminals & admins
