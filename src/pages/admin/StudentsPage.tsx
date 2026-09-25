@@ -2652,33 +2652,24 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                 </div>
 
                 {/* ======================================================== */}
-                {/* BARCODE IDENTIFICATION CONFIGURATION                     */}
+                {/* BARCODE DATA TARGET & EXTRACTION CUSTOMIZATION           */}
                 {/* ======================================================== */}
                 <div className="space-y-4 pt-3 border-t border-zinc-800">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-2">
-                        <Barcode className="w-4 h-4 text-orange-400" />
-                        <span>Barcode Identification</span>
-                      </div>
-                      <p className="text-[11px] text-zinc-400 mt-0.5">
-                        Choose the attendee ID field and configure which part of that ID is used for barcode identification.
-                      </p>
-                    </div>
+                  {/* Exact Header from Reference Screenshot */}
+                  <div className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+                    <Barcode className="w-4 h-4 text-orange-400" />
+                    <span>BARCODE DATA TARGET</span>
                   </div>
 
-                  {/* 1. Attendee ID Field Selection */}
+                  {/* Primary Scanning Key / Target Field Dropdown */}
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-zinc-300 uppercase tracking-wider">
-                      Attendee ID Field
-                    </label>
                     <select
                       value={barcodeField}
                       onChange={(e) => {
                         setBarcodeField(e.target.value);
                       }}
                       style={{ colorScheme: 'dark' }}
-                      className="w-full bg-zinc-900 border border-zinc-700 focus:border-orange-500 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none cursor-pointer"
+                      className="w-full bg-zinc-900 border border-zinc-800 focus:border-orange-500 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none cursor-pointer"
                     >
                       <option value="primary_key" className="bg-zinc-900 text-zinc-100 py-2">
                         {primaryKeyField.trim().toLowerCase() === 'primary key' || primaryKeyField.trim().toLowerCase() === 'primary_key'
@@ -2708,39 +2699,53 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                     </select>
                   </div>
 
-                  {/* 2. Extraction Mode: Custom Portion vs Full ID */}
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-zinc-300 uppercase tracking-wider">
-                      Extraction Mode
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setBarcodeExtractionMode('custom')}
-                        className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                          barcodeExtractionMode === 'custom'
-                            ? 'bg-orange-500/20 border-orange-500/60 text-orange-300 ring-1 ring-orange-500/30'
-                            : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-                        }`}
-                      >
-                        <span className={`w-2 h-2 rounded-full ${barcodeExtractionMode === 'custom' ? 'bg-orange-400 shadow-sm shadow-orange-400/50' : 'bg-zinc-600'}`} />
-                        <span>Custom Portion</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setBarcodeExtractionMode('full_id')}
-                        className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                          barcodeExtractionMode === 'full_id'
-                            ? 'bg-orange-500/20 border-orange-500/60 text-orange-300 ring-1 ring-orange-500/30'
-                            : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-                        }`}
-                      >
-                        <span className={`w-2 h-2 rounded-full ${barcodeExtractionMode === 'full_id' ? 'bg-orange-400 shadow-sm shadow-orange-400/50' : 'bg-zinc-600'}`} />
-                        <span>Full ID</span>
-                      </button>
+                  {/* Customization Section (Below the Barcode Dropdown) */}
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 space-y-4">
+                    <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800/80">
+                      <div>
+                        <div className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-2">
+                          <Sliders className="w-3.5 h-3.5 text-orange-400" />
+                          <span>BARCODE EXTRACTION CONFIGURATION</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 mt-0.5">
+                          Configure which part of <strong className="text-orange-400">{activeBarcodeTargetKey}</strong> is used for barcode identification.
+                        </p>
+                      </div>
                     </div>
-                  </div>
+
+                    {/* Extraction Mode: Custom Portion vs Full ID */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+                        Extraction Mode
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setBarcodeExtractionMode('custom')}
+                          className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                            barcodeExtractionMode === 'custom'
+                              ? 'bg-orange-500/20 border-orange-500/60 text-orange-300 ring-1 ring-orange-500/30'
+                              : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                          }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${barcodeExtractionMode === 'custom' ? 'bg-orange-400 shadow-sm shadow-orange-400/50' : 'bg-zinc-600'}`} />
+                          <span>Custom Portion</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setBarcodeExtractionMode('full_id')}
+                          className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                            barcodeExtractionMode === 'full_id'
+                              ? 'bg-orange-500/20 border-orange-500/60 text-orange-300 ring-1 ring-orange-500/30'
+                              : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                          }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${barcodeExtractionMode === 'full_id' ? 'bg-orange-400 shadow-sm shadow-orange-400/50' : 'bg-zinc-600'}`} />
+                          <span>Full ID</span>
+                        </button>
+                      </div>
+                    </div>
 
                   {/* 3. Custom Portion Configuration (Position + Character Count) */}
                   {barcodeExtractionMode === 'custom' && (
@@ -2969,6 +2974,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                     )}
                   </div>
                 </div>
+              </div>
 
                 <div className="flex items-center justify-between pt-2 border-t border-zinc-800">
                   <button
