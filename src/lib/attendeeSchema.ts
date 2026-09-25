@@ -1,4 +1,5 @@
 import { ColumnConfig, ColumnType, Student } from '../types';
+export type { ColumnConfig, ColumnType };
 
 export const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: 'col_name', name: 'Name', type: 'text', required: true },

@@ -42,6 +42,7 @@ import { EventItem, QrMode, EventScanConfig, AttendeeType } from '../../types';
 import { eventsApi, getStoredSession } from '../../lib/api';
 import { ATTENDEE_TYPE_PRESETS, getPresetByType } from '../../lib/attendeeTypes';
 import { TabSkeletonView } from '../../components/common/Skeleton';
+import { CreateEventModal } from '../../components/admin/CreateEventModal';
 import { compressImageFile } from '../../lib/imageCompression';
 import { broadcastEventUpdated, broadcastEventDeleted } from '../../lib/realtimeSync';
 import { purgeEventOfflineData } from '../../lib/offline/idb';
@@ -98,13 +99,6 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
   const [events, setEvents] = useState<EventItem[]>([]);
   const [isEventSwitcherOpen, setIsEventSwitcherOpen] = useState(false);
   const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
-  const [newEventTitle, setNewEventTitle] = useState('');
-  const [newEventVenue, setNewEventVenue] = useState('');
-  const [newEventDate, setNewEventDate] = useState('');
-  const [newAttendeeType, setNewAttendeeType] = useState<AttendeeType>('STUDENTS');
-  const [newCustomSingular, setNewCustomSingular] = useState('Member');
-  const [newCustomPlural, setNewCustomPlural] = useState('Members');
-  const [isCreatingEvent, setIsCreatingEvent] = useState(false);
 
   // Attendee Audience & Terminology Configuration
   const [attendeeType, setAttendeeType] = useState<AttendeeType>('STUDENTS');
@@ -224,46 +218,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
     }
   };
 
-  const handleCreateNewEvent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newEventTitle.trim()) return;
-    setIsCreatingEvent(true);
-    try {
-      const preset = getPresetByType(newAttendeeType);
-      const singular = newAttendeeType === 'CUSTOM' ? (newCustomSingular.trim() || 'Member') : preset.singular;
-      const plural = newAttendeeType === 'CUSTOM' ? (newCustomPlural.trim() || 'Members') : preset.plural;
-      const primaryScanField = preset.defaultPrimaryKey;
 
-      const res = await eventsApi.create({
-        title: newEventTitle.trim(),
-        venue: newEventVenue.trim() || 'Main Auditorium',
-        event_date: newEventDate ? new Date(newEventDate).toISOString() : new Date().toISOString(),
-        attendee_type: newAttendeeType,
-        attendee_label_singular: singular,
-        attendee_label_plural: plural,
-        primary_scan_field: primaryScanField,
-        barcode_field: primaryScanField,
-      });
-      if (res.event) {
-        setEvents((prev) => [res.event, ...prev]);
-        setIsCreateEventModalOpen(false);
-        setNewEventTitle('');
-        setNewEventVenue('');
-        setNewEventDate('');
-        setNewAttendeeType('STUDENTS');
-        setNewCustomSingular('Member');
-        setNewCustomPlural('Members');
-        window.dispatchEvent(new CustomEvent('admitto:events-changed'));
-        if (onSelectEventId) {
-          onSelectEventId(res.event.id);
-        }
-      }
-    } catch (err: any) {
-      alert(err.message || 'Failed to create event');
-    } finally {
-      setIsCreatingEvent(false);
-    }
-  };
 
   const handleDeleteCurrentEvent = async () => {
     if (!eventId) return;
@@ -1717,144 +1672,16 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
       )}
 
       {/* Create New Event Modal */}
-      {isCreateEventModalOpen && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#181d36]/95 border border-white/20 rounded-3xl p-6 sm:p-7 max-w-lg w-full space-y-5 shadow-2xl backdrop-blur-2xl my-auto">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div>
-                <h3 className="text-xl font-bold text-white font-['Space_Grotesk']">
-                  Create New Event
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Set event details and choose your target attendee audience.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCreateEventModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateNewEvent} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Event Title</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Annual Tech Symposium 2026, Summer Gala"
-                  value={newEventTitle}
-                  onChange={(e) => setNewEventTitle(e.target.value)}
-                  className="w-full bg-white/[0.08] border border-white/15 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-400"
-                />
-              </div>
-
-              {/* Target Audience & Attendee Type Selector */}
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                  <span>Target Audience & Attendee Type</span>
-                  <span className="text-[11px] font-normal text-orange-300">Sets terminology & default ID</span>
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-52 overflow-y-auto pr-1">
-                  {ATTENDEE_TYPE_PRESETS.map((preset) => {
-                    const isSelected = newAttendeeType === preset.id;
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => {
-                          setNewAttendeeType(preset.id);
-                        }}
-                        className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-orange-500/25 border-orange-400 text-white shadow-md shadow-orange-500/20'
-                            : 'bg-white/[0.04] border-white/10 hover:border-white/20 text-slate-300 hover:text-white'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between w-full mb-1">
-                          <span className="text-base">{preset.emoji}</span>
-                          {isSelected && <span className="w-2 h-2 rounded-full bg-orange-400 shadow-sm" />}
-                        </div>
-                        <div className="text-xs font-bold leading-tight line-clamp-1">{preset.singular}s</div>
-                        <div className="text-[10px] text-slate-400 leading-tight mt-0.5">{preset.badge}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {newAttendeeType === 'CUSTOM' && (
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <div>
-                      <label className="text-[11px] text-slate-400">Singular Term</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Member, Athlete"
-                        value={newCustomSingular}
-                        onChange={(e) => setNewCustomSingular(e.target.value)}
-                        className="w-full bg-white/[0.08] border border-white/15 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-400 mt-1"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] text-slate-400">Plural Term</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Members, Athletes"
-                        value={newCustomPlural}
-                        onChange={(e) => setNewCustomPlural(e.target.value)}
-                        className="w-full bg-white/[0.08] border border-white/15 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-400 mt-1"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300">Venue</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Main Auditorium"
-                    value={newEventVenue}
-                    onChange={(e) => setNewEventVenue(e.target.value)}
-                    className="w-full bg-white/[0.08] border border-white/15 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-400"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300">Event Date</label>
-                  <input
-                    type="datetime-local"
-                    value={newEventDate}
-                    style={{ colorScheme: 'dark' }}
-                    onChange={(e) => setNewEventDate(e.target.value)}
-                    className="w-full bg-white/[0.08] border border-white/15 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-400"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateEventModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-semibold text-slate-300 hover:text-white cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreatingEvent}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-bold shadow-lg shadow-orange-500/30 cursor-pointer disabled:opacity-50"
-                >
-                  {isCreatingEvent ? 'Creating...' : 'Create Event'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
+      <CreateEventModal
+        isOpen={isCreateEventModalOpen}
+        onClose={() => setIsCreateEventModalOpen(false)}
+        onEventCreated={(newEvent) => {
+          setEvents((prev) => [newEvent, ...prev]);
+          if (onSelectEventId) {
+            onSelectEventId(newEvent.id);
+          }
+        }}
+      />
 
       {/* Delete Event Confirmation Modal via React Portal */}
       {isDeleteModalOpen && typeof document !== 'undefined' && createPortal(
