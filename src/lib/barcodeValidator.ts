@@ -19,15 +19,22 @@ export type BarcodeValidationResult =
       extractedIdentifier?: string;
     };
 
+export interface AttendeeBarcodeExtractionResult {
+  valid: boolean;
+  barcode: string;
+  error?: string;
+  originalId: string;
+}
+
 /**
  * Extracts a barcode identifier from a raw attendee ID according to extraction rules.
  * Supports:
  * - full_id mode: returns rawId as-is
- * - custom mode: extracts N characters from front or end
+ * - custom mode: extracts N characters from front or end (returns '' if str.length < character_count)
  * - optional fixed_prefix and fixed_suffix
  */
 export function extractBarcodeIdentifier(
-  rawId: string,
+  rawId: any,
   config?: {
     extraction_mode?: 'custom' | 'full_id' | 'full';
     extraction_position?: 'front' | 'end';
@@ -37,7 +44,7 @@ export function extractBarcodeIdentifier(
     fixed_suffix?: string | null;
   } | null
 ): string {
-  if (!rawId) return '';
+  if (rawId === null || rawId === undefined) return '';
   const str = String(rawId).trim();
   if (!str) return '';
 
@@ -48,10 +55,12 @@ export function extractBarcodeIdentifier(
 
   if (!isFull) {
     const pos = config.extraction_position || 'front';
-    const count =
-      typeof config.character_count === 'number' && config.character_count > 0
-        ? Math.min(config.character_count, str.length)
-        : str.length;
+    const count = typeof config.character_count === 'number' && config.character_count > 0 ? config.character_count : 5;
+
+    // Do NOT silently truncate when source value is shorter than requested character count
+    if (str.length < count) {
+      return '';
+    }
 
     if (pos === 'front') {
       result = str.slice(0, count);
@@ -68,6 +77,62 @@ export function extractBarcodeIdentifier(
   }
 
   return result;
+}
+
+/**
+ * Validates extraction for a single attendee record, returning explicit error reason
+ * if empty or if length is insufficient.
+ */
+export function validateAttendeeBarcodeExtraction(
+  rawId: any,
+  config?: {
+    extraction_mode?: 'custom' | 'full_id' | 'full';
+    extraction_position?: 'front' | 'end';
+    character_count?: number;
+    full_id?: boolean;
+    fixed_prefix?: string | null;
+    fixed_suffix?: string | null;
+  } | null
+): AttendeeBarcodeExtractionResult {
+  if (rawId === null || rawId === undefined || String(rawId).trim() === '') {
+    return {
+      valid: false,
+      barcode: '',
+      error: 'Barcode cannot be generated because the selected ID is empty.',
+      originalId: '',
+    };
+  }
+
+  const str = String(rawId).trim();
+  const isFull = config?.extraction_mode === 'full_id' || config?.extraction_mode === 'full' || Boolean(config?.full_id);
+
+  if (!isFull && config) {
+    const count = typeof config.character_count === 'number' && config.character_count > 0 ? config.character_count : 5;
+    if (count < 3) {
+      return {
+        valid: false,
+        barcode: '',
+        error: 'Minimum barcode length is 3 characters.',
+        originalId: str,
+      };
+    }
+    if (str.length < count) {
+      return {
+        valid: false,
+        barcode: '',
+        error: `ID contains only ${str.length} characters (requires ${count}).`,
+        originalId: str,
+      };
+    }
+  }
+
+  const barcode = extractBarcodeIdentifier(str, config);
+  return {
+    valid: Boolean(barcode),
+    barcode,
+    error: barcode ? undefined : 'Failed to generate barcode identifier.',
+    originalId: str,
+  };
 }
 
 /**

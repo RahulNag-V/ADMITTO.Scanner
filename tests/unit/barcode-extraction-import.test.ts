@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { extractBarcodeIdentifier, matchAttendeeWithIdentifier } from '../../src/lib/barcodeValidator';
+import {
+  extractBarcodeIdentifier,
+  validateAttendeeBarcodeExtraction,
+  matchAttendeeWithIdentifier
+} from '../../src/lib/barcodeValidator';
 import type { BarcodeConfig, Student } from '../../src/types';
 
 describe('Barcode Extraction During Attendee Upload (Master Prompt Specs)', () => {
@@ -96,72 +100,110 @@ describe('Barcode Extraction During Attendee Upload (Master Prompt Specs)', () =
     expect(extractBarcodeIdentifier('   ', config)).toBe('');
   });
 
-  it('correctly detects duplicate barcode identifiers across dataset', () => {
-    const uploadedIds = ['1BH24CS051', '1BH24CS052', '1BH25EC101'];
-    
-    // Front + 3 produces duplicate '1BH' for 1BH24CS051 and 1BH24CS052 and 1BH25EC101
-    const configFront3: BarcodeConfig = {
+  it('Section 16: rejects empty or shorter IDs and does not silently truncate', () => {
+    const config7: BarcodeConfig = {
       enabled: true,
+      extraction_mode: 'custom',
+      extraction_position: 'end',
+      character_count: 7
+    };
+
+    // Shorter value '12345' (length 5 < 7) must return '' from extractor
+    expect(extractBarcodeIdentifier('12345', config7)).toBe('');
+
+    // validateAttendeeBarcodeExtraction flags specific error
+    const resShort = validateAttendeeBarcodeExtraction('12345', config7);
+    expect(resShort.valid).toBe(false);
+    expect(resShort.error).toBe('ID contains only 5 characters (requires 7).');
+
+    // Empty ID rejection
+    const resEmpty = validateAttendeeBarcodeExtraction('', config7);
+    expect(resEmpty.valid).toBe(false);
+    expect(resEmpty.error).toBe('Barcode cannot be generated because the selected ID is empty.');
+  });
+
+  it('Section 20 Acceptance Test: full upload -> End + 5 extraction -> scanning lookup', () => {
+    const uploadedData = [
+      { usn: '1BH24CS051', name: 'Rahul', department: 'CSE' },
+      { usn: '1BH24CS052', name: 'Arun', department: 'CSE' },
+      { usn: '1BH24CS053', name: 'Kiran', department: 'CSE' }
+    ];
+
+    const config: BarcodeConfig = {
+      enabled: true,
+      identifier_field: 'usn',
+      extraction_mode: 'custom',
+      extraction_position: 'end',
+      character_count: 5
+    };
+
+    // Step 1: Transform every row and attach barcode
+    const transformed = uploadedData.map((row) => ({
+      ...row,
+      barcode: extractBarcodeIdentifier(row.usn, config)
+    }));
+
+    expect(transformed[0].barcode).toBe('CS051');
+    expect(transformed[1].barcode).toBe('CS052');
+    expect(transformed[2].barcode).toBe('CS053');
+
+    // Step 2: Verify all 3 are unique
+    const uniqueKeys = new Set(transformed.map((t) => t.barcode));
+    expect(uniqueKeys.size).toBe(3);
+
+    // Step 3: Scanner lookup with 'CS051'
+    const attendeeRahul: Student = {
+      id: 'student-1',
+      event_id: 'evt-100',
+      usn: transformed[0].usn,
+      name: transformed[0].name,
+      department: transformed[0].department,
+      qr_code: 'adm_sec_123',
+      barcode: transformed[0].barcode, // 'CS051'
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    const scannerMatch = matchAttendeeWithIdentifier(attendeeRahul, 'usn', 'CS051', false, config);
+    expect(scannerMatch).toBe(true);
+
+    const otherMatch = matchAttendeeWithIdentifier(attendeeRahul, 'usn', 'CS052', false, config);
+    expect(otherMatch).toBe(false);
+  });
+
+  it('Section 21 Acceptance Test: Front + 3 produces duplicate barcodes and is rejected', () => {
+    const uploadedData = [
+      { usn: '1BH24CS051', name: 'Rahul' },
+      { usn: '1BH24CS052', name: 'Arun' },
+      { usn: '1BH24CS053', name: 'Kiran' }
+    ];
+
+    const config: BarcodeConfig = {
+      enabled: true,
+      identifier_field: 'usn',
       extraction_mode: 'custom',
       extraction_position: 'front',
       character_count: 3
     };
 
-    const counts: Record<string, number> = {};
-    for (const id of uploadedIds) {
-      const code = extractBarcodeIdentifier(id, configFront3).toUpperCase();
-      counts[code] = (counts[code] || 0) + 1;
+    const transformed = uploadedData.map((row) => ({
+      ...row,
+      barcode: extractBarcodeIdentifier(row.usn, config)
+    }));
+
+    expect(transformed[0].barcode).toBe('1BH');
+    expect(transformed[1].barcode).toBe('1BH');
+    expect(transformed[2].barcode).toBe('1BH');
+
+    // Calculate duplicate conflicts
+    const countMap: Record<string, number> = {};
+    for (const row of transformed) {
+      countMap[row.barcode] = (countMap[row.barcode] || 0) + 1;
     }
 
-    const duplicates = Object.entries(counts).filter(([_, count]) => count > 1);
-    expect(duplicates.length).toBeGreaterThan(0);
+    const duplicates = Object.entries(countMap).filter(([_, count]) => count > 1);
+    expect(duplicates.length).toBe(1);
     expect(duplicates[0][0]).toBe('1BH');
     expect(duplicates[0][1]).toBe(3);
-
-    // End + 5 produces unique codes: CS051, CS052, EC101
-    const configEnd5: BarcodeConfig = {
-      enabled: true,
-      extraction_mode: 'custom',
-      extraction_position: 'end',
-      character_count: 5
-    };
-
-    const uniqueCounts: Record<string, number> = {};
-    for (const id of uploadedIds) {
-      const code = extractBarcodeIdentifier(id, configEnd5).toUpperCase();
-      uniqueCounts[code] = (uniqueCounts[code] || 0) + 1;
-    }
-    const end5Duplicates = Object.entries(uniqueCounts).filter(([_, count]) => count > 1);
-    expect(end5Duplicates.length).toBe(0);
-  });
-
-  it('matches attendee by extracted barcode during scanning check-in', () => {
-    const attendee: Student = {
-      id: 'att-1',
-      event_id: 'evt-100',
-      name: 'Rahul Nag',
-      usn: '1BH24CS051',
-      department: 'CSE',
-      email: 'rahul@example.com',
-      qr_code: 'tok-123',
-      barcode: 'CS051',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    const config: BarcodeConfig = {
-      enabled: true,
-      extraction_mode: 'custom',
-      extraction_position: 'end',
-      character_count: 5
-    };
-
-    // Scanner inputs 'CS051'
-    const match = matchAttendeeWithIdentifier(attendee, 'usn', 'CS051', false, config);
-    expect(match).toBe(true);
-
-    // Scanner inputs 'CS052' -> no match
-    const mismatch = matchAttendeeWithIdentifier(attendee, 'usn', 'CS052', false, config);
-    expect(mismatch).toBe(false);
   });
 });
