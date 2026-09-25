@@ -5,6 +5,7 @@
 [![React](https://img.shields.io/badge/React-19-cyan)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-6-purple)](https://vitejs.dev/)
 [![Offline-First](https://img.shields.io/badge/IndexedDB-50k%2B%20Attendees-orange)](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red)](#-license--copyright)
 
 **ADMITTO** is a high-performance, offline-resilient event access control and credential verification platform. Engineered for large-scale venues, college festivals, conferences, and exhibitions, ADMITTO supports real-time multi-gate check-ins, custom barcode sub-string extraction, cryptographic QR tokens, and zero-latency hardware scanner integration.
 
@@ -169,5 +170,45 @@ npm start
 
 ---
 
-## 📄 License
-This project is private and proprietary. All rights reserved.
+## 🤝 Contributing
+
+This repository is maintained as proprietary software.
+
+Pull requests, modifications, redistribution, or derivative implementations are not permitted without prior authorization from the copyright holder.
+
+Bug reports and suggestions may be submitted through the project's approved communication channels.
+
+---
+
+## 📜 License & Copyright
+
+**Proprietary Software — All Rights Reserved**
+
+Copyright © 2026 Rahul Nag V. All Rights Reserved.
+
+This project and its source code are proprietary and are provided for portfolio, demonstration, and reference purposes only.
+
+No permission is granted to:
+
+- Copy the source code or substantial portions of it
+- Modify or create derivative works from the source code
+- Redistribute or republish the source code
+- Fork the repository for independent development or distribution
+- Use the source code or substantial portions of it in another project
+- Sell or sublicense the source code
+- Use the source code for commercial purposes
+- Rebrand or present the project/code as another person's work
+- Remove or alter copyright, attribution, or ownership notices
+
+Any reuse, modification, redistribution, commercial use, or incorporation of substantial portions of this project requires prior written permission from the copyright holder.
+
+The public availability of this repository on GitHub does NOT constitute a grant of a license or permission to reuse the source code.
+
+Viewing the repository and its documentation for personal evaluation, learning, or reference is permitted, provided that the code is not copied, redistributed, modified for redistribution, or represented as the viewer's own work.
+
+For permission requests, contact:
+
+**Rahul Nag V**  
+- **GitHub**: [@RahulNag-V](https://github.com/RahulNag-V)  
+- **Email**: `[Contact via GitHub Profile or email]`
+
