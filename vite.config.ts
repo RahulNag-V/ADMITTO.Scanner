@@ -16,11 +16,11 @@ export default defineConfig(({ command, mode }) => {
 
   const rawSbUrl = (process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || env.SUPABASE_URL || '').trim();
   const rawSbKey = (process.env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || '').trim();
-  const rawApiUrl = (process.env.VITE_API_URL || env.VITE_API_URL || process.env.API_URL || env.API_URL || '').trim();
-
   const sbUrl = rawSbUrl && !rawSbUrl.includes('your-project-id') ? rawSbUrl : 'https://vifgaafjgzahqxuxtdar.supabase.co';
   const sbKey = rawSbKey && !rawSbKey.includes('your-anon-key') && !rawSbKey.includes('your-') ? rawSbKey : 'sb_publishable_N40WjzqQ56ZVFuBdDKs34Q_Hopg04S2';
-  const apiUrl = rawApiUrl || 'https://admitto-scanner.onrender.com';
+  const rawApiCandidate = (process.env.VITE_API_URL || env.VITE_API_URL || process.env.API_URL || env.API_URL || '').trim();
+  const cleanedApiUrl = (rawApiCandidate && rawApiCandidate !== 'true' && rawApiCandidate !== 'undefined' && rawApiCandidate !== 'null') ? rawApiCandidate : '';
+  const apiUrl = cleanedApiUrl || (command === 'build' || isProduction ? 'https://admitto-scanner.onrender.com' : '');
 
   if (command === 'build') {
     console.log('[ADMITTO Build] Verifying client configuration:');

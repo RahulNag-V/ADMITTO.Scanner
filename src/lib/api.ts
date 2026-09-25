@@ -45,16 +45,27 @@ export function getApiBaseUrl(): string {
   let url = '';
   try {
     if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) {
-      url = String(import.meta.env.VITE_API_URL).trim();
+      const candidate = String(import.meta.env.VITE_API_URL).trim();
+      if (candidate && candidate !== 'true' && candidate !== 'undefined' && candidate !== 'null') {
+        url = candidate;
+      }
     }
   } catch {
     // Non-standard environment
   }
   if (!url && typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) {
-    url = String(process.env.VITE_API_URL).trim();
+    const candidate = String(process.env.VITE_API_URL).trim();
+    if (candidate && candidate !== 'true' && candidate !== 'undefined' && candidate !== 'null') {
+      url = candidate;
+    }
   }
-  if (!url && typeof window !== 'undefined' && window.location && window.location.hostname.includes('github.io')) {
-    url = 'https://admitto-scanner.onrender.com';
+  if (!url && typeof window !== 'undefined' && window.location) {
+    const hostname = window.location.hostname;
+    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+    if (!isLocal) {
+      // Any remote frontend deployment (GitHub Pages, custom domains, etc.) routes to the production backend
+      url = 'https://admitto-scanner.onrender.com';
+    }
   }
   return url.replace(/\/+$/, '');
 }
@@ -63,7 +74,7 @@ export function isStaticDeploymentWithoutBackend(): boolean {
   if (typeof window === 'undefined') return false;
   const hasConfiguredApi = Boolean(getApiBaseUrl());
   if (hasConfiguredApi) return false;
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1';
   return !isLocal;
 }
 
@@ -76,11 +87,43 @@ export function getApiUrl(endpoint: string): string {
   return `${base}${cleanEndpoint}`;
 }
 
+// Global alert deduplication guard: prevents 6-7 cascading browser alert popups
+if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+  const originalAlert = window.alert;
+  let lastAlertMessage = '';
+  let lastAlertTime = 0;
+
+  window.alert = function (message?: any) {
+    const str = String(message ?? '');
+    const now = Date.now();
+    // Deduplicate identical alerts within 6 seconds
+    if (str === lastAlertMessage && now - lastAlertTime < 6000) {
+      console.warn('[ADMITTO API] Suppressed duplicate browser alert:', str);
+      return;
+    }
+    lastAlertMessage = str;
+    lastAlertTime = now;
+    return originalAlert.call(window, message);
+  };
+}
+
+let hasLoggedMissingConfig = false;
+
+export function safeAlert(message: string): void {
+  if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+    window.alert(message);
+  }
+}
+
 export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   if (isStaticDeploymentWithoutBackend()) {
-    throw new Error(
-      'Production API URL is not configured. Please deploy the backend and set VITE_API_URL in your deployment configuration.'
-    );
+    const errorMsg =
+      'Backend API is not configured (missing VITE_API_URL). Please set VITE_API_URL in your deployment configuration.';
+    if (!hasLoggedMissingConfig) {
+      hasLoggedMissingConfig = true;
+      console.error(`[ADMITTO API] Configuration Error: ${errorMsg}`);
+    }
+    throw new Error(errorMsg);
   }
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -123,10 +166,19 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
   }
 
   const targetUrl = getApiUrl(endpoint);
-  const res = await fetch(targetUrl, {
-    ...options,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(targetUrl, {
+      ...options,
+      headers,
+    });
+  } catch (networkErr: any) {
+    if (networkErr?.name === 'AbortError') {
+      throw networkErr;
+    }
+    console.error(`[ADMITTO API] Network failure requesting ${targetUrl}:`, networkErr);
+    throw new Error('Unable to connect to the backend. Please try again.');
+  }
 
   if (!res.ok) {
     let errorMsg = `Request failed (${res.status})`;
