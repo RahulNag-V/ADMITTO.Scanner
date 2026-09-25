@@ -217,5 +217,6 @@ For permission requests, contact:
 
 **Rahul Nag V**  
 - **GitHub**: [@RahulNag-V](https://github.com/RahulNag-V)  
-- **Email**: `[Contact via GitHub Profile or email]`
+- **Email**: [rahulnagv888@gmail.com](mailto:rahulnagv888@gmail.com)
+
 
