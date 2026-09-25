@@ -1478,6 +1478,39 @@ app.patch('/api/students/:studentId/checkin-status', requireAdminAuth, async (re
       res.status(404).json({ error: 'NOT_FOUND', message: 'Attendee not found.' });
       return;
     }
+
+    // Broadcast scan event to real-time subscribers if checked in
+    if (is_checked_in) {
+      const adminDisplayName = admin.name ? `Admin (${admin.name})` : 'Admin Console';
+      broadcastToEventStream(updated.event_id, {
+        type: 'SCAN_EVENT',
+        eventId: updated.event_id,
+        scan: {
+          id: 'manual-scan-' + Date.now(),
+          event_id: updated.event_id,
+          student_id: updated.id,
+          scanned_value: updated.usn || updated.qr_code || 'MANUAL-CHECKIN',
+          scan_type: 'QR',
+          result: 'success',
+          reason: 'Manual Admission via Admin Console',
+          scanner_id: admin.userId,
+          timestamp: new Date().toISOString(),
+          student: updated,
+          scanner: {
+            id: admin.userId,
+            name: adminDisplayName,
+          },
+        },
+        student: updated,
+        scanner: {
+          id: admin.userId,
+          name: adminDisplayName,
+        },
+        isCheckIn: true,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     res.json({ success: true, student: updated });
   } catch (err: any) {
     res.status(403).json({ error: 'FORBIDDEN', message: err.message });
@@ -1856,7 +1889,9 @@ app.post('/api/scan/validate', requireScannerOrAdmin, scanLimiter, async (req: R
       return;
     }
 
-    const scannerId = authCheck.scannerId;
+    const isAdminUser = session.role === 'ADMIN' || authCheck.gateName === 'Admin Terminal';
+    // For admin operators, pass undefined scannerId to processCheckIn so Supabase RPC skips scanner_accounts foreign key lookup
+    const scannerId = isAdminUser ? undefined : authCheck.scannerId;
 
     const result = await dbService.processCheckIn({
       eventId,
@@ -1868,7 +1903,10 @@ app.post('/api/scan/validate', requireScannerOrAdmin, scanLimiter, async (req: R
       secondaryValue,
     });
 
-    const scannerName = (session as any).name || (authCheck as any).scannerName || 'Gate Scanner';
+    const adminDisplayName = session.name ? `Admin (${session.name})` : 'Admin (Organizer)';
+    const scannerName = isAdminUser
+      ? adminDisplayName
+      : (session as any).name || (authCheck as any).scannerName || 'Gate Scanner';
 
     // Broadcast scan event to all connected clients in real-time
     broadcastToEventStream(eventId, {
@@ -1887,17 +1925,17 @@ app.post('/api/scan/validate', requireScannerOrAdmin, scanLimiter, async (req: R
             ? 'duplicate'
             : 'invalid',
         reason: result.message,
-        scanner_id: scannerId || session.userId,
+        scanner_id: isAdminUser ? session.userId : (scannerId || session.userId),
         timestamp: new Date().toISOString(),
         student: result.student,
         scanner: {
-          id: scannerId || session.userId,
+          id: isAdminUser ? session.userId : (scannerId || session.userId),
           name: scannerName,
         },
       },
       student: result.student,
       scanner: {
-        id: scannerId || session.userId,
+        id: isAdminUser ? session.userId : (scannerId || session.userId),
         name: scannerName,
       },
       isCheckIn: result.status === 'SUCCESS' || result.status === 'IDEMPOTENT_SUCCESS',

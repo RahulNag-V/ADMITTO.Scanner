@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ScanLine,
   Search,
@@ -33,6 +33,10 @@ import {
   Square,
   MinusSquare,
   X,
+  Layers,
+  List,
+  SlidersHorizontal,
+  Shield,
 } from 'lucide-react';
 import { toBrowserPath } from '../../lib/router';
 import { ScanAttempt } from '../../types';
@@ -50,8 +54,12 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [resultFilter, setResultFilter] = useState<string>('ALL');
+  const [selectedScannerCategory, setSelectedScannerCategory] = useState<string>('ALL');
+  const [viewMode, setViewMode] = useState<'list' | 'grouped'>('list');
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set());
   const [expandedScanIds, setExpandedScanIds] = useState<Set<string>>(new Set());
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const [isScannerFilterOpen, setIsScannerFilterOpen] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Multi-Selection State for Selective Deletion
@@ -65,11 +73,15 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
   }>({ isOpen: false, mode: 'all', count: 0 });
 
   const filterMenuRef = useRef<HTMLDivElement>(null);
+  const scannerFilterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
         setIsFilterMenuOpen(false);
+      }
+      if (scannerFilterRef.current && !scannerFilterRef.current.contains(event.target as Node)) {
+        setIsScannerFilterOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -236,11 +248,77 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
     return r === 'invalid' || r === 'invalid_token' || r === 'wrong_event' || r === 'wrong_method' || r === 'scanner_disabled';
   };
 
+  // Helper to detect if a scanner is an Admin / Organizer
+  const isScannerAdmin = (scannerName?: string, reason?: string, scannerId?: string | null) => {
+    const name = (scannerName || '').toLowerCase();
+    const r = (reason || '').toLowerCase();
+    return (
+      name.includes('admin') ||
+      name.includes('organizer') ||
+      r.includes('admin console') ||
+      r.includes('manual admission') ||
+      r.includes('manual check-in') ||
+      !scannerId
+    );
+  };
+
+  const getScannerDisplayDetails = (scan: ScanAttempt) => {
+    const rawName = scan.scanner?.name || (scan as any).scanner_name || (scan.scanner_id ? 'Gate Scanner Terminal' : 'Admin Console');
+    const isAdmin = isScannerAdmin(rawName, scan.reason, scan.scanner_id);
+    const displayName = isAdmin
+      ? (rawName.toLowerCase().includes('admin') ? rawName : 'Admin Console')
+      : rawName;
+    return { name: displayName, isAdmin };
+  };
+
+  // Dynamically extract and categorize all unique scanners with aggregate counts
+  const scannerCategories = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        isAdmin: boolean;
+        count: number;
+        successCount: number;
+        duplicateCount: number;
+        invalidCount: number;
+      }
+    >();
+
+    (scans || []).forEach((s) => {
+      const { name, isAdmin } = getScannerDisplayDetails(s);
+      const existing = map.get(name) || {
+        id: name,
+        name,
+        isAdmin,
+        count: 0,
+        successCount: 0,
+        duplicateCount: 0,
+        invalidCount: 0,
+      };
+
+      existing.count++;
+      if (isSuccessResult(s.result)) existing.successCount++;
+      else if (isDuplicateResult(s.result)) existing.duplicateCount++;
+      else if (isInvalidResult(s.result)) existing.invalidCount++;
+
+      map.set(name, existing);
+    });
+
+    return Array.from(map.values()).sort((a, b) => {
+      // Pin Admin scanners to top, then sort by highest scan volume
+      if (a.isAdmin && !b.isAdmin) return -1;
+      if (!a.isAdmin && b.isAdmin) return 1;
+      return b.count - a.count;
+    });
+  }, [scans]);
+
   const filteredScans = (scans || []).filter((s) => {
     const studentName = s.student?.name || (s as any).student_name || '';
     const usn = s.student?.usn || (s as any).usn || '';
     const scannedVal = s.scanned_value || '';
-    const scannerName = s.scanner?.name || (s as any).scanner_name || '';
+    const { name: scannerName } = getScannerDisplayDetails(s);
 
     const q = (search || '').trim().toLowerCase();
     const matchesSearch =
@@ -259,8 +337,59 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
       matchesResult = isInvalidResult(s.result);
     }
 
-    return matchesSearch && matchesResult;
+    let matchesScanner = true;
+    if (selectedScannerCategory !== 'ALL') {
+      matchesScanner = scannerName === selectedScannerCategory;
+    }
+
+    return matchesSearch && matchesResult && matchesScanner;
   });
+
+  // Group scans by scanner category
+  const groupedByScanner = useMemo(() => {
+    const groups: {
+      category: {
+        id: string;
+        name: string;
+        isAdmin: boolean;
+        count: number;
+        successCount: number;
+        duplicateCount: number;
+        invalidCount: number;
+      };
+      scans: ScanAttempt[];
+    }[] = [];
+
+    const categories =
+      selectedScannerCategory === 'ALL'
+        ? scannerCategories
+        : scannerCategories.filter((c) => c.id === selectedScannerCategory);
+
+    categories.forEach((cat) => {
+      const items = filteredScans.filter((s) => {
+        const { name } = getScannerDisplayDetails(s);
+        return name === cat.id;
+      });
+
+      if (items.length > 0 || (search === '' && resultFilter === 'ALL' && selectedScannerCategory === cat.id)) {
+        groups.push({
+          category: cat,
+          scans: items,
+        });
+      }
+    });
+
+    return groups;
+  }, [filteredScans, scannerCategories, selectedScannerCategory, search, resultFilter]);
+
+  const toggleGroupCollapse = (groupId: string) => {
+    setCollapsedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  };
 
   const getResultBadge = (resultStr: string) => {
     if (isSuccessResult(resultStr)) {
@@ -325,6 +454,36 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          {/* View Mode Toggle: List vs Grouped by Scanner */}
+          <div className="flex items-center p-1 rounded-xl bg-white/[0.06] border border-white/15 backdrop-blur-md">
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'list'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/25 ring-1 ring-white/20'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Unified Chronological List"
+            >
+              <List className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">List View</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('grouped')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'grouped'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/25 ring-1 ring-white/20'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Categorized & Grouped by Scanner Name"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Group by Scanner</span>
+            </button>
+          </div>
+
           {filteredScans.length > 0 && (
             <button
               onClick={toggleExpandAll}
@@ -428,6 +587,136 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
           />
         </div>
 
+        {/* Scanner Filter Dropdown Menu */}
+        <div className="relative shrink-0 z-50" ref={scannerFilterRef}>
+          {(() => {
+            const currentCat = scannerCategories.find((c) => c.id === selectedScannerCategory);
+            const isAll = selectedScannerCategory === 'ALL';
+            const totalCount = scans.length;
+            const currentLabel = isAll ? 'All Scanners' : (currentCat?.name || selectedScannerCategory);
+            const isAdmin = currentCat?.isAdmin;
+
+            return (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsScannerFilterOpen(!isScannerFilterOpen);
+                    setIsFilterMenuOpen(false);
+                  }}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 text-xs font-bold text-white flex items-center justify-between sm:justify-start gap-2.5 transition-all cursor-pointer shadow-md group select-none relative z-50 backdrop-blur-md"
+                  aria-haspopup="true"
+                  aria-expanded={isScannerFilterOpen}
+                >
+                  <div className="flex items-center gap-2">
+                    {isAdmin ? (
+                      <ShieldCheck className="w-4 h-4 text-purple-400" />
+                    ) : (
+                      <Smartphone className="w-4 h-4 text-indigo-400" />
+                    )}
+                    <span className="truncate max-w-[130px] sm:max-w-[170px]">{currentLabel}</span>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[11px] font-mono border ${
+                      isAdmin
+                        ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
+                        : 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                    }`}
+                  >
+                    {isAll ? totalCount : currentCat?.count || 0}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-slate-400 group-hover:text-white transition-transform duration-200 ${
+                      isScannerFilterOpen ? 'rotate-180 text-indigo-400' : ''
+                    }`}
+                  />
+                </button>
+
+                {/* Floating Scanner Filter Panel */}
+                {isScannerFilterOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-[#1a203d]/95 backdrop-blur-2xl border border-white/20 rounded-2xl p-1.5 shadow-[0_30px_70px_rgba(0,0,0,0.95)] z-[100] animate-in fade-in slide-in-from-top-2 duration-150 max-h-80 overflow-y-auto">
+                    <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-300 border-b border-white/15 flex items-center justify-between">
+                      <span>Categorize by Scanner</span>
+                      <span className="text-slate-400 font-normal">{scannerCategories.length} categories</span>
+                    </div>
+                    <div className="p-1 space-y-1">
+                      {/* All Scanners option */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedScannerCategory('ALL');
+                          setIsScannerFilterOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                          selectedScannerCategory === 'ALL'
+                            ? 'bg-indigo-600 text-white shadow-md'
+                            : 'text-slate-200 hover:text-white hover:bg-white/10'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <SlidersHorizontal className="w-4 h-4 text-indigo-400" />
+                          <span>All Scanners (Combined)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono border bg-indigo-500/20 border-indigo-500/40 text-indigo-300">
+                            {scans.length}
+                          </span>
+                          {selectedScannerCategory === 'ALL' && <Check className="w-3.5 h-3.5 text-white" />}
+                        </div>
+                      </button>
+
+                      {/* Individual Scanner Categories */}
+                      {scannerCategories.map((cat) => {
+                        const isSelected = selectedScannerCategory === cat.id;
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedScannerCategory(cat.id);
+                              setIsScannerFilterOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                              isSelected
+                                ? cat.isAdmin
+                                  ? 'bg-purple-600 text-white shadow-md'
+                                  : 'bg-indigo-600 text-white shadow-md'
+                                : 'text-slate-200 hover:text-white hover:bg-white/10'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 truncate max-w-[185px]">
+                              {cat.isAdmin ? (
+                                <ShieldCheck className={`w-4 h-4 shrink-0 ${isSelected ? 'text-white' : 'text-purple-400'}`} />
+                              ) : (
+                                <Smartphone className={`w-4 h-4 shrink-0 ${isSelected ? 'text-white' : 'text-indigo-400'}`} />
+                              )}
+                              <span className="truncate">{cat.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+                                  isSelected
+                                    ? 'bg-white/20 border-white/30 text-white'
+                                    : cat.isAdmin
+                                    ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
+                                    : 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                                }`}
+                              >
+                                {cat.count}
+                              </span>
+                              {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
+
         {/* Filter Dropdown Menu right beside Search */}
         <div className="relative shrink-0 z-50" ref={filterMenuRef}>
           {(() => {
@@ -480,6 +769,7 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
                   type="button"
                   onClick={() => {
                     setIsFilterMenuOpen(!isFilterMenuOpen);
+                    setIsScannerFilterOpen(false);
                   }}
                   className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 text-xs font-bold text-white flex items-center justify-between sm:justify-start gap-2.5 transition-all cursor-pointer shadow-md group select-none relative z-50 backdrop-blur-md"
                   aria-haspopup="true"
@@ -551,6 +841,64 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
         </div>
       </div>
 
+      {/* Dynamic Scanner Category Pills Bar */}
+      {scannerCategories.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin select-none">
+          <button
+            type="button"
+            onClick={() => setSelectedScannerCategory('ALL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 flex items-center gap-2 border transition-all cursor-pointer ${
+              selectedScannerCategory === 'ALL'
+                ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-600/30'
+                : 'bg-white/[0.05] border-white/15 text-slate-300 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <span>All Scanners</span>
+            <span
+              className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                selectedScannerCategory === 'ALL' ? 'bg-white/20 text-white' : 'bg-white/10 text-slate-300'
+              }`}
+            >
+              {scans.length}
+            </span>
+          </button>
+
+          {scannerCategories.map((cat) => {
+            const isSelected = selectedScannerCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setSelectedScannerCategory(isSelected ? 'ALL' : cat.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 flex items-center gap-2 border transition-all cursor-pointer ${
+                  isSelected
+                    ? cat.isAdmin
+                      ? 'bg-purple-600 border-purple-500 text-white shadow-md shadow-purple-600/30'
+                      : 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-600/30'
+                    : cat.isAdmin
+                    ? 'bg-purple-500/10 border-purple-500/25 text-purple-300 hover:bg-purple-500/20'
+                    : 'bg-white/[0.05] border-white/15 text-slate-300 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                {cat.isAdmin ? (
+                  <ShieldCheck className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-purple-400'}`} />
+                ) : (
+                  <Smartphone className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-indigo-400'}`} />
+                )}
+                <span>{cat.name}</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                    isSelected ? 'bg-white/20 text-white' : 'bg-white/10 text-slate-300'
+                  }`}
+                >
+                  {cat.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Active Selection Action Bar */}
       {selectedScanIds.size > 0 && (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 px-4 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-xs shadow-lg animate-in fade-in slide-in-from-top-1 duration-150">
@@ -579,8 +927,271 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
         </div>
       )}
 
-      {/* Scans Table */}
-      <div className="bg-[#242b4d]/40 border border-white/20 backdrop-blur-2xl rounded-3xl overflow-hidden shadow-2xl relative z-0">
+      {/* Scans Display: Grouped by Scanner vs Standard List View */}
+      {viewMode === 'grouped' ? (
+        <div className="space-y-4">
+          {loading ? (
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="bg-[#242b4d]/40 border border-white/20 backdrop-blur-2xl rounded-3xl p-6">
+                  <div className="h-6 w-48 bg-white/10 rounded-lg animate-pulse mb-4" />
+                  <div className="space-y-2">
+                    {[...Array(3)].map((_, j) => (
+                      <div key={j} className="h-10 bg-white/5 rounded-lg animate-pulse" />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : groupedByScanner.length === 0 ? (
+            <div className="bg-[#242b4d]/40 border border-white/20 backdrop-blur-2xl rounded-3xl p-16 text-center shadow-2xl">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center justify-center mx-auto mb-4">
+                <ScanLine className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-white font-['Space_Grotesk']">
+                No scans recorded yet
+              </h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto mt-1 mb-6">
+                {scans.length === 0
+                  ? 'Scan attendee passes from an active gate terminal to see real-time verification telemetry.'
+                  : 'No scan records match the current filter criteria.'}
+              </p>
+              {scans.length === 0 && (
+                <a
+                  href={toBrowserPath('/scan')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>Open Scanner Terminal</span>
+                </a>
+              )}
+            </div>
+          ) : (
+            groupedByScanner.map((group) => {
+              const isCollapsed = collapsedGroupIds.has(group.category.id);
+              const isGroupAdmin = group.category.isAdmin;
+
+              return (
+                <div
+                  key={group.category.id}
+                  className="bg-[#242b4d]/40 border border-white/20 backdrop-blur-2xl rounded-3xl overflow-hidden shadow-2xl transition-all"
+                >
+                  {/* Collapsible Scanner Category Card Header */}
+                  <div
+                    onClick={() => toggleGroupCollapse(group.category.id)}
+                    className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/[0.04] hover:bg-white/[0.08] transition-colors cursor-pointer border-b border-white/10 select-none"
+                  >
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 transition-colors"
+                      >
+                        <ChevronDown
+                          className={`w-4 h-4 transition-transform duration-200 ${
+                            isCollapsed ? '-rotate-90 text-slate-400' : 'text-indigo-400'
+                          }`}
+                        />
+                      </button>
+
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                          isGroupAdmin
+                            ? 'bg-purple-500/20 border-purple-500/35 text-purple-300'
+                            : 'bg-indigo-500/20 border-indigo-500/35 text-indigo-300'
+                        }`}
+                      >
+                        {isGroupAdmin ? (
+                          <ShieldCheck className="w-5 h-5 text-purple-400" />
+                        ) : (
+                          <Smartphone className="w-5 h-5 text-indigo-400" />
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-extrabold text-white text-sm sm:text-base font-['Space_Grotesk']">
+                            {group.category.name}
+                          </h3>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                              isGroupAdmin
+                                ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
+                                : 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                            }`}
+                          >
+                            {isGroupAdmin ? 'ADMIN CONSOLE' : 'GATE TERMINAL'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400">
+                          {isGroupAdmin
+                            ? 'Organizers / Admin scans performed via Console & Camera'
+                            : 'Dedicated Gate Access Scanner Terminal'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Scanner Group Telemetry Badges */}
+                    <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+                      <span className="px-2.5 py-1 rounded-xl text-xs font-bold font-mono bg-white/10 text-white border border-white/15">
+                        {group.category.count} total
+                      </span>
+                      <span className="px-2.5 py-1 rounded-xl text-xs font-bold font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {group.category.successCount} verified
+                      </span>
+                      {group.category.duplicateCount > 0 && (
+                        <span className="px-2.5 py-1 rounded-xl text-xs font-bold font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          {group.category.duplicateCount} blocked
+                        </span>
+                      )}
+                      {group.category.invalidCount > 0 && (
+                        <span className="px-2.5 py-1 rounded-xl text-xs font-bold font-mono bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1">
+                          <XCircle className="w-3.5 h-3.5" />
+                          {group.category.invalidCount} invalid
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Table within Group */}
+                  {!isCollapsed && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-white/10 bg-white/[0.03] text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                            <th className="py-3 pl-4 pr-1 w-10 text-center"></th>
+                            <th className="py-3 px-1 w-8 text-center"></th>
+                            <th className="py-3 px-3">Attendee Name</th>
+                            <th className="py-3 px-4 text-right pr-6">Result Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/[0.06]">
+                          {group.scans.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="py-8 text-center text-xs text-slate-400">
+                                No scan attempts match the selected filter criteria for this scanner.
+                              </td>
+                            </tr>
+                          ) : (
+                            group.scans.map((scan) => {
+                              const isExpanded = expandedScanIds.has(scan.id);
+                              const isSelected = selectedScanIds.has(scan.id);
+                              const student = scan.student;
+                              const studentName = student?.name || (scan as any).student_name;
+                              const timestampStr = scan.timestamp || (scan as any).scanned_at;
+
+                              return (
+                                <React.Fragment key={scan.id}>
+                                  <tr
+                                    onClick={() => toggleExpand(scan.id)}
+                                    className={`transition-colors cursor-pointer select-none group h-14 ${
+                                      isSelected
+                                        ? 'bg-rose-500/10 hover:bg-rose-500/15'
+                                        : isExpanded
+                                        ? 'bg-indigo-500/10 hover:bg-indigo-500/15'
+                                        : 'hover:bg-white/[0.04]'
+                                    }`}
+                                  >
+                                    <td
+                                      className="py-3 pl-4 pr-1 text-center align-middle w-10"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleSelectScan(scan.id)}
+                                        className="w-5 h-5 rounded-md border border-white/20 hover:border-indigo-400 flex items-center justify-center transition-colors cursor-pointer bg-white/5 mx-auto"
+                                        aria-label={isSelected ? 'Deselect scan' : 'Select scan'}
+                                      >
+                                        {isSelected ? (
+                                          <CheckSquare className="w-3.5 h-3.5 text-indigo-400" />
+                                        ) : (
+                                          <Square className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-400" />
+                                        )}
+                                      </button>
+                                    </td>
+
+                                    <td className="py-3 px-1 text-center align-middle w-8">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleExpand(scan.id);
+                                        }}
+                                        className="w-6 h-6 rounded-md flex items-center justify-center text-slate-400 group-hover:text-white transition-colors cursor-pointer"
+                                        aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                                      >
+                                        <ChevronDown
+                                          className={`w-4 h-4 transition-transform duration-200 ${
+                                            isExpanded ? 'rotate-180 text-indigo-400' : ''
+                                          }`}
+                                        />
+                                      </button>
+                                    </td>
+
+                                    <td className="py-3 px-3 align-middle">
+                                      {studentName ? (
+                                        <div className="font-bold text-white text-sm truncate max-w-[220px] sm:max-w-md">
+                                          {studentName}
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-1.5 font-mono text-rose-300 font-semibold text-xs truncate">
+                                          <ShieldAlert className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                                          <span>Unregistered Token</span>
+                                        </div>
+                                      )}
+                                      <div className="text-[11px] text-slate-400 font-mono mt-1">
+                                        {formatTimestamp(timestampStr)}
+                                      </div>
+                                    </td>
+
+                                    <td className="py-3 pr-4 sm:pr-6 text-right align-middle">
+                                      {getResultBadge(scan.result)}
+                                    </td>
+                                  </tr>
+
+                                  {isExpanded && (
+                                    <tr className="bg-[#080b15] border-t border-b border-indigo-500/20">
+                                      <td colSpan={4} className="p-4 sm:p-5">
+                                        <div className="space-y-3">
+                                          <div className="flex items-center justify-between">
+                                            <span className="font-extrabold text-white text-sm">
+                                              Scan Diagnostics — {scan.id.substring(0, 8)}...
+                                            </span>
+                                            <span className="text-xs text-slate-400 font-mono">
+                                              {formatTimestamp(timestampStr)}
+                                            </span>
+                                          </div>
+                                          <p className="text-xs text-slate-300">
+                                            {scan.reason || 'Verification record processed.'}
+                                          </p>
+                                          {scan.scanned_value && (
+                                            <div className="p-2.5 rounded-xl bg-black/40 border border-white/10 font-mono text-[11px] text-slate-200 break-all select-all">
+                                              {scan.scanned_value}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      ) : (
+        /* Scans Table */
+        <div className="bg-[#242b4d]/40 border border-white/20 backdrop-blur-2xl rounded-3xl overflow-hidden shadow-2xl relative z-0">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
@@ -655,7 +1266,7 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
                   const isSelected = selectedScanIds.has(scan.id);
                   const student = scan.student;
                   const studentName = student?.name || (scan as any).student_name;
-                  const scannerStation = scan.scanner?.name || (scan as any).scanner_name || 'Terminal Gate';
+                  const { name: scannerStation, isAdmin } = getScannerDisplayDetails(scan);
                   const timestampStr = scan.timestamp || (scan as any).scanned_at;
                   const isSuccess = isSuccessResult(scan.result);
                   const isDuplicate = isDuplicateResult(scan.result);
@@ -725,19 +1336,39 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
                           )}
 
                           {/* Scanner Name Subtitle for Mobile / Quick Context */}
-                          <div className="flex items-center gap-1.5 text-[11px] text-indigo-300/80 mt-1 font-medium">
-                            <Smartphone className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <div
+                            className={`flex items-center gap-1.5 text-[11px] mt-1 font-medium ${
+                              isAdmin ? 'text-purple-300/90' : 'text-indigo-300/80'
+                            }`}
+                          >
+                            {isAdmin ? (
+                              <ShieldCheck className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                            ) : (
+                              <Smartphone className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            )}
                             <span className="truncate max-w-[200px] sm:max-w-[260px]">{scannerStation}</span>
                             <span className="text-slate-600 sm:hidden">•</span>
-                            <span className="text-slate-400 font-mono text-[10px] sm:hidden">{formatTimestamp(timestampStr)}</span>
+                            <span className="text-slate-400 font-mono text-[10px] sm:hidden">
+                              {formatTimestamp(timestampStr)}
+                            </span>
                           </div>
                         </td>
 
                         {/* Dedicated Scanner / Gate Column (Desktop & Tablets) */}
                         <td className="py-3 px-4 align-middle hidden sm:table-cell">
                           <div className="flex flex-col gap-0.5">
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/25 text-indigo-300 text-xs font-medium w-fit max-w-[220px]">
-                              <Smartphone className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            <div
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold w-fit max-w-[220px] ${
+                                isAdmin
+                                  ? 'bg-purple-500/15 border border-purple-500/30 text-purple-300'
+                                  : 'bg-indigo-500/15 border border-indigo-500/25 text-indigo-300'
+                              }`}
+                            >
+                              {isAdmin ? (
+                                <ShieldCheck className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                              ) : (
+                                <Smartphone className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                              )}
                               <span className="truncate">{scannerStation}</span>
                             </div>
                             <span className="text-slate-400 text-[10px] font-mono pl-1">
@@ -915,8 +1546,15 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
                                   <div className="space-y-2 text-xs">
                                     <div className="flex justify-between items-baseline py-1 border-b border-white/5">
                                       <span className="text-slate-400">Gate / Scanner</span>
-                                      <span className="font-semibold text-white truncate max-w-[170px]">
+                                      <span className={`font-semibold truncate max-w-[170px] ${isAdmin ? 'text-purple-300 font-bold' : 'text-white'}`}>
                                         {scannerStation}
+                                      </span>
+                                    </div>
+
+                                    <div className="flex justify-between items-baseline py-1 border-b border-white/5">
+                                      <span className="text-slate-400">Operator Role</span>
+                                      <span className="font-semibold text-slate-300">
+                                        {isAdmin ? 'Event Administrator' : 'Gate Volunteer / Scanner'}
                                       </span>
                                     </div>
 
@@ -964,6 +1602,7 @@ export const ScansHistoryPage: React.FC<ScansHistoryPageProps> = ({ eventId }) =
           </table>
         </div>
       </div>
+      )}
 
       {/* Professional Confirmation Modal */}
       {confirmModal.isOpen && (

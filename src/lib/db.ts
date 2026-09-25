@@ -2304,6 +2304,19 @@ class DatabaseService {
           { onConflict: 'event_id,student_id' }
         );
         if (error) throw new Error(`Database error recording check-in: ${error.message}`);
+
+        // Also record in scan_attempts so it appears in Gate Check-In & Scan Logs
+        await supabase.from('scan_attempts').insert({
+          id: generateId(),
+          event_id: student.event_id,
+          scanner_id: adminId || null,
+          student_id: student.id,
+          scanned_value: student.usn || student.qr_code || 'MANUAL-ADMIN-CHECKIN',
+          scan_type: 'QR',
+          result: 'success',
+          reason: 'Manual Admission via Admin Console',
+          timestamp: now,
+        });
       }
       const existing = this.inMemoryDB.check_ins.find((c) => c.student_id === studentId && c.event_id === student!.event_id);
       if (!existing) {
@@ -2318,14 +2331,29 @@ class DatabaseService {
           created_at: now,
           updated_at: now,
         });
+        this.inMemoryDB.scan_attempts.push({
+          id: generateId(),
+          event_id: student.event_id,
+          scanner_id: adminId || null,
+          student_id: student.id,
+          scanned_value: student.usn || student.qr_code || 'MANUAL-ADMIN-CHECKIN',
+          scan_type: 'QR',
+          result: 'success',
+          reason: 'Manual Admission via Admin Console',
+          timestamp: now,
+        });
       }
     } else {
       if (supabase) {
         const { error } = await supabase.from('check_ins').delete().eq('event_id', student.event_id).eq('student_id', student.id);
         if (error) throw new Error(`Database error deleting check-in: ${error.message}`);
+        await supabase.from('scan_attempts').delete().eq('event_id', student.event_id).eq('student_id', student.id);
       }
       this.inMemoryDB.check_ins = this.inMemoryDB.check_ins.filter(
         (c) => !(c.student_id === studentId && c.event_id === student!.event_id)
+      );
+      this.inMemoryDB.scan_attempts = this.inMemoryDB.scan_attempts.filter(
+        (a) => !(a.student_id === studentId && a.event_id === student!.event_id)
       );
     }
 
@@ -3022,12 +3050,13 @@ class DatabaseService {
         atmQuery = atmQuery.range(offset, offset + limit - 1);
       }
 
-      const [atmRes, stRes, scnRes, reqRes, profRes] = await Promise.all([
+      const [atmRes, stRes, scnRes, reqRes, profRes, chkRes] = await Promise.all([
         atmQuery,
         supabase.from('students').select('*').eq('event_id', eventId),
         supabase.from('scanner_accounts').select('*').eq('event_id', eventId),
         supabase.from('scanner_access_requests').select('*').eq('event_id', eventId),
         supabase.from('profiles').select('id, name, email'),
+        supabase.from('check_ins').select('*').eq('event_id', eventId),
       ]);
 
       if (atmRes.error) throw new Error(`Database error fetching scan history: ${atmRes.error.message}`);
@@ -3060,7 +3089,7 @@ class DatabaseService {
           if (!scannersMap.has(p.id)) {
             scannersMap.set(p.id, {
               id: p.id,
-              name: `${p.name || 'Admin'} (Organizer)`,
+              name: `Admin (${p.name || 'Organizer'})`,
               email: p.email || '',
               access_code: 'ADMIN',
               role: 'SCANNER',
@@ -3071,6 +3100,30 @@ class DatabaseService {
             });
           }
         });
+      }
+
+      // Ensure any check-ins from check_ins table without explicit scan_attempts are included
+      const recordedSuccessIds = new Set(
+        attempts.filter((a) => (a.result === 'success' || (a.result as string) === 'IDEMPOTENT_SUCCESS') && a.student_id).map((a) => a.student_id)
+      );
+      if (chkRes.data) {
+        for (const c of chkRes.data as any[]) {
+          if (c.student_id && !recordedSuccessIds.has(c.student_id)) {
+            recordedSuccessIds.add(c.student_id);
+            const st = studentsMap.get(c.student_id);
+            attempts.push({
+              id: c.id ? `ci-${c.id}` : `ci-${c.student_id}`,
+              event_id: eventId,
+              student_id: c.student_id,
+              scanned_value: st?.usn || st?.qr_code || 'VERIFIED-CHECKIN',
+              scan_type: (c.scan_type as any) || 'QR',
+              result: 'success',
+              reason: 'Verified Admission Check-In',
+              scanner_id: c.scanner_id || null,
+              timestamp: c.check_in_at || c.created_at || new Date().toISOString(),
+            });
+          }
+        }
       }
     } else {
       attempts = this.inMemoryDB.scan_attempts.filter((a) => a.event_id === eventId);
@@ -3101,7 +3154,7 @@ class DatabaseService {
         if (!scannersMap.has(p.id)) {
           scannersMap.set(p.id, {
             id: p.id,
-            name: `${p.name || 'Admin'} (Organizer)`,
+            name: `Admin (${p.name || 'Organizer'})`,
             email: p.email || '',
             access_code: 'ADMIN',
             role: 'SCANNER',
@@ -3112,6 +3165,50 @@ class DatabaseService {
           });
         }
       });
+
+      // Include check-ins from inMemoryDB.check_ins
+      const recordedSuccessIds = new Set(
+        attempts.filter((a) => (a.result === 'success' || (a.result as string) === 'IDEMPOTENT_SUCCESS') && a.student_id).map((a) => a.student_id)
+      );
+      const inMemCheckIns = this.inMemoryDB.check_ins.filter((c) => c.event_id === eventId);
+      for (const c of inMemCheckIns) {
+        if (c.student_id && !recordedSuccessIds.has(c.student_id)) {
+          recordedSuccessIds.add(c.student_id);
+          const st = studentsMap.get(c.student_id);
+          attempts.push({
+            id: c.id ? `ci-${c.id}` : `ci-${c.student_id}`,
+            event_id: eventId,
+            student_id: c.student_id,
+            scanned_value: st?.usn || st?.qr_code || 'VERIFIED-CHECKIN',
+            scan_type: (c.scan_type as any) || 'QR',
+            result: 'success',
+            reason: 'Verified Admission Check-In',
+            scanner_id: c.scanner_id || null,
+            timestamp: c.check_in_at || c.created_at || new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    // Also include any attendee whose is_checked_in is true
+    const recordedSuccessStudentIds = new Set(
+      attempts.filter((a) => (a.result === 'success' || (a.result as string) === 'IDEMPOTENT_SUCCESS') && a.student_id).map((a) => a.student_id)
+    );
+    for (const [stId, st] of studentsMap.entries()) {
+      if ((st.is_checked_in || (st as any).checked_in) && !recordedSuccessStudentIds.has(stId)) {
+        recordedSuccessStudentIds.add(stId);
+        attempts.push({
+          id: `st-ci-${stId}`,
+          event_id: eventId,
+          student_id: stId,
+          scanned_value: st.usn || st.qr_code || 'VERIFIED-CHECKIN',
+          scan_type: 'QR',
+          result: 'success',
+          reason: 'Verified Attendee Admission',
+          scanner_id: null,
+          timestamp: st.checked_in_at || st.created_at || new Date().toISOString(),
+        });
+      }
     }
 
     if (filters?.result && filters.result !== 'ALL') {
@@ -3121,13 +3218,15 @@ class DatabaseService {
       attempts = attempts.filter((a) => a.scanner_id === filters.scannerId);
     }
 
+    const adminDisplayName = event.admin_name ? `Admin (${event.admin_name})` : 'Admin (Organizer)';
+
     let enriched = attempts.map((a) => {
       let scanner = a.scanner_id ? scannersMap.get(a.scanner_id) : undefined;
       if (!scanner) {
         if (!a.scanner_id || a.scanner_id === event.admin_id) {
           scanner = {
             id: event.admin_id,
-            name: `${event.admin_name || 'Admin'} (Organizer)`,
+            name: adminDisplayName,
             email: event.admin_email || '',
             access_code: 'ADMIN',
             role: 'SCANNER',
