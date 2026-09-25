@@ -1,6 +1,7 @@
 # ADMITTO — Digital Event Access & Token Scanning Platform
 
 [![Tests](https://img.shields.io/badge/tests-95%20passed-emerald)](https://github.com/RahulNag-V/ADMITTO.Scanner)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Try%20it%20Now-2ea44f?style=flat&logo=googlechrome&logoColor=white)](https://rahulnag-v.github.io/ADMITTO.Scanner/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-cyan)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-6-purple)](https://vitejs.dev/)
@@ -8,6 +9,10 @@
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red)](#-license--copyright)
 
 **ADMITTO** is a high-performance, offline-resilient event access control and credential verification platform. Engineered for large-scale venues, college festivals, conferences, and exhibitions, ADMITTO supports real-time multi-gate check-ins, custom barcode sub-string extraction, cryptographic QR tokens, and zero-latency hardware scanner integration.
+
+> 🎮 **Try a Live Demo**: Test the scanner, attendee management, and barcode extraction engine directly in your browser:  
+> 🔗 **[Launch ADMITTO Live Demo →](https://rahulnag-v.github.io/ADMITTO.Scanner/)**
+
 
 ---
 
@@ -101,6 +106,8 @@
 ---
 
 ## 🚀 Quick Start Guide
+
+> 💡 **Instant Evaluation**: Want to test ADMITTO without local installation? Launch the **[Live Demo](https://rahulnag-v.github.io/ADMITTO.Scanner/)** directly in your browser.
 
 ### Prerequisites
 - **Node.js**: v18.0.0 or higher
