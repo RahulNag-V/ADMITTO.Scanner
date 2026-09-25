@@ -109,6 +109,17 @@ export interface ColumnConfig {
   required?: boolean;
 }
 
+export type BarcodeMatchingMode = 'prefix' | 'suffix' | 'full';
+
+export interface BarcodeConfig {
+  mode: BarcodeMatchingMode;
+  value: string;
+  identifier_field: string;
+  case_sensitive: boolean;
+  min_length?: number | null;
+  max_length?: number | null;
+}
+
 export interface EventScanConfig {
   primary_scan_field: string;
   secondary_scan_field?: string | null;
@@ -118,6 +129,7 @@ export interface EventScanConfig {
   is_uniqueness_verified?: boolean;
   column_configs?: ColumnConfig[];
   dataset_name?: string;
+  barcode_config?: BarcodeConfig;
 }
 
 export interface UniquenessValidationResult {
@@ -157,6 +169,7 @@ export interface EventItem {
   secondary_scan_field?: string | null;
   qr_mode?: QrMode;
   barcode_field?: string;
+  barcode_config?: BarcodeConfig;
   scan_config?: EventScanConfig;
   created_at: string;
   updated_at: string;

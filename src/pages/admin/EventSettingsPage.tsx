@@ -38,7 +38,7 @@ import {
   Mail,
   ShieldCheck,
 } from 'lucide-react';
-import { EventItem, QrMode, EventScanConfig, AttendeeType } from '../../types';
+import { EventItem, QrMode, EventScanConfig, AttendeeType, BarcodeMatchingMode, BarcodeConfig } from '../../types';
 import { eventsApi, getStoredSession } from '../../lib/api';
 import { ATTENDEE_TYPE_PRESETS, getPresetByType } from '../../lib/attendeeTypes';
 import { TabSkeletonView } from '../../components/common/Skeleton';
@@ -144,6 +144,17 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
   const [barcodeField, setBarcodeField] = useState('usn');
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
+  // Barcode Identification Configuration States
+  const [barcodeMode, setBarcodeMode] = useState<BarcodeMatchingMode>('prefix');
+  const [barcodeValue, setBarcodeValue] = useState('1BH');
+  const [barcodeIdentifierField, setBarcodeIdentifierField] = useState('usn');
+  const [barcodeCaseSensitive, setBarcodeCaseSensitive] = useState(false);
+  const [barcodeLengthValidation, setBarcodeLengthValidation] = useState(false);
+  const [barcodeMinLength, setBarcodeMinLength] = useState<string>('');
+  const [barcodeMaxLength, setBarcodeMaxLength] = useState<string>('');
+  const [savingBarcodeConfig, setSavingBarcodeConfig] = useState(false);
+  const [barcodeConfigSavedMessage, setBarcodeConfigSavedMessage] = useState<string | null>(null);
+
   // Custom Banner & Background Customization
   const [customBannerText, setCustomBannerText] = useState('');
   const [customBannerSubtext, setCustomBannerSubtext] = useState('');
@@ -211,6 +222,25 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
       setSecondaryScanField(res.event.secondary_scan_field || '');
       setQrMode(res.event.qr_mode || 'SECURE_TOKEN');
       setBarcodeField(res.event.barcode_field || 'usn');
+
+      const bc = res.event.barcode_config || res.event.scan_config?.barcode_config;
+      if (bc) {
+        setBarcodeMode(bc.mode || 'prefix');
+        setBarcodeValue(bc.value || '');
+        setBarcodeIdentifierField(bc.identifier_field || res.event.primary_scan_field || 'usn');
+        setBarcodeCaseSensitive(Boolean(bc.case_sensitive));
+        setBarcodeLengthValidation(Boolean(bc.min_length || bc.max_length));
+        setBarcodeMinLength(bc.min_length ? String(bc.min_length) : '');
+        setBarcodeMaxLength(bc.max_length ? String(bc.max_length) : '');
+      } else {
+        setBarcodeMode('prefix');
+        setBarcodeValue('1BH');
+        setBarcodeIdentifierField(res.event.primary_scan_field || 'usn');
+        setBarcodeCaseSensitive(false);
+        setBarcodeLengthValidation(false);
+        setBarcodeMinLength('');
+        setBarcodeMaxLength('');
+      }
     } catch (err) {
       console.error('Failed to load event details:', err);
     } finally {
@@ -430,6 +460,15 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
     setSuccessMsg(null);
 
     try {
+      const currentBarcodeConfig: BarcodeConfig = {
+        mode: barcodeMode,
+        value: barcodeValue.trim(),
+        identifier_field: barcodeIdentifierField || primaryScanField || 'usn',
+        case_sensitive: barcodeCaseSensitive,
+        min_length: barcodeLengthValidation && barcodeMinLength ? parseInt(barcodeMinLength, 10) : null,
+        max_length: barcodeLengthValidation && barcodeMaxLength ? parseInt(barcodeMaxLength, 10) : null,
+      };
+
       const res = await eventsApi.update(eventId, {
         title,
         description,
@@ -442,6 +481,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
         attendee_type: attendeeType,
         attendee_label_singular: attendeeSingular.trim() || 'Attendee',
         attendee_label_plural: attendeePlural.trim() || 'Attendees',
+        barcode_config: currentBarcodeConfig,
       });
 
       // Update scan config
@@ -449,7 +489,8 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
         primary_scan_field: primaryScanField.trim().toLowerCase(),
         secondary_scan_field: secondaryScanField.trim() ? secondaryScanField.trim().toLowerCase() : null,
         qr_mode: qrMode,
-        barcode_field: barcodeField,
+        barcode_field: barcodeIdentifierField || barcodeField,
+        barcode_config: currentBarcodeConfig,
         is_uniqueness_verified: true,
       });
 
@@ -477,6 +518,46 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
       alert(err.message || 'Failed to save event details');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveBarcodeConfig = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!eventId) return;
+    setSavingBarcodeConfig(true);
+    setBarcodeConfigSavedMessage(null);
+    try {
+      const barcodeConfig: BarcodeConfig = {
+        mode: barcodeMode,
+        value: barcodeValue.trim(),
+        identifier_field: barcodeIdentifierField || primaryScanField || 'usn',
+        case_sensitive: barcodeCaseSensitive,
+        min_length: barcodeLengthValidation && barcodeMinLength ? parseInt(barcodeMinLength, 10) : null,
+        max_length: barcodeLengthValidation && barcodeMaxLength ? parseInt(barcodeMaxLength, 10) : null,
+      };
+
+      const res = await eventsApi.updateScanConfig(eventId, {
+        primary_scan_field: primaryScanField.trim().toLowerCase(),
+        secondary_scan_field: secondaryScanField.trim() ? secondaryScanField.trim().toLowerCase() : null,
+        qr_mode: qrMode,
+        barcode_field: barcodeIdentifierField || barcodeField || 'usn',
+        barcode_config: barcodeConfig,
+        is_uniqueness_verified: true,
+      });
+
+      const updatedEv = res.event;
+      if (updatedEv) {
+        setEvent(updatedEv);
+        setEvents((prev) => prev.map((ev) => (ev.id === updatedEv.id ? updatedEv : ev)));
+        await broadcastEventUpdated(eventId, updatedEv);
+        window.dispatchEvent(new CustomEvent('admitto:events-changed'));
+        setBarcodeConfigSavedMessage('Barcode identification configuration saved successfully.');
+        setTimeout(() => setBarcodeConfigSavedMessage(null), 3500);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to save barcode configuration');
+    } finally {
+      setSavingBarcodeConfig(false);
     }
   };
 
@@ -1530,46 +1611,251 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
               </div>
             </div>
 
-            {/* Barcode Target */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
-                <Barcode className="w-3.5 h-3.5 text-orange-400" />
-                <span>Barcode Data Target</span>
-              </label>
-              <select
-                value={barcodeField}
-                onChange={(e) => {
-                  setBarcodeField(e.target.value);
-                }}
-                style={{ colorScheme: 'dark' }}
-                className="w-full bg-[#181d33] border border-white/15 hover:border-white/25 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-orange-400 font-medium shadow-inner transition-colors cursor-pointer"
-              >
-                <option value="primary_key" className="bg-[#121626] text-slate-100 py-2.5">
-                  {primaryScanField.trim().toLowerCase() === 'primary key' || primaryScanField.trim().toLowerCase() === 'primary_key'
-                    ? 'Primary Scanning Key'
-                    : `Primary Scanning Key (${primaryScanField})`}
-                </option>
-                {secondaryScanField && (
-                  <option value="secondary_key" className="bg-[#121626] text-slate-100 py-2.5">
-                    {secondaryScanField.trim().toLowerCase() === 'secondary key' || secondaryScanField.trim().toLowerCase() === 'secondary_key'
-                      ? 'Secondary Verification Key'
-                      : `Secondary Verification Key (${secondaryScanField})`}
-                  </option>
+            {/* Dedicated Barcode Identification Card */}
+            <div className="pt-4 border-t border-white/10 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                <div>
+                  <h3 className="text-xs sm:text-sm font-bold text-zinc-100 flex items-center gap-2">
+                    <Barcode className="w-4 h-4 text-orange-400" />
+                    <span>BARCODE IDENTIFICATION</span>
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    How should attendee barcodes be identified?
+                  </p>
+                </div>
+                {barcodeConfigSavedMessage && (
+                  <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-lg flex items-center gap-1.5 animate-in fade-in">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {barcodeConfigSavedMessage}
+                  </span>
                 )}
-                <option value="token" className="bg-[#121626] text-slate-100 py-2.5">
-                  Secure Unique Barcode Token
-                </option>
-              </select>
-              {barcodeField !== 'token' && (
-                <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/25 text-[11px] text-amber-300 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+              </div>
+
+              {/* Warning Notice per Requirements */}
+              <div className="p-3.5 bg-amber-500/10 rounded-2xl border border-amber-500/25 text-xs text-amber-300 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                <div>
+                  <div className="font-semibold text-amber-200">
+                    Changing barcode identification rules may affect attendee verification for this event.
+                  </div>
+                  <div className="text-[11px] text-amber-300/80 mt-0.5">
+                    Modifying this configuration does NOT alter existing attendee barcodes in the database. Only scanner interpretation and validation rules are changed.
+                  </div>
+                </div>
+              </div>
+
+              {/* Barcode Matching Type Selector */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-300">
+                  Barcode Matching Type
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['prefix', 'suffix', 'full'] as BarcodeMatchingMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setBarcodeMode(mode)}
+                      className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        barcodeMode === mode
+                          ? 'bg-orange-500/20 border-orange-500/60 text-orange-300 ring-1 ring-orange-500/30'
+                          : 'bg-white/[0.03] border-white/10 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${barcodeMode === mode ? 'bg-orange-400 shadow-sm shadow-orange-400/50' : 'bg-zinc-600'}`} />
+                      <span className="capitalize">{mode === 'full' ? 'Full Barcode' : mode}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Configured Value and Unique Identifier Field */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {barcodeMode !== 'full' ? (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-zinc-300">
+                      {barcodeMode === 'prefix' ? 'Prefix Value' : 'Suffix Value'}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={barcodeMode === 'prefix' ? 'e.g. 1BH' : 'e.g. 2026'}
+                      value={barcodeValue}
+                      onChange={(e) => setBarcodeValue(e.target.value)}
+                      className="w-full h-11 px-3.5 rounded-xl bg-[#181d33] border border-white/15 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-zinc-300">
+                      Matching Rule
+                    </label>
+                    <div className="h-11 px-3.5 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-zinc-400 flex items-center">
+                      Exact full barcode lookup against attendee record
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-zinc-300">
+                    Unique Identifier Field
+                  </label>
+                  <select
+                    value={barcodeIdentifierField}
+                    onChange={(e) => setBarcodeIdentifierField(e.target.value)}
+                    style={{ colorScheme: 'dark' }}
+                    className="w-full h-11 px-3 rounded-xl bg-[#181d33] border border-white/15 text-xs text-white focus:outline-none focus:border-orange-400 cursor-pointer"
+                  >
+                    <option value="usn" className="bg-[#121626] text-white">USN / Roll Number</option>
+                    <option value="roll_number" className="bg-[#121626] text-white">Roll Number</option>
+                    <option value="employee_id" className="bg-[#121626] text-white">Employee ID</option>
+                    <option value="registration_id" className="bg-[#121626] text-white">Registration ID</option>
+                    <option value="participant_id" className="bg-[#121626] text-white">Participant ID</option>
+                    <option value="email" className="bg-[#121626] text-white">Email</option>
+                    <option value="membership_id" className="bg-[#121626] text-white">Membership ID</option>
+                    <option value="custom_id" className="bg-[#121626] text-white">Custom ID</option>
+                    <option value="barcode" className="bg-[#121626] text-white">Barcode</option>
+                    {/* Add any event custom fields dynamically */}
+                    {event?.scan_config?.available_fields?.filter((f) => !['usn', 'roll_number', 'employee_id', 'registration_id', 'participant_id', 'email', 'membership_id', 'custom_id', 'barcode'].includes(f.toLowerCase())).map((f) => (
+                      <option key={f} value={f} className="bg-[#121626] text-white">
+                        {f} (Custom Field)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Toggles: Case Sensitivity & Length Validation */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-white/5">
+                {/* Case Sensitivity */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
                   <div>
-                    <span className="font-semibold">Low-Entropy Target Advisory:</span> When barcodes encode guessable identifiers (such as student USNs or sequential IDs), attendees could theoretically forge a barcode pass. For tamper-resistant verification, select <strong className="text-white">Secure Unique Barcode Token</strong> or use <strong className="text-white">Secure Token QR codes</strong>.
+                    <div className="text-xs font-medium text-zinc-200">Case Sensitive</div>
+                    <div className="text-[10px] text-zinc-400">Match upper/lowercase strictly</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBarcodeCaseSensitive(!barcodeCaseSensitive)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      barcodeCaseSensitive ? 'bg-orange-500' : 'bg-zinc-700'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        barcodeCaseSensitive ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Optional Length Validation Toggle */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                  <div>
+                    <div className="text-xs font-medium text-zinc-200">Optional Length Validation</div>
+                    <div className="text-[10px] text-zinc-400">Enforce min & max length limits</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBarcodeLengthValidation(!barcodeLengthValidation)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      barcodeLengthValidation ? 'bg-orange-500' : 'bg-zinc-700'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        barcodeLengthValidation ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Length Validation Inputs (if enabled) */}
+              {barcodeLengthValidation && (
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-white/[0.02] border border-orange-500/20">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-zinc-400">Minimum Barcode Length</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 9"
+                      value={barcodeMinLength}
+                      onChange={(e) => setBarcodeMinLength(e.target.value)}
+                      className="w-full h-9 px-3 rounded-lg bg-white/[0.05] border border-white/10 text-xs text-white focus:outline-none focus:border-orange-400"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-zinc-400">Maximum Barcode Length</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 12"
+                      value={barcodeMaxLength}
+                      onChange={(e) => setBarcodeMaxLength(e.target.value)}
+                      className="w-full h-9 px-3 rounded-lg bg-white/[0.05] border border-white/10 text-xs text-white focus:outline-none focus:border-orange-400"
+                    />
                   </div>
                 </div>
               )}
-              <div className="p-3 bg-white/[0.05] rounded-xl border border-white/10 text-[11px] text-zinc-400">
-                Scanners will parse physical and optical 1D barcodes as this target field.
+
+              {/* Barcode Preview */}
+              <div className="p-4 rounded-xl bg-orange-950/20 border border-orange-500/25 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-orange-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-orange-400" />
+                    Barcode Preview
+                  </span>
+                  <span className="text-zinc-400 capitalize">{barcodeMode} Mode</span>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap text-xs">
+                  {barcodeMode === 'prefix' && (
+                    <>
+                      <div className="px-3 py-1 rounded-lg bg-orange-500/25 border border-orange-500/40 text-orange-200 font-mono font-bold">
+                        {barcodeValue.trim() || '1BH'}
+                      </div>
+                      <span className="text-zinc-500 font-bold">+</span>
+                      <div className="px-3 py-1 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-200 font-mono font-bold">
+                        24CS051
+                      </div>
+                    </>
+                  )}
+                  {barcodeMode === 'suffix' && (
+                    <>
+                      <div className="px-3 py-1 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-200 font-mono font-bold">
+                        24CS051
+                      </div>
+                      <span className="text-zinc-500 font-bold">+</span>
+                      <div className="px-3 py-1 rounded-lg bg-orange-500/25 border border-orange-500/40 text-orange-200 font-mono font-bold">
+                        {barcodeValue.trim() || '2026'}
+                      </div>
+                    </>
+                  )}
+                  {barcodeMode === 'full' && (
+                    <div className="px-3 py-1 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-200 font-mono font-bold">
+                      1BH24CS051
+                    </div>
+                  )}
+                  <span className="text-zinc-500 text-xs">→</span>
+                  <span className="text-xs text-zinc-300">
+                    Example: <strong className="text-white font-mono">{
+                      barcodeMode === 'prefix'
+                        ? `${barcodeValue.trim() || '1BH'}24CS051`
+                        : barcodeMode === 'suffix'
+                        ? `24CS051${barcodeValue.trim() || '2026'}`
+                        : '1BH24CS051'
+                    }</strong>
+                  </span>
+                </div>
+              </div>
+
+              {/* Dedicated Save Button */}
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={handleSaveBarcodeConfig}
+                  disabled={savingBarcodeConfig}
+                  className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white shadow-lg shadow-orange-500/20 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all select-none"
+                >
+                  <Save className={`w-3.5 h-3.5 ${savingBarcodeConfig ? 'animate-spin' : ''}`} />
+                  <span>{savingBarcodeConfig ? 'Saving Barcode Rules...' : 'Save Barcode Configuration'}</span>
+                </button>
               </div>
             </div>
           </div>

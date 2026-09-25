@@ -1,4 +1,4 @@
-import { ScanType, Student, ScanValidationResult } from '../../types';
+import { ScanType, Student, ScanValidationResult, BarcodeConfig } from '../../types';
 
 export interface CachedEvent {
   id: string;
@@ -9,6 +9,7 @@ export interface CachedEvent {
   secondary_scan_field?: string;
   qr_mode?: string;
   barcode_field?: string;
+  barcode_config?: BarcodeConfig;
   banner_url?: string;
   admin_name?: string;
   admin_phone?: string;

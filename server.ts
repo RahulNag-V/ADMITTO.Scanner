@@ -1085,6 +1085,8 @@ app.post('/api/events', requireAdminAuth, async (req: Request, res: Response) =>
       secondary_scan_field,
       qr_mode,
       barcode_field,
+      barcode_config,
+      scan_config,
     } = req.body;
 
     if (!title) {
@@ -1108,6 +1110,8 @@ app.post('/api/events', requireAdminAuth, async (req: Request, res: Response) =>
       secondary_scan_field: secondary_scan_field || null,
       qr_mode: qr_mode || 'SECURE_TOKEN',
       barcode_field: barcode_field || primary_scan_field || 'usn',
+      barcode_config,
+      scan_config,
     });
 
     res.status(201).json({ success: true, event: newEvent });
@@ -1248,6 +1252,7 @@ app.get('/api/events/:id/offline-bundle', requireScannerOrAdmin, async (req: Req
         secondary_scan_field: event.secondary_scan_field,
         qr_mode: event.qr_mode,
         barcode_field: event.barcode_field,
+        barcode_config: event.barcode_config || event.scan_config?.barcode_config,
         downloaded_at: new Date(now).toISOString(),
         expires_at: expiresAt,
         version,
@@ -1295,6 +1300,7 @@ app.patch('/api/events/:id/scan-config', requireAdminAuth, async (req: Request, 
       secondary_scan_field,
       qr_mode,
       barcode_field,
+      barcode_config,
       available_fields,
       is_uniqueness_verified,
       column_configs,
@@ -1308,6 +1314,7 @@ app.patch('/api/events/:id/scan-config', requireAdminAuth, async (req: Request, 
       secondary_scan_field: secondary_scan_field || null,
       qr_mode: qr_mode || 'SECURE_TOKEN',
       barcode_field: barcode_field || 'usn',
+      barcode_config: barcode_config || undefined,
       available_fields: available_fields || [],
       is_uniqueness_verified: is_uniqueness_verified ?? true,
       column_configs: column_configs || undefined,

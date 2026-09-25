@@ -656,7 +656,7 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
                         {lastResult.student.name}
                       </div>
                       <div className="text-[11px] font-mono text-emerald-200/90 truncate">
-                        USN: {lastResult.student.usn} • {lastResult.student.branch || 'General'}
+                        USN: {lastResult.student.usn} {lastResult.student.barcode ? `• Barcode: ${lastResult.student.barcode}` : (lastResult.student.branch ? `• ${lastResult.student.branch}` : '')}
                       </div>
                     </>
                   ) : (

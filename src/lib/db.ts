@@ -18,8 +18,10 @@ import {
   EventScanConfig,
   UniquenessValidationResult,
   PasswordResetCode,
+  BarcodeConfig,
 } from '../types';
 import { getServerSupabase, getServerSupabaseAdmin } from './supabase/server';
+import { resolveBarcodeConfig, validateBarcodePattern, matchAttendeeWithIdentifier } from './barcodeValidator';
 
 type ScannerInvalidationHook = (scannerId: string) => void;
 let scannerInvalidationHook: ScannerInvalidationHook | null = null;
@@ -724,12 +726,29 @@ class DatabaseService {
       secondary_scan_field: data.secondary_scan_field || null,
       qr_mode: data.qr_mode || 'SECURE_TOKEN',
       barcode_field: data.barcode_field || 'usn',
-      scan_config: data.scan_config || {
+      barcode_config: data.barcode_config || data.scan_config?.barcode_config || {
+        mode: 'full',
+        value: '',
+        identifier_field: data.barcode_field || data.primary_scan_field || 'usn',
+        case_sensitive: false,
+        min_length: null,
+        max_length: null,
+      },
+      scan_config: {
         primary_scan_field: data.primary_scan_field || 'usn',
         secondary_scan_field: data.secondary_scan_field || null,
         qr_mode: data.qr_mode || 'SECURE_TOKEN',
         barcode_field: data.barcode_field || 'usn',
         is_uniqueness_verified: true,
+        ...(data.scan_config || {}),
+        barcode_config: data.barcode_config || data.scan_config?.barcode_config || {
+          mode: 'full',
+          value: '',
+          identifier_field: data.barcode_field || data.primary_scan_field || 'usn',
+          case_sensitive: false,
+          min_length: null,
+          max_length: null,
+        },
       },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -740,8 +759,13 @@ class DatabaseService {
     if (supabase) {
       const { error } = await supabase.from('events').insert(newEvent);
       if (error) {
-        console.error('[Supabase DB] Error creating event:', error);
-        throw new Error(`Failed to create event in database: ${error.message}`);
+        console.warn('[Supabase DB] Error creating event with full schema, retrying without barcode_config column:', error.message);
+        const { barcode_config, ...cleanEvent } = newEvent;
+        const { error: retryErr } = await supabase.from('events').insert(cleanEvent);
+        if (retryErr) {
+          console.error('[Supabase DB] Error creating event on retry:', retryErr);
+          throw new Error(`Failed to create event in database: ${retryErr.message}`);
+        }
       }
     }
 
@@ -767,10 +791,25 @@ class DatabaseService {
     const event = await this.getEventById(eventId, adminId);
     if (!event) return null;
 
-    const updatedData = {
+    const updatedData: any = {
       ...updates,
       updated_at: new Date().toISOString(),
     };
+
+    if (updates.barcode_config) {
+      updatedData.barcode_config = updates.barcode_config;
+      if (!updatedData.scan_config) {
+        updatedData.scan_config = {
+          ...event.scan_config,
+          primary_scan_field: event.primary_scan_field || 'usn',
+          barcode_field: event.barcode_field || 'usn',
+          qr_mode: event.qr_mode || 'SECURE_TOKEN',
+          barcode_config: updates.barcode_config,
+        };
+      } else {
+        updatedData.scan_config.barcode_config = updates.barcode_config;
+      }
+    }
 
     const supabase = this.getClient();
     if (supabase) {
@@ -790,6 +829,7 @@ class DatabaseService {
         if (updatedData.admin_email !== undefined) corePayload.admin_email = updatedData.admin_email;
         if (updatedData.banner_url !== undefined) corePayload.banner_url = updatedData.banner_url;
         if (updatedData.status !== undefined) corePayload.status = updatedData.status;
+        if (updatedData.scan_config !== undefined) corePayload.scan_config = updatedData.scan_config;
 
         const { error: retryError } = await supabase.from('events').update(corePayload).eq('id', eventId);
         if (retryError) {
@@ -828,7 +868,7 @@ class DatabaseService {
     const event = await this.getEventById(eventId, adminId);
     if (!event) throw new Error('Unauthorized or event not found');
 
-    const updatePayload = {
+    const updatePayload: any = {
       primary_scan_field: config.primary_scan_field || 'usn',
       secondary_scan_field: config.secondary_scan_field || null,
       qr_mode: config.qr_mode || 'SECURE_TOKEN',
@@ -836,11 +876,19 @@ class DatabaseService {
       scan_config: config,
       updated_at: new Date().toISOString(),
     };
+    if (config.barcode_config) {
+      updatePayload.barcode_config = config.barcode_config;
+    }
 
     const supabase = this.getClient();
     if (supabase) {
       const { error } = await supabase.from('events').update(updatePayload).eq('id', eventId).eq('admin_id', adminId);
-      if (error) throw new Error(`Database error saving scan configuration: ${error.message}`);
+      if (error) {
+        console.warn('[Supabase DB] Error saving scan configuration with barcode_config column, retrying with scan_config fallback:', error.message);
+        const { barcode_config, ...cleanPayload } = updatePayload;
+        const { error: retryError } = await supabase.from('events').update(cleanPayload).eq('id', eventId).eq('admin_id', adminId);
+        if (retryError) throw new Error(`Database error saving scan configuration: ${retryError.message}`);
+      }
     }
 
     Object.assign(event, updatePayload);
@@ -2694,6 +2742,11 @@ class DatabaseService {
     const cleanVal = (scannedValue || '').trim();
     const cleanSecVal = (secondaryValue || '').trim();
 
+    const event = await this.getEventById(eventId);
+    if (!event || event.status === 'DELETED') {
+      return { success: false, status: 'WRONG_EVENT', message: 'Event not found or inactive.' };
+    }
+
     if (!cleanVal) {
       return {
         success: false,
@@ -2704,7 +2757,253 @@ class DatabaseService {
 
     const supabase = this.getClient();
 
-    // If Supabase is active, execute atomic RPC stored procedure
+    // 1. Configurable Barcode Verification Pipeline
+    if (scanType === 'BARCODE') {
+      const barcodeConfig = resolveBarcodeConfig(event);
+      const patternResult = validateBarcodePattern(cleanVal, barcodeConfig);
+
+      if (!patternResult.valid) {
+        this.inMemoryDB.scan_attempts.push({
+          id: generateId(),
+          event_id: eventId,
+          scanner_id: scannerId || null,
+          student_id: null,
+          scanned_value: cleanVal,
+          scan_type: scanType,
+          result: 'invalid',
+          reason: patternResult.message,
+          timestamp: new Date().toISOString(),
+        });
+
+        if (supabase) {
+          try {
+            await supabase.from('scan_attempts').insert({
+              event_id: eventId,
+              scanner_id: scannerId || null,
+              student_id: null,
+              scanned_value: cleanVal,
+              scan_type: scanType,
+              result: 'invalid',
+              reason: patternResult.message,
+            });
+          } catch (e) {}
+        }
+
+        return {
+          success: false,
+          status: 'INVALID_BARCODE',
+          message: patternResult.message,
+        };
+      }
+
+      // Check Idempotency via client_scan_id
+      if (clientScanId) {
+        const existingIdempotent = this.inMemoryDB.check_ins.find(
+          (c) => c.event_id === eventId && c.client_scan_id === clientScanId
+        );
+        if (existingIdempotent) {
+          const student = this.inMemoryDB.students.find((s) => s.id === existingIdempotent.student_id);
+          return {
+            success: true,
+            status: 'IDEMPOTENT_SUCCESS',
+            message: 'Check-in was already recorded successfully.',
+            student: student ? { ...student, is_checked_in: true, checked_in_at: existingIdempotent.check_in_at } : undefined,
+            check_in_id: existingIdempotent.id,
+            check_in_at: existingIdempotent.check_in_at,
+          };
+        }
+      }
+
+      const extractedIdentifier = patternResult.extractedIdentifier;
+      const identifierField = patternResult.identifierField;
+      const caseSensitive = patternResult.caseSensitive;
+
+      // Find attendee by extracted identifier
+      let matchingStudents: Student[] = [];
+      if (supabase) {
+        const { data: studentsData } = await supabase
+          .from('students')
+          .select('*')
+          .eq('event_id', eventId);
+        const studentList = (studentsData as Student[]) || [];
+        matchingStudents = studentList.filter((s) =>
+          matchAttendeeWithIdentifier(s, identifierField, extractedIdentifier, caseSensitive)
+        );
+      } else {
+        matchingStudents = this.inMemoryDB.students.filter(
+          (s) => s.event_id === eventId && matchAttendeeWithIdentifier(s, identifierField, extractedIdentifier, caseSensitive)
+        );
+      }
+
+      if (matchingStudents.length === 0) {
+        this.inMemoryDB.scan_attempts.push({
+          id: generateId(),
+          event_id: eventId,
+          scanner_id: scannerId || null,
+          student_id: null,
+          scanned_value: cleanVal,
+          scan_type: scanType,
+          result: 'invalid',
+          reason: 'Attendee not found',
+          timestamp: new Date().toISOString(),
+        });
+        if (supabase) {
+          try {
+            await supabase.from('scan_attempts').insert({
+              event_id: eventId,
+              scanner_id: scannerId || null,
+              student_id: null,
+              scanned_value: cleanVal,
+              scan_type: scanType,
+              result: 'invalid',
+              reason: 'Attendee not found',
+            });
+          } catch (e) {}
+        }
+        return {
+          success: false,
+          status: 'ATTENDEE_NOT_FOUND',
+          message: 'Barcode recognized, but no registered attendee was found.',
+        };
+      }
+
+      let student = matchingStudents[0];
+      if (matchingStudents.length > 1) {
+        if (cleanSecVal) {
+          const secField = event.secondary_scan_field || 'email';
+          student =
+            matchingStudents.find((s) => {
+              const val = ((s as any)[secField] || s.meta?.[secField] || '').toString();
+              return caseSensitive ? val === cleanSecVal : val.toUpperCase() === cleanSecVal.toUpperCase();
+            }) || matchingStudents[0];
+        } else {
+          return {
+            success: false,
+            status: 'AMBIGUOUS_MATCH',
+            message: `Multiple attendees found with ${identifierField} "${extractedIdentifier}". Additional verification required (${event.secondary_scan_field || 'secondary key'}).`,
+            requires_secondary: true,
+            secondary_field: event.secondary_scan_field || 'email',
+            primary_value: cleanVal,
+          };
+        }
+      }
+
+      // Duplicate Check
+      let existingCheckIn: CheckIn | undefined;
+      if (supabase) {
+        const { data: existingChk } = await supabase
+          .from('check_ins')
+          .select('*')
+          .eq('event_id', eventId)
+          .eq('student_id', student.id)
+          .maybeSingle();
+        if (existingChk) existingCheckIn = existingChk as CheckIn;
+      } else {
+        existingCheckIn = this.inMemoryDB.check_ins.find((c) => c.event_id === eventId && c.student_id === student.id);
+      }
+
+      if (existingCheckIn) {
+        const checkInTimeStr = new Date(existingCheckIn.check_in_at).toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        });
+        this.inMemoryDB.scan_attempts.push({
+          id: generateId(),
+          event_id: eventId,
+          scanner_id: scannerId || null,
+          student_id: student.id,
+          scanned_value: cleanVal,
+          scan_type: scanType,
+          result: 'duplicate',
+          reason: `Already checked in at ${checkInTimeStr}`,
+          timestamp: new Date().toISOString(),
+        });
+        if (supabase) {
+          try {
+            await supabase.from('scan_attempts').insert({
+              event_id: eventId,
+              scanner_id: scannerId || null,
+              student_id: student.id,
+              scanned_value: cleanVal,
+              scan_type: scanType,
+              result: 'duplicate',
+              reason: `Already checked in at ${checkInTimeStr}`,
+            });
+          } catch (e) {}
+        }
+
+        return {
+          success: false,
+          status: 'DUPLICATE_CHECKIN',
+          message: `ALREADY CHECKED IN at ${checkInTimeStr}`,
+          student: { ...student, is_checked_in: true, checked_in_at: existingCheckIn.check_in_at },
+          check_in_at: existingCheckIn.check_in_at,
+        };
+      }
+
+      // Record Successful Check-in
+      const checkInId = generateId();
+      const checkInTime = new Date().toISOString();
+      const newCheckIn: CheckIn = {
+        id: checkInId,
+        event_id: eventId,
+        student_id: student.id,
+        scanner_id: scannerId || null,
+        scan_type: scanType,
+        check_in_at: checkInTime,
+        status: 'SUCCESS',
+        source,
+        client_scan_id: clientScanId || null,
+        created_at: checkInTime,
+      };
+
+      if (supabase) {
+        try {
+          await supabase.from('check_ins').insert(newCheckIn);
+          await supabase.from('scan_attempts').insert({
+            event_id: eventId,
+            scanner_id: scannerId || null,
+            student_id: student.id,
+            scanned_value: cleanVal,
+            scan_type: scanType,
+            result: 'success',
+            reason: 'Access granted',
+          });
+        } catch (e) {
+          console.error('[Supabase DB] Error inserting check_in:', e);
+        }
+      }
+
+      this.inMemoryDB.check_ins.push(newCheckIn);
+      this.inMemoryDB.scan_attempts.push({
+        id: generateId(),
+        event_id: eventId,
+        scanner_id: scannerId || null,
+        student_id: student.id,
+        scanned_value: cleanVal,
+        scan_type: scanType,
+        result: 'success',
+        reason: 'Access granted',
+        timestamp: checkInTime,
+      });
+
+      return {
+        success: true,
+        status: 'SUCCESS',
+        message: 'Check-in confirmed successfully.',
+        student: {
+          ...student,
+          is_checked_in: true,
+          checked_in_at: checkInTime,
+          scan_type: scanType,
+        },
+        check_in_id: checkInId,
+        check_in_at: checkInTime,
+      };
+    }
+
+    // 2. If Supabase is active and scanType is QR, execute atomic RPC stored procedure
     if (supabase) {
       try {
         const { data, error } = await supabase.rpc('process_check_in_atomic', {
@@ -2729,12 +3028,6 @@ class DatabaseService {
         console.error('[Supabase DB] RPC invocation error:', rpcErr);
         throw new Error(rpcErr.message || 'Database error during atomic verification');
       }
-    }
-
-    // Fallback in-memory atomic processing engine
-    const event = await this.getEventById(eventId);
-    if (!event || event.status === 'DELETED') {
-      return { success: false, status: 'WRONG_EVENT', message: 'Event not found or inactive.' };
     }
 
     // Idempotency check via client_scan_id

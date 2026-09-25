@@ -2,6 +2,7 @@ import { getAdmittoDB } from './idb';
 import { ScanType, ScanValidationResult, Student } from '../../types';
 import { CachedEvent, CachedAttendee, LocalCheckIn, SyncQueueItem } from './types';
 import { getOrCreateDeviceUuid, isBundleExpired } from './security';
+import { resolveBarcodeConfig, validateBarcodePattern } from '../barcodeValidator';
 
 export interface LocalScanParams {
   eventId: string;
@@ -76,15 +77,46 @@ export const localValidator = {
         if (byCleanQr.length > 0) matchedAttendees = byCleanQr;
       }
     } else {
+      // 2b. Barcode mode: validate pattern and extract unique identifier
+      const barcodeConfig = resolveBarcodeConfig(event as any);
+      const patternResult = validateBarcodePattern(cleanVal, barcodeConfig);
+
+      if (!patternResult.valid) {
+        return {
+          success: false,
+          status: 'INVALID_BARCODE',
+          message: patternResult.message,
+        };
+      }
+
+      const extractedIdentifier = patternResult.extractedIdentifier;
       // Look up by Barcode index
       const byBarcode = await attendeeStore.index('by_event_barcode').getAll([eventId, cleanVal]);
       if (byBarcode.length > 0) {
         matchedAttendees = byBarcode;
+      } else {
+        const byExtractedBarcode = await attendeeStore.index('by_event_barcode').getAll([eventId, extractedIdentifier]);
+        if (byExtractedBarcode.length > 0) {
+          matchedAttendees = byExtractedBarcode;
+        }
+      }
+
+      // If not matched by barcode index, check primary scan field index (e.g. USN) using extractedIdentifier
+      if (matchedAttendees.length === 0) {
+        const byUsn = await attendeeStore.index('by_event_usn').getAll([eventId, extractedIdentifier]);
+        if (byUsn.length > 0) {
+          matchedAttendees = byUsn;
+        } else {
+          const byPrimary = await attendeeStore.index('by_event_primary').getAll([eventId, extractedIdentifier]);
+          if (byPrimary.length > 0) {
+            matchedAttendees = byPrimary;
+          }
+        }
       }
     }
 
-    // If not matched by QR/Barcode, check primary scan field index (e.g. USN or custom field)
-    if (matchedAttendees.length === 0) {
+    // If QR scan not matched by QR, check primary scan field index
+    if (scanType === 'QR' && matchedAttendees.length === 0) {
       const byUsn = await attendeeStore.index('by_event_usn').getAll([eventId, cleanVal]);
       if (byUsn.length > 0) {
         matchedAttendees = byUsn;
@@ -98,6 +130,13 @@ export const localValidator = {
 
     // Case: No attendee matched in local snapshot
     if (matchedAttendees.length === 0) {
+      if (scanType === 'BARCODE') {
+        return {
+          success: false,
+          status: 'ATTENDEE_NOT_FOUND',
+          message: 'Barcode recognized, but no registered attendee was found.',
+        };
+      }
       return {
         success: false,
         status: 'INVALID_TOKEN',
