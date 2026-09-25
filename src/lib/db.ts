@@ -21,7 +21,7 @@ import {
   BarcodeConfig,
 } from '../types';
 import { getServerSupabase, getServerSupabaseAdmin } from './supabase/server';
-import { resolveBarcodeConfig, validateBarcodePattern, matchAttendeeWithIdentifier } from './barcodeValidator';
+import { resolveBarcodeConfig, validateBarcodePattern, matchAttendeeWithIdentifier, extractBarcodeIdentifier } from './barcodeValidator';
 
 type ScannerInvalidationHook = (scannerId: string) => void;
 let scannerInvalidationHook: ScannerInvalidationHook | null = null;
@@ -2248,22 +2248,28 @@ class DatabaseService {
         }
       }
 
-      // Generate Barcode value based on barcode_field
+      // Generate Barcode value based on barcode_field and barcode_config
       let generatedBarcode = row.barcode?.trim();
+      const activeBarcodeConfig = scanConfig?.barcode_config || event.barcode_config;
       if (!generatedBarcode) {
+        let baseVal = usnClean;
         if (barcodeField === 'primary_key' || barcodeField === primaryKeyField || barcodeField === 'usn') {
-          generatedBarcode = usnClean;
+          baseVal = usnClean;
         } else if (barcodeField === 'secondary_key' || (secondaryKeyField && barcodeField === secondaryKeyField)) {
           const secVal = (row.meta && row.meta[secondaryKeyField]) || row.email || row.phone_number || usnClean;
-          generatedBarcode = String(secVal).trim();
+          baseVal = String(secVal).trim();
         } else if (barcodeField === 'token' || barcodeField === 'secure_token') {
-          generatedBarcode = barcodeRand;
+          baseVal = barcodeRand;
         } else if (barcodeField && row.meta && row.meta[barcodeField]) {
-          generatedBarcode = String(row.meta[barcodeField]).trim();
+          baseVal = String(row.meta[barcodeField]).trim();
         } else if (barcodeField && (row as any)[barcodeField]) {
-          generatedBarcode = String((row as any)[barcodeField]).trim();
+          baseVal = String((row as any)[barcodeField]).trim();
+        }
+
+        if (activeBarcodeConfig && activeBarcodeConfig.extraction_mode === 'custom') {
+          generatedBarcode = extractBarcodeIdentifier(baseVal, activeBarcodeConfig);
         } else {
-          generatedBarcode = usnClean || barcodeRand;
+          generatedBarcode = baseVal || barcodeRand;
         }
       }
 
@@ -2827,11 +2833,11 @@ class DatabaseService {
           .eq('event_id', eventId);
         const studentList = (studentsData as Student[]) || [];
         matchingStudents = studentList.filter((s) =>
-          matchAttendeeWithIdentifier(s, identifierField, extractedIdentifier, caseSensitive)
+          matchAttendeeWithIdentifier(s, identifierField, extractedIdentifier, caseSensitive, barcodeConfig)
         );
       } else {
         matchingStudents = this.inMemoryDB.students.filter(
-          (s) => s.event_id === eventId && matchAttendeeWithIdentifier(s, identifierField, extractedIdentifier, caseSensitive)
+          (s) => s.event_id === eventId && matchAttendeeWithIdentifier(s, identifierField, extractedIdentifier, caseSensitive, barcodeConfig)
         );
       }
 
@@ -2956,6 +2962,7 @@ class DatabaseService {
         source,
         client_scan_id: clientScanId || null,
         created_at: checkInTime,
+        updated_at: checkInTime,
       };
 
       if (supabase) {

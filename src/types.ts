@@ -110,14 +110,23 @@ export interface ColumnConfig {
 }
 
 export type BarcodeMatchingMode = 'prefix' | 'suffix' | 'full';
+export type BarcodeExtractionMode = 'custom' | 'full_id' | 'full';
+export type BarcodeExtractionPosition = 'front' | 'end';
 
 export interface BarcodeConfig {
-  mode: BarcodeMatchingMode;
-  value: string;
-  identifier_field: string;
-  case_sensitive: boolean;
+  mode?: BarcodeMatchingMode;
+  value?: string;
+  identifier_field?: string;
+  case_sensitive?: boolean;
   min_length?: number | null;
   max_length?: number | null;
+  enabled?: boolean;
+  extraction_mode?: BarcodeExtractionMode;
+  extraction_position?: BarcodeExtractionPosition;
+  character_count?: number;
+  full_id?: boolean;
+  fixed_prefix?: string | null;
+  fixed_suffix?: string | null;
 }
 
 export interface EventScanConfig {
@@ -187,6 +196,7 @@ export interface Student {
   year?: string;
   section?: string;
   branch?: string;
+  department?: string;
   qr_code: string;
   barcode: string;
   meta?: Record<string, any>;
@@ -328,6 +338,8 @@ export interface ScanValidationResult {
     | 'SCANNER_DISABLED'
     | 'SCANNER_EXPIRED'
     | 'SCANNER_NOT_FOUND'
+    | 'INVALID_BARCODE'
+    | 'ATTENDEE_NOT_FOUND'
     | 'ERROR';
   message: string;
   student?: Student;

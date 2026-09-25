@@ -8,47 +8,93 @@ export type BarcodeValidationResult =
       identifierField: string;
       caseSensitive: boolean;
       originalBarcode: string;
+      message?: string;
+      reason?: string;
     }
   | {
       valid: false;
       reason: 'EMPTY_BARCODE' | 'LENGTH_MISMATCH' | 'PREFIX_MISMATCH' | 'SUFFIX_MISMATCH' | 'EMPTY_IDENTIFIER';
       message: string;
       originalBarcode: string;
+      extractedIdentifier?: string;
     };
+
+/**
+ * Extracts a barcode identifier from a raw attendee ID according to extraction rules.
+ * Supports:
+ * - full_id mode: returns rawId as-is
+ * - custom mode: extracts N characters from front or end
+ * - optional fixed_prefix and fixed_suffix
+ */
+export function extractBarcodeIdentifier(
+  rawId: string,
+  config?: {
+    extraction_mode?: 'custom' | 'full_id' | 'full';
+    extraction_position?: 'front' | 'end';
+    character_count?: number;
+    full_id?: boolean;
+    fixed_prefix?: string | null;
+    fixed_suffix?: string | null;
+  } | null
+): string {
+  if (!rawId) return '';
+  const str = String(rawId).trim();
+  if (!str) return '';
+
+  if (!config) return str;
+
+  const isFull = config.extraction_mode === 'full_id' || config.extraction_mode === 'full' || Boolean(config.full_id);
+  let result = str;
+
+  if (!isFull) {
+    const pos = config.extraction_position || 'front';
+    const count =
+      typeof config.character_count === 'number' && config.character_count > 0
+        ? Math.min(config.character_count, str.length)
+        : str.length;
+
+    if (pos === 'front') {
+      result = str.slice(0, count);
+    } else {
+      result = str.slice(-count);
+    }
+  }
+
+  if (config.fixed_prefix) {
+    result = `${config.fixed_prefix}${result}`;
+  }
+  if (config.fixed_suffix) {
+    result = `${result}${config.fixed_suffix}`;
+  }
+
+  return result;
+}
 
 /**
  * Resolves the active BarcodeConfig from an event, checking both top-level and scan_config,
  * or returning a sensible default.
  */
 export function resolveBarcodeConfig(event?: EventItem | null): BarcodeConfig {
-  if (event?.barcode_config) {
+  const bc = event?.barcode_config || event?.scan_config?.barcode_config;
+  if (bc) {
     return {
-      mode: event.barcode_config.mode || 'full',
-      value: event.barcode_config.value || '',
-      identifier_field:
-        event.barcode_config.identifier_field ||
-        event.barcode_field ||
-        event.primary_scan_field ||
-        'usn',
-      case_sensitive: Boolean(event.barcode_config.case_sensitive),
-      min_length: event.barcode_config.min_length ?? null,
-      max_length: event.barcode_config.max_length ?? null,
-    };
-  }
-
-  if (event?.scan_config?.barcode_config) {
-    const bc = event.scan_config.barcode_config;
-    return {
-      mode: bc.mode || 'full',
-      value: bc.value || '',
+      mode: bc.mode || (bc.extraction_mode === 'custom' ? (bc.extraction_position === 'end' ? 'suffix' : 'prefix') : 'full'),
+      value: bc.value || (bc.fixed_prefix || bc.fixed_suffix || ''),
       identifier_field:
         bc.identifier_field ||
-        event.barcode_field ||
-        event.primary_scan_field ||
+        event?.barcode_field ||
+        event?.primary_scan_field ||
         'usn',
       case_sensitive: Boolean(bc.case_sensitive),
       min_length: bc.min_length ?? null,
       max_length: bc.max_length ?? null,
+      enabled: bc.enabled ?? true,
+      extraction_mode: bc.extraction_mode || (bc.full_id ? 'full_id' : undefined),
+      extraction_position: bc.extraction_position,
+      character_count: bc.character_count,
+      full_id: bc.full_id,
+      fixed_prefix: bc.fixed_prefix ?? null,
+      fixed_suffix: bc.fixed_suffix ?? null,
     };
   }
 
@@ -59,6 +105,8 @@ export function resolveBarcodeConfig(event?: EventItem | null): BarcodeConfig {
     case_sensitive: false,
     min_length: null,
     max_length: null,
+    extraction_mode: 'full_id',
+    full_id: true,
   };
 }
 
@@ -215,7 +263,8 @@ export function matchAttendeeWithIdentifier(
   student: Student,
   identifierField: string,
   identifierValue: string,
-  caseSensitive: boolean = false
+  caseSensitive: boolean = false,
+  barcodeConfig?: BarcodeConfig | null
 ): boolean {
   if (!student || !identifierValue) return false;
 
@@ -227,6 +276,11 @@ export function matchAttendeeWithIdentifier(
 
   const target = normalize(identifierValue);
   if (!target) return false;
+
+  // Direct check against student.barcode
+  if (student.barcode && normalize(student.barcode) === target) {
+    return true;
+  }
 
   // Gather candidate field values from student model
   const fieldKey = identifierField.trim();
@@ -254,5 +308,19 @@ export function matchAttendeeWithIdentifier(
     candidates.push(student.barcode);
   }
 
-  return candidates.some((c) => c !== undefined && c !== null && normalize(c) === target);
+  // 1. Direct match
+  if (candidates.some((c) => c !== undefined && c !== null && normalize(c) === target)) {
+    return true;
+  }
+
+  // 2. Extracted match if custom extraction config is present
+  if (barcodeConfig && barcodeConfig.extraction_mode === 'custom') {
+    return candidates.some((c) => {
+      if (c === undefined || c === null) return false;
+      const extracted = extractBarcodeIdentifier(String(c), barcodeConfig);
+      return normalize(extracted) === target;
+    });
+  }
+
+  return false;
 }
