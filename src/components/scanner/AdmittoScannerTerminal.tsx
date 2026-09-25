@@ -445,24 +445,31 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 p-4">
           <motion.div
             layout
-            key={scanType}
-            initial={{ scale: 0.92, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.92, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-            className={`relative rounded-2xl sm:rounded-3xl transition-all duration-300 flex items-center justify-center ${
+            animate={
+              isInvalid
+                ? { x: [-8, 8, -6, 6, -3, 3, 0], scale: 1 }
+                : isSuccess
+                ? { scale: [1, 1.03, 1] }
+                : { x: 0, scale: 1 }
+            }
+            transition={{
+              layout: { type: 'spring', stiffness: 340, damping: 28 },
+              x: { duration: 0.4 },
+              scale: { duration: 0.3 },
+            }}
+            className={`relative rounded-2xl sm:rounded-3xl transition-colors duration-300 flex items-center justify-center overflow-hidden ${
               scanType === 'QR'
                 ? 'w-[200px] h-[200px] sm:w-[230px] sm:h-[230px] max-w-[72%] max-h-[78%] aspect-square'
                 : 'w-[280px] h-[120px] sm:w-[320px] sm:h-[135px] max-w-[88%] max-h-[60%]'
             } ${
               isSuccess
-                ? 'border-2 border-emerald-400 shadow-[0_0_35px_rgba(52,211,153,0.45)]'
+                ? 'border-2 border-emerald-400 shadow-[0_0_35px_rgba(52,211,153,0.5)]'
                 : isDuplicate
-                ? 'border-2 border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.45)]'
+                ? 'border-2 border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.5)]'
                 : isInvalid
-                ? 'border-2 border-rose-400 shadow-[0_0_35px_rgba(244,63,94,0.45)]'
+                ? 'border-2 border-rose-400 shadow-[0_0_35px_rgba(244,63,94,0.5)]'
                 : isProcessing
-                ? 'border-2 border-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.45)]'
+                ? 'border-2 border-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.5)]'
                 : scanType === 'QR'
                 ? 'border-2 border-indigo-400/80 shadow-[0_0_25px_rgba(99,102,241,0.35)]'
                 : 'border-2 border-purple-400/80 shadow-[0_0_25px_rgba(168,85,247,0.35)]'
@@ -470,7 +477,7 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
           >
             {/* 4 Emphasized Corner Brackets */}
             <div
-              className={`absolute -top-1.5 -left-1.5 w-6 h-6 border-t-4 border-l-4 rounded-tl-xl transition-colors ${
+              className={`absolute -top-1.5 -left-1.5 w-6 h-6 border-t-4 border-l-4 rounded-tl-xl transition-colors duration-300 ${
                 isSuccess
                   ? 'border-emerald-400'
                   : isDuplicate
@@ -485,7 +492,7 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
               }`}
             />
             <div
-              className={`absolute -top-1.5 -right-1.5 w-6 h-6 border-t-4 border-r-4 rounded-tr-xl transition-colors ${
+              className={`absolute -top-1.5 -right-1.5 w-6 h-6 border-t-4 border-r-4 rounded-tr-xl transition-colors duration-300 ${
                 isSuccess
                   ? 'border-emerald-400'
                   : isDuplicate
@@ -500,7 +507,7 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
               }`}
             />
             <div
-              className={`absolute -bottom-1.5 -left-1.5 w-6 h-6 border-b-4 border-l-4 rounded-bl-xl transition-colors ${
+              className={`absolute -bottom-1.5 -left-1.5 w-6 h-6 border-b-4 border-l-4 rounded-bl-xl transition-colors duration-300 ${
                 isSuccess
                   ? 'border-emerald-400'
                   : isDuplicate
@@ -515,7 +522,7 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
               }`}
             />
             <div
-              className={`absolute -bottom-1.5 -right-1.5 w-6 h-6 border-b-4 border-r-4 rounded-br-xl transition-colors ${
+              className={`absolute -bottom-1.5 -right-1.5 w-6 h-6 border-b-4 border-r-4 rounded-br-xl transition-colors duration-300 ${
                 isSuccess
                   ? 'border-emerald-400'
                   : isDuplicate
@@ -530,30 +537,100 @@ export const AdmittoScannerTerminal: React.FC<AdmittoScannerTerminalProps> = ({
               }`}
             />
 
-            {/* Smooth Animated Laser Sweep */}
+            {/* Mode-Specific Guides: QR Matrix Targeting vs 1D Linear Barcode Guideline */}
+            {scanType === 'QR' ? (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
+                {/* Center Aiming Crosshair */}
+                <div className="relative w-6 h-6 flex items-center justify-center">
+                  <div className="w-2.5 h-2.5 rounded-full border border-indigo-300/80 animate-ping" />
+                  <div className="absolute w-1 h-1 rounded-full bg-indigo-300" />
+                  <div className="absolute w-6 h-[1px] bg-indigo-400/30" />
+                  <div className="absolute h-6 w-[1px] bg-indigo-400/30" />
+                </div>
+                {/* Corner Mini Target Finders */}
+                <div className="absolute top-3 left-3 w-3 h-3 border border-indigo-400/40 rounded-xs" />
+                <div className="absolute top-3 right-3 w-3 h-3 border border-indigo-400/40 rounded-xs" />
+                <div className="absolute bottom-3 left-3 w-3 h-3 border border-indigo-400/40 rounded-xs" />
+              </div>
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                {/* Horizontal Alignment Guideline */}
+                <div className="w-full border-b border-dashed border-purple-400/40" />
+                {/* Subtle Barcode Line Motif */}
+                <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 flex items-center justify-between text-[11px] font-mono text-purple-300/20 tracking-widest select-none">
+                  <span>||| | || |||| | || |||| | |||</span>
+                </div>
+              </div>
+            )}
+
+            {/* Smooth High-Precision Laser Sweep with Light Fan & Hotspot */}
             <motion.div
               animate={{
-                top: ['8%', '92%', '8%'],
+                top: ['6%', '92%', '6%'],
               }}
               transition={{
-                duration: isProcessing ? 1.0 : 2.2,
+                duration: isProcessing ? 0.9 : 2.0,
                 repeat: Infinity,
                 ease: 'easeInOut',
               }}
-              className={`absolute left-2 right-2 h-0.5 rounded-full transition-all ${
-                isSuccess
-                  ? 'bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_14px_#34d399]'
-                  : isDuplicate
-                  ? 'bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-[0_0_14px_#fbbf24]'
-                  : isInvalid
-                  ? 'bg-gradient-to-r from-transparent via-rose-400 to-transparent shadow-[0_0_14px_#f43f5e]'
-                  : isProcessing
-                  ? 'bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_16px_#22d3ee]'
-                  : scanType === 'QR'
-                  ? 'bg-gradient-to-r from-transparent via-indigo-400 to-transparent shadow-[0_0_12px_#818cf8]'
-                  : 'bg-gradient-to-r from-transparent via-purple-400 to-transparent shadow-[0_0_12px_#c084fc]'
-              }`}
-            />
+              style={{ willChange: 'top' }}
+              className="absolute inset-x-1.5 pointer-events-none z-20 flex flex-col items-center -translate-y-1/2"
+            >
+              {/* Trailing Optical Light Fan / Aura */}
+              <div
+                className={`w-full h-7 sm:h-9 transition-colors duration-300 pointer-events-none ${
+                  isSuccess
+                    ? 'bg-gradient-to-t from-emerald-400/30 to-transparent'
+                    : isDuplicate
+                    ? 'bg-gradient-to-t from-amber-400/30 to-transparent'
+                    : isInvalid
+                    ? 'bg-gradient-to-t from-rose-400/30 to-transparent'
+                    : isProcessing
+                    ? 'bg-gradient-to-t from-cyan-400/35 to-transparent'
+                    : scanType === 'QR'
+                    ? 'bg-gradient-to-t from-indigo-400/25 to-transparent'
+                    : 'bg-gradient-to-t from-purple-400/25 to-transparent'
+                }`}
+              />
+              {/* Laser Core Blade */}
+              <div
+                className={`w-full h-[2.5px] rounded-full transition-colors duration-300 relative shadow-lg ${
+                  isSuccess
+                    ? 'bg-emerald-400 shadow-[0_0_18px_#34d399,0_0_6px_#10b981]'
+                    : isDuplicate
+                    ? 'bg-amber-400 shadow-[0_0_18px_#fbbf24,0_0_6px_#f59e0b]'
+                    : isInvalid
+                    ? 'bg-rose-400 shadow-[0_0_18px_#f43f5e,0_0_6px_#ef4444]'
+                    : isProcessing
+                    ? 'bg-cyan-400 shadow-[0_0_20px_#22d3ee,0_0_8px_#06b6d4]'
+                    : scanType === 'QR'
+                    ? 'bg-gradient-to-r from-transparent via-indigo-300 to-transparent shadow-[0_0_16px_#818cf8,0_0_6px_#6366f1]'
+                    : 'bg-gradient-to-r from-transparent via-purple-300 to-transparent shadow-[0_0_16px_#c084fc,0_0_6px_#a855f7]'
+                }`}
+              >
+                {/* Center Hotspot Flare */}
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-1.5 bg-white rounded-full blur-[0.5px] shadow-[0_0_8px_#ffffff]" />
+              </div>
+            </motion.div>
+
+            {/* Instant Affirmative Flash Wave on Scan Result */}
+            <AnimatePresence>
+              {(isSuccess || isDuplicate || isInvalid) && (
+                <motion.div
+                  initial={{ opacity: 0.6, scale: 0.96 }}
+                  animate={{ opacity: 0, scale: 1.04 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.5, ease: 'easeOut' }}
+                  className={`absolute inset-0 rounded-2xl sm:rounded-3xl pointer-events-none ${
+                    isSuccess
+                      ? 'bg-emerald-400/20'
+                      : isDuplicate
+                      ? 'bg-amber-400/20'
+                      : 'bg-rose-400/20'
+                  }`}
+                />
+              )}
+            </AnimatePresence>
           </motion.div>
         </div>
 

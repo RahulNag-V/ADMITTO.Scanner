@@ -704,7 +704,7 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
       isCurrent = false;
       stopCameraScanner();
     };
-  }, [activeTab, scanType, prefs.facingMode]);
+  }, [activeTab, prefs.facingMode]);
 
   const stopCameraScanner = async () => {
     if (!qrReaderRef.current) return;
