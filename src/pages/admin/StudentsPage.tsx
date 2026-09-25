@@ -135,29 +135,15 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const [singleName, setSingleName] = useState('');
   const [singleEmail, setSingleEmail] = useState('');
   const [singlePhone, setSinglePhone] = useState('');
-  const [singleBranch, setSingleBranch] = useState(preset.defaultGroupingValue || 'General');
-  const [singleYear, setSingleYear] = useState(preset.defaultSubGroupingValue || 'General');
-  const [singleSection, setSingleSection] = useState(preset.defaultDivisionValue || 'A');
+  const [singleBranch, setSingleBranch] = useState('');
+  const [singleYear, setSingleYear] = useState('');
+  const [singleSection, setSingleSection] = useState('');
   const [singleBarcode, setSingleBarcode] = useState('');
   const [customFields, setCustomFields] = useState<Array<{ id: string; key: string; value: string }>>([]);
   const [batchAddedCount, setBatchAddedCount] = useState(0);
   const [lastAddedAttendee, setLastAddedAttendee] = useState<{ name: string; usn: string } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const singleUsnInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (preset) {
-      if (preset.defaultGroupingValue && (!singleBranch || singleBranch === 'Computer Science' || singleBranch === 'General')) {
-        setSingleBranch(preset.defaultGroupingValue);
-      }
-      if (preset.defaultSubGroupingValue && (!singleYear || singleYear === '2026' || singleYear === 'General')) {
-        setSingleYear(preset.defaultSubGroupingValue);
-      }
-      if (preset.defaultDivisionValue && (!singleSection || singleSection === 'A')) {
-        setSingleSection(preset.defaultDivisionValue);
-      }
-    }
-  }, [preset]);
 
   // 5-Step Attendee Identification & QR Configuration Wizard State
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -373,6 +359,9 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
           setSingleName('');
           setSingleEmail('');
           setSinglePhone('');
+          setSingleBranch('');
+          setSingleYear('');
+          setSingleSection('');
           setSingleBarcode('');
           setCustomFields([]);
         }

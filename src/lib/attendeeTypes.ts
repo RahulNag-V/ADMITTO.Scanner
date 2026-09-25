@@ -42,9 +42,6 @@ export const ATTENDEE_TYPE_PRESETS: AttendeeTypePreset[] = [
     subGroupingPlaceholder: 'e.g. 2026 or 4th Year',
     divisionLabel: 'Section',
     divisionPlaceholder: 'e.g. A, B, C',
-    defaultGroupingValue: 'Computer Science',
-    defaultSubGroupingValue: '2026',
-    defaultDivisionValue: 'A',
   },
   {
     id: 'EMPLOYEES',
@@ -64,9 +61,6 @@ export const ATTENDEE_TYPE_PRESETS: AttendeeTypePreset[] = [
     subGroupingPlaceholder: 'e.g. Senior Lead, Staff',
     divisionLabel: 'Office / Location',
     divisionPlaceholder: 'e.g. HQ, Floor 4, Remote',
-    defaultGroupingValue: 'Engineering',
-    defaultSubGroupingValue: 'Staff',
-    defaultDivisionValue: 'HQ',
   },
   {
     id: 'GUESTS',
@@ -86,9 +80,6 @@ export const ATTENDEE_TYPE_PRESETS: AttendeeTypePreset[] = [
     subGroupingPlaceholder: 'e.g. Table 4, Row B',
     divisionLabel: 'Gate / Access Zone',
     divisionPlaceholder: 'e.g. Gate 1, Lounge A',
-    defaultGroupingValue: 'General Access',
-    defaultSubGroupingValue: 'General',
-    defaultDivisionValue: 'Gate 1',
   },
   {
     id: 'DELEGATES',
@@ -108,9 +99,6 @@ export const ATTENDEE_TYPE_PRESETS: AttendeeTypePreset[] = [
     subGroupingPlaceholder: 'e.g. Director, Speaker',
     divisionLabel: 'Track / Hall',
     divisionPlaceholder: 'e.g. Main Hall, Track 2',
-    defaultGroupingValue: 'Delegate',
-    defaultSubGroupingValue: 'Delegate',
-    defaultDivisionValue: 'Main Hall',
   },
   {
     id: 'PARTICIPANTS',
@@ -130,9 +118,6 @@ export const ATTENDEE_TYPE_PRESETS: AttendeeTypePreset[] = [
     subGroupingPlaceholder: 'e.g. Team Alpha',
     divisionLabel: 'Role / Seat',
     divisionPlaceholder: 'e.g. Team Lead, Member',
-    defaultGroupingValue: 'General Track',
-    defaultSubGroupingValue: 'Solo',
-    defaultDivisionValue: 'Participant',
   },
   {
     id: 'ATTENDEES',
@@ -152,9 +137,6 @@ export const ATTENDEE_TYPE_PRESETS: AttendeeTypePreset[] = [
     subGroupingPlaceholder: 'e.g. Community Member',
     divisionLabel: 'Access Zone',
     divisionPlaceholder: 'e.g. General, Hall A',
-    defaultGroupingValue: 'General',
-    defaultSubGroupingValue: 'General',
-    defaultDivisionValue: 'Main',
   },
   {
     id: 'CUSTOM',
@@ -174,9 +156,6 @@ export const ATTENDEE_TYPE_PRESETS: AttendeeTypePreset[] = [
     subGroupingPlaceholder: 'e.g. Gold, Premium',
     divisionLabel: 'Status / Division',
     divisionPlaceholder: 'e.g. Active, Batch A',
-    defaultGroupingValue: 'Member',
-    defaultSubGroupingValue: 'Standard',
-    defaultDivisionValue: 'Active',
   },
 ];
 
