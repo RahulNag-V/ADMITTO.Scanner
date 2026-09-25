@@ -54,6 +54,8 @@ import {
   Hash,
   Calendar,
   ListFilter,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import {
   Student,
@@ -183,6 +185,13 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
   const [uniquenessResult, setUniquenessResult] = useState<UniquenessValidationResult | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    stage: string;
+    percent: number;
+    current: number;
+    total: number;
+  } | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<{ imported: number; duplicates?: number; errors: any[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -771,6 +780,13 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const handleCommitImport = async () => {
     if (!rawSpreadsheetRows || rawSpreadsheetRows.length === 0) return;
     setIsImporting(true);
+    setImportError(null);
+    setImportProgress({
+      stage: 'Preparing attendee records...',
+      percent: 15,
+      current: 0,
+      total: rawSpreadsheetRows.length,
+    });
 
     try {
       const getColVal = (row: Record<string, any>, colCandidates: string[], fallback = ''): string => {
@@ -813,14 +829,71 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         is_uniqueness_verified: uniquenessResult?.is_unique ?? true,
       };
 
-      const res = await studentsApi.importCsv(eventId, preparedAttendees, scanConfig);
-      setImportSummary({ imported: res.imported, duplicates: res.duplicates, errors: res.errors || [] });
+      setImportProgress({
+        stage: 'Generating 128-bit cryptographic tokens & barcodes...',
+        percent: 45,
+        current: Math.floor(rawSpreadsheetRows.length * 0.4),
+        total: rawSpreadsheetRows.length,
+      });
+
+      // Batching for reliability and progressive UI updates
+      const BATCH_SIZE = 150;
+      let totalImported = 0;
+      let totalDuplicates = 0;
+      const allErrors: string[] = [];
+
+      if (preparedAttendees.length <= BATCH_SIZE) {
+        setImportProgress({
+          stage: 'Syncing roster and scan configuration...',
+          percent: 75,
+          current: preparedAttendees.length,
+          total: preparedAttendees.length,
+        });
+        const res = await studentsApi.importCsv(eventId, preparedAttendees, scanConfig);
+        totalImported = res.imported;
+        totalDuplicates = res.duplicates;
+        if (res.errors) allErrors.push(...res.errors);
+      } else {
+        const totalBatches = Math.ceil(preparedAttendees.length / BATCH_SIZE);
+        for (let b = 0; b < totalBatches; b++) {
+          const chunk = preparedAttendees.slice(b * BATCH_SIZE, (b + 1) * BATCH_SIZE);
+          const currentProcessed = Math.min((b + 1) * BATCH_SIZE, preparedAttendees.length);
+          const currentPercent = Math.round(50 + ((b + 1) / totalBatches) * 45);
+
+          setImportProgress({
+            stage: `Importing batch ${b + 1} of ${totalBatches} (${currentProcessed}/${preparedAttendees.length})...`,
+            percent: currentPercent,
+            current: currentProcessed,
+            total: preparedAttendees.length,
+          });
+
+          const res = await studentsApi.importCsv(
+            eventId,
+            chunk,
+            b === 0 ? scanConfig : undefined
+          );
+          totalImported += res.imported;
+          totalDuplicates += res.duplicates;
+          if (res.errors) allErrors.push(...res.errors);
+        }
+      }
+
+      setImportProgress({
+        stage: 'Finalizing attendee passes...',
+        percent: 100,
+        current: rawSpreadsheetRows.length,
+        total: rawSpreadsheetRows.length,
+      });
+
+      setImportSummary({ imported: totalImported, duplicates: totalDuplicates, errors: allErrors });
       saveLocalSchema(eventId, columns, scanConfig.dataset_name);
-      loadStudents();
+      await loadStudents();
     } catch (err: any) {
-      alert(err.message || 'Import failed');
+      console.error('Import failed:', err);
+      setImportError(err.message || 'Import failed. Please verify your connection or try again.');
     } finally {
       setIsImporting(false);
+      setImportProgress(null);
     }
   };
 
@@ -2440,94 +2513,173 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
             )}
 
             {/* ======================================================== */}
-            {/* STEP 5: REVIEW & SAVE CONFIGURATION */}
+            {/* STEP 5: REVIEW & SAVE CONFIGURATION / LOADING / ERROR */}
             {/* ======================================================== */}
             {wizardStep === 5 && !importSummary && (
-              <div className="space-y-5">
-                <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                    <span className="text-xs font-bold text-white uppercase tracking-wider">
-                      Configuration Summary
-                    </span>
-                    <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      ✓ Validated 100% Unique
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="space-y-1">
-                      <div className="text-zinc-500 text-[10px] uppercase">Primary Scanning Key</div>
-                      <div className="font-bold text-orange-400 font-mono">{primaryKeyField}</div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="text-zinc-500 text-[10px] uppercase">Secondary Verification</div>
-                      <div className="font-bold text-white font-mono">{secondaryKeyField || 'None (Single Key)'}</div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="text-zinc-500 text-[10px] uppercase">QR Code Mode</div>
-                      <div className="font-bold text-white font-mono">
-                        {qrMode === 'SECURE_TOKEN' ? 'Secure Attendee Token' : 'Full Attendee Data (Embedded)'}
+              <div>
+                {isImporting ? (
+                  /* Dedicated Full-Screen Loading & Progress View */
+                  <div className="bg-zinc-950/80 border border-white/10 rounded-3xl p-8 sm:p-10 text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="relative w-16 h-16 mx-auto">
+                      <div className="absolute inset-0 rounded-full bg-orange-500/20 blur-xl animate-pulse" />
+                      <div className="relative w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <div className="text-zinc-500 text-[10px] uppercase">Barcode Target</div>
-                      <div className="font-bold text-white font-mono">{barcodeField}</div>
+
+                    <div className="space-y-1.5 max-w-md mx-auto">
+                      <h4 className="text-lg sm:text-xl font-bold text-white font-['Space_Grotesk']">
+                        Importing & Generating Tokens...
+                      </h4>
+                      <p className="text-xs text-zinc-400">
+                        Generating 128-bit cryptographically secure QR passes and storing records in the attendee database.
+                      </p>
+                    </div>
+
+                    {/* Progress Bar & Details */}
+                    <div className="space-y-2.5 max-w-md mx-auto">
+                      <div className="flex items-center justify-between text-xs text-zinc-400 font-medium">
+                        <span className="text-orange-300 font-mono text-[11px] truncate">
+                          {importProgress?.stage || 'Processing attendee records...'}
+                        </span>
+                        <span className="font-mono text-[11px] text-zinc-200 shrink-0 font-bold">
+                          {importProgress?.percent ?? 45}%
+                        </span>
+                      </div>
+                      <div className="w-full h-3 rounded-full bg-white/[0.08] overflow-hidden p-0.5 border border-white/10">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-300 shadow-sm shadow-orange-500/50"
+                          style={{ width: `${importProgress?.percent ?? 45}%` }}
+                        />
+                      </div>
+                      <div className="text-[11px] text-zinc-500 flex items-center justify-between">
+                        <span>{importProgress?.current ? `${importProgress.current} of ${importProgress.total} records` : `${rawSpreadsheetRows.length} attendees`}</span>
+                        <span>Please do not close this window</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5 text-[11px] text-zinc-400 max-w-sm mx-auto flex items-center justify-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>CSPRNG encryption & duplicate prevention active</span>
                     </div>
                   </div>
-                </div>
-
-                {/* Attendee Roster Preview Table */}
-                <div className="space-y-2">
-                  <div className="text-xs font-bold text-zinc-300">
-                    Attendee Preview ({rawSpreadsheetRows.length} records ready to import):
+                ) : importError ? (
+                  /* Import Error & Retry View */
+                  <div className="bg-rose-950/40 border border-rose-500/30 rounded-3xl p-8 text-center space-y-4 animate-in fade-in duration-200">
+                    <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mx-auto text-rose-400">
+                      <AlertCircle className="w-7 h-7" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-lg font-bold text-white">Import Failed</h4>
+                      <p className="text-xs text-rose-300 max-w-md mx-auto">{importError}</p>
+                    </div>
+                    <div className="flex items-center justify-center gap-3 pt-3">
+                      <button
+                        type="button"
+                        onClick={() => setImportError(null)}
+                        className="px-4 py-2 rounded-xl bg-zinc-800 text-xs font-semibold text-zinc-300 hover:text-white cursor-pointer"
+                      >
+                        Back to Review
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCommitImport}
+                        className="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white shadow-lg cursor-pointer flex items-center gap-2"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Try Again</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="border border-zinc-800 rounded-2xl max-h-48 overflow-y-auto">
-                    <table className="w-full text-left text-[11px]">
-                      <thead className="bg-zinc-900 text-zinc-400 sticky top-0">
-                        <tr>
-                          <th className="p-2.5">{primaryKeyField} (Primary)</th>
-                          <th className="p-2.5">Name</th>
-                          {secondaryKeyField && <th className="p-2.5">{secondaryKeyField} (Sec)</th>}
-                          <th className="p-2.5">Department</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-800">
-                        {rawSpreadsheetRows.slice(0, 10).map((r, i) => (
-                          <tr key={i} className="hover:bg-zinc-800/30">
-                            <td className="p-2.5 font-mono text-orange-400 font-bold">
-                              {r[primaryKeyField] || r.usn || '-'}
-                            </td>
-                            <td className="p-2.5 text-white">{r.name || r.Name || 'Attendee'}</td>
-                            {secondaryKeyField && (
-                              <td className="p-2.5 text-zinc-300 font-mono">{r[secondaryKeyField] || '-'}</td>
-                            )}
-                            <td className="p-2.5 text-zinc-400">{r.branch || r.department || r.dept || 'General'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                ) : (
+                  /* Standard Step 5 Review & Save View */
+                  <div className="space-y-5">
+                    <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 space-y-4">
+                      <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">
+                          Configuration Summary
+                        </span>
+                        <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          ✓ Validated 100% Unique
+                        </span>
+                      </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-zinc-800">
-                  <button
-                    type="button"
-                    onClick={() => setWizardStep(4)}
-                    className="px-4 py-2 rounded-xl bg-zinc-800 text-xs font-bold text-zinc-300 hover:text-white cursor-pointer flex items-center gap-1.5"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    <span>Back</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCommitImport}
-                    disabled={isImporting}
-                    className="px-6 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white shadow-lg shadow-orange-500/25 cursor-pointer flex items-center gap-2"
-                  >
-                    <Save className={`w-3.5 h-3.5 ${isImporting ? 'animate-spin' : ''}`} />
-                    <span>{isImporting ? 'Importing & Generating Tokens...' : `Save Configuration & Commit ${rawSpreadsheetRows.length} Attendees`}</span>
-                  </button>
-                </div>
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="space-y-1">
+                          <div className="text-zinc-500 text-[10px] uppercase">Primary Scanning Key</div>
+                          <div className="font-bold text-orange-400 font-mono">{primaryKeyField}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-zinc-500 text-[10px] uppercase">Secondary Verification</div>
+                          <div className="font-bold text-white font-mono">{secondaryKeyField || 'None (Single Key)'}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-zinc-500 text-[10px] uppercase">QR Code Mode</div>
+                          <div className="font-bold text-white font-mono">
+                            {qrMode === 'SECURE_TOKEN' ? 'Secure Attendee Token' : 'Full Attendee Data (Embedded)'}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-zinc-500 text-[10px] uppercase">Barcode Target</div>
+                          <div className="font-bold text-white font-mono">{barcodeField}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Attendee Roster Preview Table */}
+                    <div className="space-y-2">
+                      <div className="text-xs font-bold text-zinc-300">
+                        Attendee Preview ({rawSpreadsheetRows.length} records ready to import):
+                      </div>
+                      <div className="border border-zinc-800 rounded-2xl max-h-48 overflow-y-auto">
+                        <table className="w-full text-left text-[11px]">
+                          <thead className="bg-zinc-900 text-zinc-400 sticky top-0">
+                            <tr>
+                              <th className="p-2.5">{primaryKeyField} (Primary)</th>
+                              <th className="p-2.5">Name</th>
+                              {secondaryKeyField && <th className="p-2.5">{secondaryKeyField} (Sec)</th>}
+                              <th className="p-2.5">Department</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-800">
+                            {rawSpreadsheetRows.slice(0, 10).map((r, i) => (
+                              <tr key={i} className="hover:bg-zinc-800/30">
+                                <td className="p-2.5 font-mono text-orange-400 font-bold">
+                                  {r[primaryKeyField] || r.usn || '-'}
+                                </td>
+                                <td className="p-2.5 text-white">{r.name || r.Name || 'Attendee'}</td>
+                                {secondaryKeyField && (
+                                  <td className="p-2.5 text-zinc-300 font-mono">{r[secondaryKeyField] || '-'}</td>
+                                )}
+                                <td className="p-2.5 text-zinc-400">{r.branch || r.department || r.dept || 'General'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-zinc-800">
+                      <button
+                        type="button"
+                        onClick={() => setWizardStep(4)}
+                        className="px-4 py-2 rounded-xl bg-zinc-800 text-xs font-bold text-zinc-300 hover:text-white cursor-pointer flex items-center gap-1.5"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <span>Back</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCommitImport}
+                        disabled={isImporting}
+                        className="px-6 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white shadow-lg shadow-orange-500/25 cursor-pointer flex items-center gap-2"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Save Configuration & Commit {rawSpreadsheetRows.length} Attendees</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
