@@ -1,8 +1,9 @@
 import { registerSW } from 'virtual:pwa-register';
 
 export function setupPWA() {
-  if ('serviceWorker' in navigator) {
+  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     const updateSW = registerSW({
+      immediate: true,
       onNeedRefresh() {
         console.log('[PWA] New content available, updating automatically.');
         updateSW(true);
