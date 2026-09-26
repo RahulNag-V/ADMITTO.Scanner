@@ -89,8 +89,17 @@ jobs:
           ls -la dist
           ls -la dist/assets
 
+      - name: Deploy to gh-pages branch (Dual-Hosting & Fallback Support)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          keep_files: false
+          force_orphan: true
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
+        continue-on-error: true
 
       - name: Upload GitHub Pages Artifact
         uses: actions/upload-pages-artifact@v3
@@ -100,3 +109,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
