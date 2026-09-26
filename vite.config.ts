@@ -52,7 +52,7 @@ export default defineConfig(({ command, mode }) => {
       },
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.png', 'logo.png'],
+        includeAssets: ['favicon.png', 'logo.png', 'peeps.png'],
         manifest: {
           name: 'ADMITTO — Digital Event Access & Token Validation',
           short_name: 'ADMITTO Scanner',
@@ -75,6 +75,10 @@ export default defineConfig(({ command, mode }) => {
           ],
         },
         workbox: {
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
+          dontCacheBustURLsMatching: /\.[0-9a-f]{8}\./,
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
           runtimeCaching: [
@@ -104,6 +108,19 @@ export default defineConfig(({ command, mode }) => {
         },
       }),
     ],
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+      sourcemap: false,
+      cssCodeSplit: true,
+      rollupOptions: {
+        output: {
+          entryFileNames: 'assets/[name]-[hash].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash].[ext]',
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

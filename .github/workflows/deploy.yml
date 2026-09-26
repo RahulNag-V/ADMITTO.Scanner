@@ -34,6 +34,9 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Clean Previous Build Artifacts
+        run: rm -rf dist
+
       - name: Build Vite Production Frontend
         run: npm run build:client
         env:
@@ -42,6 +45,43 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL || 'https://vifgaafjgzahqxuxtdar.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY || 'sb_publishable_N40WjzqQ56ZVFuBdDKs34Q_Hopg04S2' }}
           VITE_API_URL: ${{ vars.VITE_API_URL != '' && vars.VITE_API_URL || 'https://admitto-scanner.onrender.com' }}
+
+      - name: Verify Production Build
+        run: |
+          echo "=== Verifying Production Build Output in dist/ ==="
+          if [ ! -d "dist" ]; then
+            echo "ERROR: dist/ directory does not exist!"
+            exit 1
+          fi
+          if [ ! -f "dist/index.html" ]; then
+            echo "ERROR: dist/index.html does not exist!"
+            exit 1
+          fi
+          if [ ! -f "dist/404.html" ]; then
+            echo "ERROR: dist/404.html does not exist for GitHub Pages SPA routing!"
+            exit 1
+          fi
+
+          # Verify generated hashed JS and CSS assets
+          JS_COUNT=$(find dist/assets -maxdepth 1 -name "index-*.js" | wc -l)
+          CSS_COUNT=$(find dist/assets -maxdepth 1 -name "index-*.css" | wc -l)
+
+          if [ "$JS_COUNT" -eq 0 ]; then
+            echo "ERROR: No hashed JS bundle (index-*.js) found in dist/assets!"
+            exit 1
+          fi
+          if [ "$CSS_COUNT" -eq 0 ]; then
+            echo "ERROR: No hashed CSS bundle (index-*.css) found in dist/assets!"
+            exit 1
+          fi
+
+          echo "SUCCESS: Production build verified cleanly."
+          echo "  - dist/index.html exists"
+          echo "  - dist/404.html exists"
+          echo "  - Found $JS_COUNT hashed JS bundle(s)"
+          echo "  - Found $CSS_COUNT hashed CSS bundle(s)"
+          ls -la dist
+          ls -la dist/assets
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
