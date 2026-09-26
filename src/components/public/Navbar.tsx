@@ -120,24 +120,12 @@ export const Navbar: React.FC<NavbarProps> = ({
     <>
       <header
         id="navbar-header"
-        className={`fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300 transform ease-in-out ${
+        className={`fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300 transform ease-in-out border-b border-[#314A56] bg-[#10232D] ${
           isNavVisible || isMobileMenuOpen
             ? 'translate-y-0 opacity-100'
             : '-translate-y-full opacity-0 pointer-events-none'
-        } ${
-          isScrolled
-            ? 'backdrop-blur-2xl bg-[#0a0a0f]/90 border-b border-white/[0.14] shadow-[0_12px_32px_rgba(0,0,0,0.55)]'
-            : 'backdrop-blur-xl bg-[#0a0a0f]/75 border-b border-white/[0.08]'
         }`}
       >
-        {/* Floating Liquid Aurora Background inside Header */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10">
-          <div className="absolute -top-10 left-1/4 w-60 h-24 bg-indigo-600/25 rounded-full blur-2xl animate-pulse" />
-          <div className="absolute -top-6 right-1/3 w-48 h-20 bg-purple-600/25 rounded-full blur-2xl animate-[pulse_4s_infinite]" />
-          <div className="absolute -bottom-6 right-12 w-40 h-16 bg-pink-600/20 rounded-full blur-xl animate-pulse" />
-          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/40 via-purple-500/40 to-transparent" />
-        </div>
-
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between relative z-10">
           {/* Logo & Mobile Current Page Badge */}
           <div className="flex items-center gap-3">
@@ -149,28 +137,28 @@ export const Navbar: React.FC<NavbarProps> = ({
               <AppLogo size="sm" className="group-hover:scale-105" />
               <div className="flex flex-col justify-center">
                 <div className="flex items-center gap-2">
-                  <span className="text-base sm:text-xl font-bold tracking-tight text-white font-['Space_Grotesk'] leading-none">
+                  <span className="text-base sm:text-xl font-bold tracking-tight text-[#ECEEF0] font-['Poppins'] leading-none">
                     ADMITTO
                   </span>
-                  <span className="hidden sm:inline-block text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
+                  <span className="hidden sm:inline-block text-[9px] uppercase font-semibold tracking-wider px-2 py-0.5 rounded-[6px] bg-[#FFE3A6]/10 text-[#FFE3A6] border border-[#FFE3A6]/30">
                     Pro
                   </span>
                 </div>
-                <span className="hidden sm:block text-[10px] sm:text-[11px] text-slate-400 font-medium tracking-wide mt-0.5 leading-none">
+                <span className="hidden sm:block text-[10px] sm:text-[11px] text-[#8A9BA8] font-medium tracking-wide mt-0.5 leading-none">
                   Digital Event Access
                 </span>
               </div>
             </div>
 
             {/* Mobile Active Page Indicator Pill */}
-            <div className="flex lg:hidden items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/35 text-indigo-300 text-[10px] sm:text-[11px] font-bold shrink-0 animate-in fade-in">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+            <div className="flex lg:hidden items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-[#FFE3A6]/10 border border-[#FFE3A6]/30 text-[#FFE3A6] text-[10px] sm:text-[11px] font-semibold shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FFE3A6]" />
               <span>{currentLink.label}</span>
             </div>
           </div>
 
-          {/* Desktop Nav Links with Liquid Morphing Capsule */}
-          <nav id="desktop-nav-links" className="hidden lg:flex items-center gap-1.5 p-1 rounded-2xl glass-dark relative">
+          {/* Desktop Nav Links with Clean Minimal Container */}
+          <nav id="desktop-nav-links" className="hidden lg:flex items-center gap-1 p-1 rounded-[10px] bg-[#1B303A] border border-[#314A56] relative">
             {navLinks.map((link) => {
               const isActive = currentPath === link.path;
               return (
@@ -178,20 +166,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                   key={link.path}
                   id={`nav-link-${link.path.replace('/', '') || 'home'}`}
                   onClick={() => handleLinkClick(link.path)}
-                  className={`relative px-4 py-2 rounded-xl text-xs font-medium transition-colors duration-150 flex items-center gap-2 cursor-pointer z-10 select-none ${
+                  className={`relative px-3.5 py-1.5 rounded-[8px] text-xs font-medium transition-colors duration-150 flex items-center gap-2 cursor-pointer z-10 select-none ${
                     isActive
-                      ? 'text-white font-bold'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+                      ? 'text-[#10232D] font-semibold'
+                      : 'text-[#8A9BA8] hover:text-[#ECEEF0]'
                   }`}
                 >
                   {isActive && (
                     <motion.div
                       layoutId="public-active-nav-pill"
-                      className="absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-500/25 via-purple-500/30 to-pink-500/20 border border-indigo-400/40 shadow-[0_0_15px_rgba(99,102,241,0.25)] backdrop-blur-md -z-10"
+                      className="absolute inset-0 rounded-[8px] bg-[#FFE3A6] -z-10"
                       transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                     />
                   )}
-                  {isActive && <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-sm shadow-indigo-400/50" />}
                   <span>{link.label}</span>
                 </button>
               );
@@ -433,32 +420,32 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   id="nav-admin-btn-logged-out"
                   onClick={() => handleLinkClick('/admin')}
-                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-indigo-300 glass hover:bg-indigo-500/15 border border-indigo-500/30 transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-[8px] text-xs font-medium text-[#ECEEF0] bg-[#1B303A] hover:bg-[#223B47] border border-[#314A56] transition-colors flex items-center gap-1.5 cursor-pointer"
                   title="Open Admin Console (Login Required)"
                 >
-                  <Shield className="w-3.5 h-3.5 text-indigo-400" />
+                  <Shield className="w-3.5 h-3.5 text-[#FFE3A6]" />
                   <span>Admin Console</span>
                 </button>
 
                 <button
                   id="nav-scanner-btn-logged-out"
                   onClick={() => handleLinkClick('/scan')}
-                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-orange-300 glass hover:bg-orange-500/15 border border-orange-500/30 transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-[8px] text-xs font-medium text-[#E4A0B3] bg-[#1B303A] hover:bg-[#223B47] border border-[#314A56] transition-colors flex items-center gap-1.5 cursor-pointer"
                   title="Open Scanner Terminal (Login Required)"
                 >
-                  <Smartphone className="w-3.5 h-3.5 text-orange-400" />
+                  <Smartphone className="w-3.5 h-3.5 text-[#E4A0B3]" />
                   <span>Scanner Terminal</span>
                 </button>
 
                 {/* Direct Login Button before logged in */}
                 <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   id="nav-login-btn"
                   onClick={() => handleLinkClick('/login')}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-900 bg-white hover:bg-slate-100 shadow-lg shadow-white/10 hover:shadow-indigo-500/20 transition-all duration-150 flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-1.5 rounded-[8px] text-xs font-semibold text-[#10232D] bg-[#FFE3A6] hover:bg-[#FFF0CF] transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
-                  <LogIn className="w-3.5 h-3.5 text-slate-900" />
+                  <LogIn className="w-3.5 h-3.5 text-[#10232D]" />
                   <span>Login</span>
                 </motion.button>
               </>
@@ -472,21 +459,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                 whileTap={{ scale: 0.95 }}
                 id="mobile-start-btn"
                 onClick={() => handleLinkClick(session.user.role === 'ADMIN' ? '/admin' : '/scan')}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-900 bg-white hover:bg-slate-100 shadow-sm cursor-pointer transition-colors flex items-center gap-1.5"
+                className="px-3.5 py-1.5 rounded-[8px] text-xs font-semibold text-[#10232D] bg-[#FFE3A6] hover:bg-[#FFF0CF] cursor-pointer transition-colors flex items-center gap-1.5"
                 title="Start Portal"
               >
                 <span>Start</span>
-                <ArrowRight className="w-3 h-3 text-slate-900" />
+                <ArrowRight className="w-3 h-3 text-[#10232D]" />
               </motion.button>
             ) : (
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 id="mobile-login-btn"
                 onClick={() => handleLinkClick('/login')}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-900 bg-white hover:bg-slate-100 shadow-sm cursor-pointer transition-colors flex items-center gap-1.5"
+                className="px-3.5 py-1.5 rounded-[8px] text-xs font-semibold text-[#10232D] bg-[#FFE3A6] hover:bg-[#FFF0CF] cursor-pointer transition-colors flex items-center gap-1.5"
                 title="Login"
               >
-                <LogIn className="w-3 h-3 text-slate-900" />
+                <LogIn className="w-3 h-3 text-[#10232D]" />
                 <span>Login</span>
               </motion.button>
             )}

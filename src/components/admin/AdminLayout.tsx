@@ -270,21 +270,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
 
   return (
-    <div id="admin-portal-layout" className="relative h-full h-[100dvh] max-h-[100dvh] w-full overflow-hidden text-slate-100 flex flex-col selection:bg-indigo-500 selection:text-white">
-      {/* Ambient Liquid Animated Canvas */}
-      <LiquidBackground intensity="vibrant" />
-
-      {/* Top Navbar with Ambient Liquid Aurora Flow */}
-      <header className="sticky top-0 z-50 glass-header border-b border-white/[0.08] px-3 sm:px-6 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4 w-full shrink-0 relative">
-        {/* Floating Liquid Blobs inside Navbar */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10">
-          <div className="absolute -top-10 left-1/4 w-52 h-24 bg-indigo-600/30 rounded-full blur-2xl animate-pulse" />
-          <div className="absolute -top-8 right-1/3 w-44 h-24 bg-purple-600/25 rounded-full blur-2xl animate-[pulse_4s_infinite]" />
-          <div className="absolute -bottom-8 right-10 w-36 h-20 bg-pink-600/20 rounded-full blur-xl animate-pulse" />
-          {/* Flowing liquid iridescent border shimmer */}
-          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/50 via-purple-500/50 to-transparent" />
-        </div>
-
+    <div id="admin-portal-layout" className="relative h-full h-[100dvh] max-h-[100dvh] w-full overflow-hidden text-[#ECEEF0] bg-[#10232D] flex flex-col selection:bg-[#FFE3A6] selection:text-[#10232D]">
+      {/* Top Navbar */}
+      <header className="sticky top-0 z-50 bg-[#10232D] border-b border-[#314A56] px-3 sm:px-6 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4 w-full shrink-0 relative">
         {/* Left: Brand + Event Switcher */}
         <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-1 sm:flex-initial">
           <div
@@ -292,12 +280,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             className={`flex items-center gap-2 shrink-0 ${onNavigateHome ? 'cursor-pointer group select-none' : ''}`}
             title={onNavigateHome ? 'Return to Home Page' : undefined}
           >
-            <AppLogo size="sm" className="shadow-lg shadow-orange-500/20 group-hover:scale-105 transition-transform" />
+            <AppLogo size="sm" className="group-hover:scale-105 transition-transform" />
             <div className="hidden lg:block">
-              <span className="font-extrabold text-white text-base tracking-tight font-['Space_Grotesk'] group-hover:text-indigo-300 transition-colors">
+              <span className="font-bold text-[#ECEEF0] text-base tracking-tight group-hover:text-[#FFE3A6] transition-colors">
                 ADMITTO
               </span>
-              <span className="text-[10px] uppercase font-bold text-indigo-300 ml-1.5 px-2 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/30">
+              <span className="text-[10px] uppercase font-semibold text-[#FFE3A6] ml-1.5 px-2 py-0.5 rounded bg-[#1B303A] border border-[#314A56]">
                 CONSOLE
               </span>
             </div>
@@ -308,26 +296,26 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             <button
               id="event-switcher-btn"
               onClick={() => setIsEventDropdownOpen(!isEventDropdownOpen)}
-              className="w-full px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl glass-dark hover:bg-white/[0.08] border border-white/10 text-xs font-bold text-white flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer shadow-sm"
+              className="w-full px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg bg-[#1B303A] hover:bg-[#223b47] border border-[#314A56] text-xs font-medium text-[#ECEEF0] flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer"
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50 shrink-0" />
+              <span className="w-2 h-2 rounded-full bg-[#FFE3A6] shrink-0" />
               <span className="truncate text-left min-w-0 flex-1">{currentEvent?.title || 'Select Event'}</span>
-              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${isEventDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-3.5 h-3.5 text-[#8A9BA8] shrink-0 transition-transform ${isEventDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isEventDropdownOpen && typeof document !== 'undefined' && createPortal(
-              <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="fixed inset-0 z-[100] bg-[#10232D]/80 flex items-center justify-center p-4">
                 <div
                   className="fixed inset-0"
                   onClick={() => setIsEventDropdownOpen(false)}
                 />
-                <div className="relative z-10 w-full max-w-sm bg-[#181d36]/98 border border-white/20 rounded-3xl p-4 sm:p-5 shadow-2xl space-y-3 backdrop-blur-2xl animate-scale-in ring-1 ring-white/15">
-                  <div className="px-1 py-1 text-xs uppercase font-bold text-slate-400 tracking-wider flex items-center justify-between border-b border-white/10 pb-2">
-                    <span className="text-white font-['Space_Grotesk'] text-sm font-bold">Your Owned Events ({events.length})</span>
+                <div className="relative z-10 w-full max-w-sm bg-[#1B303A] border border-[#314A56] rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+                  <div className="px-1 py-1 text-xs uppercase font-medium text-[#8A9BA8] tracking-wider flex items-center justify-between border-b border-[#314A56] pb-2">
+                    <span className="text-[#ECEEF0] text-sm font-bold">Your Owned Events ({events.length})</span>
                     <button
                       type="button"
                       onClick={() => setIsEventDropdownOpen(false)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                      className="p-1 rounded-lg text-[#8A9BA8] hover:text-[#ECEEF0] hover:bg-[#10232D] transition-colors"
                     >
                       ✕
                     </button>
@@ -341,17 +329,17 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                           onSelectEventId(ev.id);
                           setIsEventDropdownOpen(false);
                         }}
-                        className={`w-full text-left p-3 rounded-2xl text-xs flex flex-col transition-all cursor-pointer ${
+                        className={`w-full text-left p-3 rounded-xl text-xs flex flex-col transition-all cursor-pointer ${
                           ev.id === currentEvent?.id
-                            ? 'bg-indigo-600/35 text-indigo-100 font-bold border border-indigo-500/50 shadow-md ring-1 ring-indigo-400/30'
-                            : 'text-slate-300 hover:bg-white/[0.08] border border-white/5'
+                            ? 'bg-[#10232D] text-[#FFE3A6] font-semibold border border-[#FFE3A6]/50'
+                            : 'text-[#ECEEF0] hover:bg-[#10232D] border border-[#314A56]'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="truncate text-white font-bold text-sm">{ev.title}</span>
+                          <span className="truncate text-[#ECEEF0] font-bold text-sm">{ev.title}</span>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {ev.id === currentEvent?.id && (
-                              <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold">
+                              <span className="text-[10px] uppercase px-2 py-0.5 rounded bg-[#1B303A] text-[#FFE3A6] border border-[#FFE3A6]/30 font-mono font-semibold">
                                 Active
                               </span>
                             )}
@@ -361,28 +349,28 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                                 e.stopPropagation();
                                 handleDeleteEventFromDropdown(ev);
                               }}
-                              className="p-1 rounded-lg hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 transition"
+                              className="p-1 rounded-lg hover:bg-[#E255A2]/20 text-[#8A9BA8] hover:text-[#E255A2] transition-colors"
                               title="Delete this event"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
-                        <span className="text-[11px] text-slate-400 truncate mt-0.5">{ev.venue}</span>
+                        <span className="text-[11px] text-[#8A9BA8] truncate mt-0.5">{ev.venue}</span>
                       </button>
                     ))}
                   </div>
 
-                  <div className="pt-2 border-t border-white/10">
+                  <div className="pt-2 border-t border-[#314A56]">
                     <button
                       type="button"
                       onClick={() => {
                         setIsEventDropdownOpen(false);
                         setIsCreateEventModalOpen(true);
                       }}
-                      className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-[0.99] text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-indigo-600/30 border border-indigo-400/30"
+                      className="w-full py-2.5 px-4 rounded-lg bg-[#FFE3A6] hover:bg-[#fff0cb] text-[#10232D] text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
                     >
-                      <Plus className="w-4 h-4 text-white" />
+                      <Plus className="w-4 h-4 text-[#10232D]" />
                       <span>Create New Event</span>
                     </button>
                   </div>
@@ -400,10 +388,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             <button
               id="admin-header-home-btn"
               onClick={onNavigateHome}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass-dark hover:bg-white/[0.08] border border-white/10 text-slate-300 hover:text-white text-xs font-semibold transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1B303A] hover:bg-[#223b47] border border-[#314A56] text-[#8A9BA8] hover:text-[#ECEEF0] text-xs font-medium transition-colors cursor-pointer"
               title="Return to Home Page"
             >
-              <Home className="w-3.5 h-3.5 text-indigo-400" />
+              <Home className="w-3.5 h-3.5 text-[#FFE3A6]" />
               <span className="hidden xs:inline">Home</span>
             </button>
           )}
@@ -412,46 +400,46 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           <button
             id="admin-launch-scanner-btn"
             onClick={onOpenScanner}
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl glass-dark hover:bg-white/[0.08] border border-indigo-500/30 text-indigo-300 text-xs font-bold transition-all cursor-pointer"
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1B303A] hover:bg-[#223b47] border border-[#314A56] hover:border-[#E4A0B3]/40 text-[#E4A0B3] text-xs font-semibold transition-colors cursor-pointer"
             title="Open Camera Scanner Terminal"
           >
-            <Smartphone className="w-3.5 h-3.5 text-indigo-400" />
+            <Smartphone className="w-3.5 h-3.5 text-[#E4A0B3]" />
             <span className="hidden xl:inline">Launch Gate Scanner</span>
             <span className="xl:hidden">Scanner</span>
-            <ArrowUpRight className="w-3 h-3 text-indigo-400" />
+            <ArrowUpRight className="w-3 h-3 text-[#E4A0B3]" />
           </button>
 
-          {/* Admin Badge: "Admin" instead of just "A" */}
+          {/* Admin Badge */}
           <div
             id="admin-role-indicator"
-            className="flex items-center gap-1.5 sm:gap-2 glass-dark rounded-xl px-2.5 sm:px-3 py-1.5 border border-indigo-500/30 shrink-0"
+            className="flex items-center gap-1.5 sm:gap-2 bg-[#1B303A] rounded-lg px-2.5 sm:px-3 py-1.5 border border-[#314A56] shrink-0"
             title={`Logged in as Admin: ${session.user.name} (${session.user.email})`}
           >
-            <div className="w-5 h-5 rounded-lg bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 flex items-center justify-center font-bold text-xs shrink-0">
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-300" />
+            <div className="w-5 h-5 rounded bg-[#10232D] text-[#FFE3A6] border border-[#314A56] flex items-center justify-center font-bold text-xs shrink-0">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#FFE3A6]" />
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-extrabold text-white tracking-wide">Admin</span>
-              <span className="hidden lg:inline-block text-[11px] text-slate-400 font-medium truncate max-w-[90px]">
+              <span className="text-xs font-semibold text-[#ECEEF0] tracking-wide">Admin</span>
+              <span className="hidden lg:inline-block text-[11px] text-[#8A9BA8] font-normal truncate max-w-[90px]">
                 ({session.user.name})
               </span>
             </div>
           </div>
 
-          {/* Hamburger Menu Button (Right Top) */}
+          {/* Hamburger Menu Button */}
           <button
             id="admin-hamburger-menu-btn"
             onClick={() => {
               setIsMobileMenuOpen(!isMobileMenuOpen);
             }}
-            className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl glass-dark hover:bg-white/[0.1] border border-white/10 text-white transition-all cursor-pointer shrink-0"
+            className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg bg-[#1B303A] hover:bg-[#223b47] border border-[#314A56] text-[#ECEEF0] transition-colors cursor-pointer shrink-0"
             title="Toggle Navigation Menu"
             aria-label="Navigation Menu"
           >
             {isMobileMenuOpen ? (
-              <X className="w-4 h-4 text-indigo-400" />
+              <X className="w-4 h-4 text-[#FFE3A6]" />
             ) : (
-              <Menu className="w-4 h-4 text-white" />
+              <Menu className="w-4 h-4 text-[#ECEEF0]" />
             )}
           </button>
         </div>
@@ -467,7 +455,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="absolute inset-0 bg-black/70 backdrop-blur-md"
+              className="absolute inset-0 bg-[#10232D]/80"
             />
 
             {/* Menu Slideout Panel from Right */}
@@ -476,26 +464,26 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              className="absolute top-0 right-0 bottom-0 w-full max-w-sm sm:max-w-md glass-card border-l border-white/10 shadow-2xl flex flex-col z-10 overflow-y-auto"
+              className="absolute top-0 right-0 bottom-0 w-full max-w-sm sm:max-w-md bg-[#1B303A] border-l border-[#314A56] flex flex-col z-10 overflow-y-auto"
             >
               {/* Menu Header */}
-              <div className="p-5 border-b border-white/10 flex items-center justify-between">
+              <div className="p-5 border-b border-[#314A56] flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300">
+                  <div className="w-8 h-8 rounded-lg bg-[#10232D] border border-[#314A56] flex items-center justify-center text-[#FFE3A6]">
                     <ShieldCheck className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-white text-base font-['Space_Grotesk']">
+                    <h3 className="font-bold text-[#ECEEF0] text-base">
                       Admin Navigation
                     </h3>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-[#8A9BA8]">
                       {session.user.name} • {session.user.email}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2 rounded-xl glass text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  className="p-2 rounded-lg bg-[#10232D] border border-[#314A56] text-[#8A9BA8] hover:text-[#ECEEF0] transition-colors cursor-pointer"
                   title="Close Menu"
                 >
                   <X className="w-4 h-4" />
@@ -503,19 +491,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               </div>
 
               {/* Active Event Card in Menu */}
-              <div className="p-5 border-b border-white/10 bg-white/[0.02]">
-                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">
+              <div className="p-5 border-b border-[#314A56] bg-[#10232D]/40">
+                <div className="text-[10px] uppercase font-medium text-[#8A9BA8] tracking-wider mb-2">
                   Active Event Context
                 </div>
-                <div className="p-3 rounded-2xl glass-dark border border-white/10 flex items-center justify-between gap-3">
+                <div className="p-3 rounded-xl bg-[#10232D] border border-[#314A56] flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50 shrink-0" />
-                      <span className="text-xs font-bold text-white truncate">
+                      <span className="w-2 h-2 rounded-full bg-[#FFE3A6] shrink-0" />
+                      <span className="text-xs font-bold text-[#ECEEF0] truncate">
                         {currentEvent?.title || 'No event selected'}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                    <p className="text-[11px] text-[#8A9BA8] truncate mt-0.5">
                       {currentEvent?.venue || 'Campus Venue'}
                     </p>
                   </div>
@@ -524,7 +512,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                       setIsMobileMenuOpen(false);
                       setIsEventDropdownOpen(true);
                     }}
-                    className="px-2.5 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 text-[11px] font-bold border border-indigo-500/30 shrink-0 cursor-pointer"
+                    className="px-2.5 py-1.5 rounded-lg bg-[#1B303A] text-[#FFE3A6] hover:bg-[#223b47] text-[11px] font-semibold border border-[#314A56] shrink-0 cursor-pointer"
                   >
                     Switch
                   </button>
@@ -533,7 +521,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
               {/* All Navbar Items in Menu */}
               <div className="p-5 space-y-1.5 flex-1">
-                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-3 px-1">
+                <div className="text-[10px] uppercase font-medium text-[#8A9BA8] tracking-wider mb-3 px-1">
                   Portal Navigation
                 </div>
                 {navItems.map((item) => {
@@ -547,33 +535,33 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                         handleSelectTab(item.id);
                         setIsMobileMenuOpen(false);
                       }}
-                      className={`w-full p-3 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer ${
+                      className={`w-full p-3 rounded-xl flex items-center justify-between text-left transition-all cursor-pointer ${
                         isActive
-                          ? 'bg-indigo-500/20 text-white font-bold border border-indigo-500/40 shadow-lg shadow-indigo-500/10'
-                          : 'glass-dark text-slate-300 hover:text-white hover:bg-white/[0.08] border border-white/5'
+                          ? 'bg-[#10232D] text-[#FFE3A6] font-semibold border border-[#FFE3A6]/40'
+                          : 'bg-[#10232D]/40 text-[#8A9BA8] hover:text-[#ECEEF0] hover:bg-[#10232D] border border-[#314A56]'
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div
-                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                          className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
                             isActive
-                              ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30'
-                              : 'bg-white/5 text-slate-400'
+                              ? 'bg-[#FFE3A6] text-[#10232D]'
+                              : 'bg-[#1B303A] text-[#8A9BA8]'
                           }`}
                         >
                           <Icon className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
-                          <div className={`text-xs ${isActive ? 'font-bold text-white' : 'font-semibold text-slate-200'}`}>
+                          <div className={`text-xs ${isActive ? 'font-bold text-[#FFE3A6]' : 'font-medium text-[#ECEEF0]'}`}>
                             {item.label}
                           </div>
-                          <div className="text-[10px] text-slate-400 truncate">
+                          <div className="text-[10px] text-[#8A9BA8] truncate">
                             {item.desc}
                           </div>
                         </div>
                       </div>
                       {isActive && (
-                        <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0 ml-2" />
+                        <CheckCircle2 className="w-4 h-4 text-[#FFE3A6] shrink-0 ml-2" />
                       )}
                     </button>
                   );
@@ -581,8 +569,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               </div>
 
               {/* Quick Actions & Utility Tools */}
-              <div className="p-5 border-t border-white/10 space-y-3 bg-white/[0.02]">
-                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider px-1">
+              <div className="p-5 border-t border-[#314A56] space-y-3 bg-[#10232D]/40">
+                <div className="text-[10px] uppercase font-medium text-[#8A9BA8] tracking-wider px-1">
                   Quick Actions & Controls
                 </div>
 
@@ -592,7 +580,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                       setIsMobileMenuOpen(false);
                       onOpenScanner();
                     }}
-                    className="p-3 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-300 text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    className="p-3 rounded-lg bg-[#10232D] hover:bg-[#152834] border border-[#314A56] text-[#E4A0B3] text-xs font-semibold flex flex-col items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <Smartphone className="w-4 h-4" />
                     <span>Launch Scanner</span>
@@ -603,7 +591,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                       setIsMobileMenuOpen(false);
                       setIsCreateEventModalOpen(true);
                     }}
-                    className="p-3 rounded-xl glass hover:bg-white/[0.08] text-slate-200 text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    className="p-3 rounded-lg bg-[#10232D] hover:bg-[#152834] border border-[#314A56] text-[#FFE3A6] text-xs font-semibold flex flex-col items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
                     <span>New Event</span>
@@ -617,9 +605,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                       setIsMobileMenuOpen(false);
                       onNavigateHome();
                     }}
-                    className="w-full py-2.5 px-4 rounded-xl glass-dark hover:bg-white/[0.08] border border-white/10 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                    className="w-full py-2.5 px-4 rounded-lg bg-[#10232D] hover:bg-[#152834] border border-[#314A56] text-[#ECEEF0] text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
                   >
-                    <Home className="w-4 h-4 text-indigo-400" />
+                    <Home className="w-4 h-4 text-[#FFE3A6]" />
                     <span>Return to Home Page</span>
                   </button>
                 )}
@@ -630,7 +618,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                     setIsMobileMenuOpen(false);
                     onLogout();
                   }}
-                  className="w-full py-3 px-4 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="w-full py-2.5 px-4 rounded-lg bg-[#E255A2]/10 hover:bg-[#E255A2]/20 border border-[#E255A2]/30 text-[#E255A2] text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Sign Out of Admin Console</span>
@@ -641,18 +629,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Admin Tab Navigation Strip with Liquid Aurora & Morphing Active Pill */}
+      {/* Admin Tab Navigation Strip */}
       <div
         ref={tabContainerRef}
-        className="glass-dark border-b border-white/[0.08] px-4 sm:px-6 overflow-x-auto shrink-0 relative scroll-smooth no-scrollbar"
+        className="bg-[#10232D] border-b border-[#314A56] px-4 sm:px-6 overflow-x-auto shrink-0 relative scroll-smooth no-scrollbar"
       >
-        {/* Liquid Aurora Under-Glow */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10">
-          <div className="absolute -top-6 left-1/4 w-72 h-16 bg-gradient-to-r from-indigo-500/25 via-purple-500/25 to-pink-500/20 rounded-full blur-2xl animate-pulse" />
-          <div className="absolute -bottom-4 right-1/4 w-60 h-12 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 rounded-full blur-xl animate-[pulse_4s_infinite]" />
-          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-400/40 via-purple-400/40 to-transparent" />
-        </div>
-
         <div className="max-w-7xl mx-auto flex items-center gap-1 sm:gap-2 relative py-1.5">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -662,23 +643,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 key={item.id}
                 id={`admin-nav-tab-${item.id}`}
                 onClick={() => handleSelectTab(item.id)}
-                className={`relative py-2.5 px-3.5 sm:px-4 text-xs font-semibold flex items-center gap-2 rounded-xl transition-colors whitespace-nowrap cursor-pointer z-10 select-none ${
+                className={`relative py-2 px-3 sm:px-3.5 text-xs font-medium flex items-center gap-2 rounded-lg transition-colors whitespace-nowrap cursor-pointer z-10 select-none ${
                   isActive
-                    ? 'text-white font-bold'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+                    ? 'text-[#FFE3A6] bg-[#1B303A] border border-[#314A56]'
+                    : 'text-[#8A9BA8] hover:text-[#ECEEF0] hover:bg-[#1B303A]/50 border border-transparent'
                 }`}
               >
-                {/* Active Liquid Pill Animation */}
-                {isActive && (
-                  <motion.div
-                    layoutId="admin-active-tab-liquid"
-                    className="absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-500/25 via-purple-500/30 to-pink-500/20 border border-indigo-400/40 shadow-[0_0_20px_rgba(99,102,241,0.3)] backdrop-blur-md -z-10"
-                    transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                  >
-                    <div className="absolute bottom-0 inset-x-2 h-[2px] bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 rounded-full shadow-[0_0_8px_rgba(129,140,248,0.8)]" />
-                  </motion.div>
-                )}
-                <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-indigo-300' : 'text-slate-500'}`} />
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#FFE3A6]' : 'text-[#8A9BA8]'}`} />
                 <span>{item.label}</span>
               </button>
             );

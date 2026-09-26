@@ -70,7 +70,7 @@ export const AppleDock: React.FC<AppleDockProps> = ({
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-        className="flex items-center gap-1.5 sm:gap-3 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-3xl bg-slate-900/85 backdrop-blur-2xl border border-white/15 shadow-[0_20px_50px_rgba(0,0,0,0.5),0_0_20px_rgba(99,102,241,0.15)] ring-1 ring-white/10"
+        className="flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-4 py-2 rounded-2xl bg-[#1B303A] border border-[#314A56]"
         role="navigation"
         aria-label="Scanner Apple Dock Navigation"
       >
@@ -84,43 +84,40 @@ export const AppleDock: React.FC<AppleDockProps> = ({
               key={item.id}
               id={`dock-btn-${item.id}`}
               onClick={() => onSelectTab(item.id)}
-              whileHover={{ scale: 1.18, y: -4 }}
-              whileTap={{ scale: 0.92 }}
+              whileHover={{ scale: 1.08, y: -2 }}
+              whileTap={{ scale: 0.94 }}
               transition={{ type: 'spring', stiffness: 450, damping: 22 }}
-              className={`relative group flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${
+              className={`relative group flex flex-col items-center justify-center rounded-xl transition-colors cursor-pointer ${
                 isScannerBtn
                   ? isActive
-                    ? 'w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 text-white shadow-lg shadow-indigo-500/40 ring-2 ring-white/30'
-                    : 'w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-tr from-indigo-500/80 to-purple-600/80 text-white shadow-md shadow-indigo-500/25 hover:shadow-indigo-500/40'
+                    ? 'w-11 h-11 sm:w-12 sm:h-12 bg-[#FFE3A6] text-[#10232D] border border-[#FFE3A6]'
+                    : 'w-11 h-11 sm:w-12 sm:h-12 bg-[#10232D] text-[#FFE3A6] border border-[#314A56] hover:border-[#FFE3A6]/50'
                   : isActive
-                  ? 'w-11 h-11 sm:w-12 sm:h-12 bg-white/15 text-white border border-white/20 shadow-inner'
-                  : 'w-11 h-11 sm:w-12 sm:h-12 text-slate-400 hover:text-slate-100 hover:bg-white/10'
+                  ? 'w-10 h-10 sm:w-11 sm:h-11 bg-[#10232D] text-[#FFE3A6] border border-[#314A56]'
+                  : 'w-10 h-10 sm:w-11 sm:h-11 text-[#8A9BA8] hover:text-[#ECEEF0] hover:bg-[#10232D]'
               }`}
               title={item.label}
               aria-label={item.label}
               aria-pressed={isActive}
             >
-              {/* Tooltip on hover (Apple dock style) */}
-              <div className="dock-tooltip absolute -top-9 px-2.5 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-semibold tracking-wide border border-slate-700/80 opacity-0 group-hover:opacity-100 transition-all duration-150 pointer-events-none whitespace-nowrap shadow-2xl scale-90 group-hover:scale-100 z-50">
-                <span className="relative z-10 text-white font-semibold">{item.label}</span>
-                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45 border-r border-b border-slate-700/80" />
+              {/* Tooltip on hover */}
+              <div className="dock-tooltip absolute -top-8 px-2 py-0.5 rounded bg-[#10232D] text-[#ECEEF0] text-[10px] font-medium border border-[#314A56] opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none whitespace-nowrap z-50">
+                <span className="relative z-10 text-[#ECEEF0]">{item.label}</span>
               </div>
 
               {/* Icon */}
-              <Icon className={`${isScannerBtn ? 'w-6 h-6' : 'w-5 h-5'} transition-transform`} />
+              <Icon className={`${isScannerBtn ? 'w-5 h-5' : 'w-4 h-4'} transition-transform`} />
 
               {/* Badge if present */}
               {item.badge !== undefined && (
                 <span
-                  className={`dock-badge absolute -top-1 -right-1 text-[9px] font-bold px-1.5 py-0.2 min-w-[18px] text-center rounded-full shadow-md ${
-                    item.badgeColor || 'bg-indigo-500 text-white'
-                  }`}
+                  className="dock-badge absolute -top-1 -right-1 text-[9px] font-bold px-1.5 py-0.2 min-w-[16px] text-center rounded-full bg-[#E4A0B3] text-[#10232D]"
                 >
                   {item.badge}
                 </span>
               )}
 
-              {/* Active Indicator Dot (Apple macOS Dock style) */}
+              {/* Active Indicator Dot */}
               <AnimatePresence>
                 {isActive && (
                   <motion.span
@@ -128,11 +125,7 @@ export const AppleDock: React.FC<AppleDockProps> = ({
                     initial={{ scale: 0, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0, opacity: 0 }}
-                    className={`absolute -bottom-1 w-1.5 h-1.5 rounded-full ${
-                      isScannerBtn
-                        ? 'bg-indigo-300 shadow-[0_0_8px_#a5b4fc]'
-                        : 'bg-indigo-500 dark:bg-white shadow-[0_0_6px_rgba(99,102,241,0.6)] dark:shadow-[0_0_6px_#ffffff]'
-                    }`}
+                    className="absolute -bottom-1 w-1 h-1 rounded-full bg-[#FFE3A6]"
                   />
                 )}
               </AnimatePresence>

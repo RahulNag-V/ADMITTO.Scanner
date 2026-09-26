@@ -1612,33 +1612,33 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
             </div>
 
             {/* Dedicated Barcode Identification Card */}
-            <div className="pt-4 border-t border-white/10 space-y-4">
+            <div className="pt-4 border-t border-[#314A56] space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                 <div>
-                  <h3 className="text-xs sm:text-sm font-bold text-zinc-100 flex items-center gap-2">
-                    <Barcode className="w-4 h-4 text-orange-400" />
+                  <h3 className="text-xs sm:text-sm font-bold text-[#ECEEF0] flex items-center gap-2 font-mono">
+                    <Barcode className="w-4 h-4 text-[#FFE3A6]" />
                     <span>BARCODE IDENTIFICATION</span>
                   </h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
+                  <p className="text-xs text-[#8A9BA8] mt-0.5">
                     How should attendee barcodes be identified?
                   </p>
                 </div>
                 {barcodeConfigSavedMessage && (
-                  <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-lg flex items-center gap-1.5 animate-in fade-in">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span className="text-xs font-semibold text-[#FFE3A6] bg-[#1B303A] border border-[#314A56] px-2.5 py-1 rounded-lg flex items-center gap-1.5 animate-in fade-in">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#FFE3A6]" />
                     {barcodeConfigSavedMessage}
                   </span>
                 )}
               </div>
 
-              {/* Warning Notice per Requirements */}
-              <div className="p-3.5 bg-amber-500/10 rounded-2xl border border-amber-500/25 text-xs text-amber-300 flex items-start gap-2.5">
-                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+              {/* Warning Notice */}
+              <div className="p-3.5 bg-[#0C1B23] rounded-2xl border border-[#314A56] text-xs text-[#ECEEF0] flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-[#FFE3A6] mt-0.5" />
                 <div>
-                  <div className="font-semibold text-amber-200">
+                  <div className="font-semibold text-[#FFE3A6]">
                     Changing barcode identification rules may affect attendee verification for this event.
                   </div>
-                  <div className="text-[11px] text-amber-300/80 mt-0.5">
+                  <div className="text-[11px] text-[#8A9BA8] mt-0.5">
                     Modifying this configuration does NOT alter existing attendee barcodes in the database. Only scanner interpretation and validation rules are changed.
                   </div>
                 </div>
@@ -1646,7 +1646,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
 
               {/* Barcode Matching Type Selector */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-300">
+                <label className="text-xs font-medium text-[#8A9BA8]">
                   Barcode Matching Type
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -1657,11 +1657,11 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                       onClick={() => setBarcodeMode(mode)}
                       className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                         barcodeMode === mode
-                          ? 'bg-orange-500/20 border-orange-500/60 text-orange-300 ring-1 ring-orange-500/30'
-                          : 'bg-white/[0.03] border-white/10 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]'
+                          ? 'bg-[#FFE3A6]/15 border-[#FFE3A6] text-[#FFE3A6]'
+                          : 'bg-[#0C1B23] border-[#314A56] text-[#8A9BA8] hover:text-[#ECEEF0] hover:bg-[#314A56]/30'
                       }`}
                     >
-                      <span className={`w-2 h-2 rounded-full ${barcodeMode === mode ? 'bg-orange-400 shadow-sm shadow-orange-400/50' : 'bg-zinc-600'}`} />
+                      <span className={`w-2 h-2 rounded-full ${barcodeMode === mode ? 'bg-[#FFE3A6]' : 'bg-[#8A9BA8]'}`} />
                       <span className="capitalize">{mode === 'full' ? 'Full Barcode' : mode}</span>
                     </button>
                   ))}
@@ -1672,7 +1672,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {barcodeMode !== 'full' ? (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-zinc-300">
+                    <label className="text-xs font-medium text-[#8A9BA8]">
                       {barcodeMode === 'prefix' ? 'Prefix Value' : 'Suffix Value'}
                     </label>
                     <input
@@ -1680,42 +1680,42 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                       placeholder={barcodeMode === 'prefix' ? 'e.g. 1BH' : 'e.g. 2026'}
                       value={barcodeValue}
                       onChange={(e) => setBarcodeValue(e.target.value)}
-                      className="w-full h-11 px-3.5 rounded-xl bg-[#181d33] border border-white/15 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400"
+                      className="w-full h-11 px-3.5 rounded-xl bg-[#0C1B23] border border-[#314A56] text-xs text-[#ECEEF0] placeholder-[#8A9BA8]/50 focus:outline-none focus:border-[#FFE3A6]"
                     />
                   </div>
                 ) : (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-zinc-300">
+                    <label className="text-xs font-medium text-[#8A9BA8]">
                       Matching Rule
                     </label>
-                    <div className="h-11 px-3.5 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-zinc-400 flex items-center">
+                    <div className="h-11 px-3.5 rounded-xl bg-[#0C1B23] border border-[#314A56] text-xs text-[#8A9BA8] flex items-center">
                       Exact full barcode lookup against attendee record
                     </div>
                   </div>
                 )}
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-300">
+                  <label className="text-xs font-medium text-[#8A9BA8]">
                     Unique Identifier Field
                   </label>
                   <select
                     value={barcodeIdentifierField}
                     onChange={(e) => setBarcodeIdentifierField(e.target.value)}
                     style={{ colorScheme: 'dark' }}
-                    className="w-full h-11 px-3 rounded-xl bg-[#181d33] border border-white/15 text-xs text-white focus:outline-none focus:border-orange-400 cursor-pointer"
+                    className="w-full h-11 px-3 rounded-xl bg-[#0C1B23] border border-[#314A56] text-xs text-[#ECEEF0] focus:outline-none focus:border-[#FFE3A6] cursor-pointer"
                   >
-                    <option value="usn" className="bg-[#121626] text-white">USN / Roll Number</option>
-                    <option value="roll_number" className="bg-[#121626] text-white">Roll Number</option>
-                    <option value="employee_id" className="bg-[#121626] text-white">Employee ID</option>
-                    <option value="registration_id" className="bg-[#121626] text-white">Registration ID</option>
-                    <option value="participant_id" className="bg-[#121626] text-white">Participant ID</option>
-                    <option value="email" className="bg-[#121626] text-white">Email</option>
-                    <option value="membership_id" className="bg-[#121626] text-white">Membership ID</option>
-                    <option value="custom_id" className="bg-[#121626] text-white">Custom ID</option>
-                    <option value="barcode" className="bg-[#121626] text-white">Barcode</option>
+                    <option value="usn" className="bg-[#0C1B23] text-[#ECEEF0]">USN / Roll Number</option>
+                    <option value="roll_number" className="bg-[#0C1B23] text-[#ECEEF0]">Roll Number</option>
+                    <option value="employee_id" className="bg-[#0C1B23] text-[#ECEEF0]">Employee ID</option>
+                    <option value="registration_id" className="bg-[#0C1B23] text-[#ECEEF0]">Registration ID</option>
+                    <option value="participant_id" className="bg-[#0C1B23] text-[#ECEEF0]">Participant ID</option>
+                    <option value="email" className="bg-[#0C1B23] text-[#ECEEF0]">Email</option>
+                    <option value="membership_id" className="bg-[#0C1B23] text-[#ECEEF0]">Membership ID</option>
+                    <option value="custom_id" className="bg-[#0C1B23] text-[#ECEEF0]">Custom ID</option>
+                    <option value="barcode" className="bg-[#0C1B23] text-[#ECEEF0]">Barcode</option>
                     {/* Add any event custom fields dynamically */}
                     {event?.scan_config?.available_fields?.filter((f) => !['usn', 'roll_number', 'employee_id', 'registration_id', 'participant_id', 'email', 'membership_id', 'custom_id', 'barcode'].includes(f.toLowerCase())).map((f) => (
-                      <option key={f} value={f} className="bg-[#121626] text-white">
+                      <option key={f} value={f} className="bg-[#0C1B23] text-[#ECEEF0]">
                         {f} (Custom Field)
                       </option>
                     ))}
@@ -1724,44 +1724,44 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
               </div>
 
               {/* Toggles: Case Sensitivity & Length Validation */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-white/5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-[#314A56]">
                 {/* Case Sensitivity */}
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-[#0C1B23] border border-[#314A56]">
                   <div>
-                    <div className="text-xs font-medium text-zinc-200">Case Sensitive</div>
-                    <div className="text-[10px] text-zinc-400">Match upper/lowercase strictly</div>
+                    <div className="text-xs font-medium text-[#ECEEF0]">Case Sensitive</div>
+                    <div className="text-[10px] text-[#8A9BA8]">Match upper/lowercase strictly</div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setBarcodeCaseSensitive(!barcodeCaseSensitive)}
                     className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      barcodeCaseSensitive ? 'bg-orange-500' : 'bg-zinc-700'
+                      barcodeCaseSensitive ? 'bg-[#FFE3A6]' : 'bg-[#314A56]'
                     }`}
                   >
                     <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                        barcodeCaseSensitive ? 'translate-x-4' : 'translate-x-0'
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-md ring-0 transition duration-200 ease-in-out ${
+                        barcodeCaseSensitive ? 'translate-x-4 bg-[#10232D]' : 'translate-x-0 bg-[#8A9BA8]'
                       }`}
                     />
                   </button>
                 </div>
 
                 {/* Optional Length Validation Toggle */}
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-[#0C1B23] border border-[#314A56]">
                   <div>
-                    <div className="text-xs font-medium text-zinc-200">Optional Length Validation</div>
-                    <div className="text-[10px] text-zinc-400">Enforce min & max length limits</div>
+                    <div className="text-xs font-medium text-[#ECEEF0]">Optional Length Validation</div>
+                    <div className="text-[10px] text-[#8A9BA8]">Enforce min & max length limits</div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setBarcodeLengthValidation(!barcodeLengthValidation)}
                     className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      barcodeLengthValidation ? 'bg-orange-500' : 'bg-zinc-700'
+                      barcodeLengthValidation ? 'bg-[#FFE3A6]' : 'bg-[#314A56]'
                     }`}
                   >
                     <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                        barcodeLengthValidation ? 'translate-x-4' : 'translate-x-0'
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-md ring-0 transition duration-200 ease-in-out ${
+                        barcodeLengthValidation ? 'translate-x-4 bg-[#10232D]' : 'translate-x-0 bg-[#8A9BA8]'
                       }`}
                     />
                   </button>
@@ -1770,71 +1770,71 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
 
               {/* Length Validation Inputs (if enabled) */}
               {barcodeLengthValidation && (
-                <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-white/[0.02] border border-orange-500/20">
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-[#0C1B23] border border-[#314A56]">
                   <div className="space-y-1">
-                    <label className="text-[11px] font-medium text-zinc-400">Minimum Barcode Length</label>
+                    <label className="text-[11px] font-medium text-[#8A9BA8]">Minimum Barcode Length</label>
                     <input
                       type="number"
                       placeholder="e.g. 9"
                       value={barcodeMinLength}
                       onChange={(e) => setBarcodeMinLength(e.target.value)}
-                      className="w-full h-9 px-3 rounded-lg bg-white/[0.05] border border-white/10 text-xs text-white focus:outline-none focus:border-orange-400"
+                      className="w-full h-9 px-3 rounded-lg bg-[#1B303A] border border-[#314A56] text-xs text-[#ECEEF0] placeholder-[#8A9BA8]/50 focus:outline-none focus:border-[#FFE3A6]"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] font-medium text-zinc-400">Maximum Barcode Length</label>
+                    <label className="text-[11px] font-medium text-[#8A9BA8]">Maximum Barcode Length</label>
                     <input
                       type="number"
                       placeholder="e.g. 12"
                       value={barcodeMaxLength}
                       onChange={(e) => setBarcodeMaxLength(e.target.value)}
-                      className="w-full h-9 px-3 rounded-lg bg-white/[0.05] border border-white/10 text-xs text-white focus:outline-none focus:border-orange-400"
+                      className="w-full h-9 px-3 rounded-lg bg-[#1B303A] border border-[#314A56] text-xs text-[#ECEEF0] placeholder-[#8A9BA8]/50 focus:outline-none focus:border-[#FFE3A6]"
                     />
                   </div>
                 </div>
               )}
 
               {/* Barcode Preview */}
-              <div className="p-4 rounded-xl bg-orange-950/20 border border-orange-500/25 space-y-2">
+              <div className="p-4 rounded-xl bg-[#0C1B23] border border-[#314A56] space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-orange-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-orange-400" />
+                  <span className="font-semibold text-[#FFE3A6] uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                    <Sparkles className="w-3.5 h-3.5 text-[#FFE3A6]" />
                     Barcode Preview
                   </span>
-                  <span className="text-zinc-400 capitalize">{barcodeMode} Mode</span>
+                  <span className="text-[#8A9BA8] capitalize font-mono text-[10px]">{barcodeMode} Mode</span>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap text-xs">
                   {barcodeMode === 'prefix' && (
                     <>
-                      <div className="px-3 py-1 rounded-lg bg-orange-500/25 border border-orange-500/40 text-orange-200 font-mono font-bold">
+                      <div className="px-3 py-1 rounded-lg bg-[#FFE3A6]/20 border border-[#FFE3A6]/40 text-[#FFE3A6] font-mono font-bold">
                         {barcodeValue.trim() || '1BH'}
                       </div>
-                      <span className="text-zinc-500 font-bold">+</span>
-                      <div className="px-3 py-1 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-200 font-mono font-bold">
+                      <span className="text-[#8A9BA8] font-bold">+</span>
+                      <div className="px-3 py-1 rounded-lg bg-[#E4A0B3]/20 border border-[#E4A0B3]/40 text-[#E4A0B3] font-mono font-bold">
                         24CS051
                       </div>
                     </>
                   )}
                   {barcodeMode === 'suffix' && (
                     <>
-                      <div className="px-3 py-1 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-200 font-mono font-bold">
+                      <div className="px-3 py-1 rounded-lg bg-[#E4A0B3]/20 border border-[#E4A0B3]/40 text-[#E4A0B3] font-mono font-bold">
                         24CS051
                       </div>
-                      <span className="text-zinc-500 font-bold">+</span>
-                      <div className="px-3 py-1 rounded-lg bg-orange-500/25 border border-orange-500/40 text-orange-200 font-mono font-bold">
+                      <span className="text-[#8A9BA8] font-bold">+</span>
+                      <div className="px-3 py-1 rounded-lg bg-[#FFE3A6]/20 border border-[#FFE3A6]/40 text-[#FFE3A6] font-mono font-bold">
                         {barcodeValue.trim() || '2026'}
                       </div>
                     </>
                   )}
                   {barcodeMode === 'full' && (
-                    <div className="px-3 py-1 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-200 font-mono font-bold">
+                    <div className="px-3 py-1 rounded-lg bg-[#FFE3A6]/20 border border-[#FFE3A6]/40 text-[#FFE3A6] font-mono font-bold">
                       1BH24CS051
                     </div>
                   )}
-                  <span className="text-zinc-500 text-xs">→</span>
-                  <span className="text-xs text-zinc-300">
-                    Example: <strong className="text-white font-mono">{
+                  <span className="text-[#8A9BA8] text-xs">→</span>
+                  <span className="text-xs text-[#8A9BA8]">
+                    Example: <strong className="text-[#ECEEF0] font-mono">{
                       barcodeMode === 'prefix'
                         ? `${barcodeValue.trim() || '1BH'}24CS051`
                         : barcodeMode === 'suffix'

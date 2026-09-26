@@ -204,22 +204,19 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#10232D] flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center animate-spin">
-            <RefreshCw className="w-6 h-6 text-orange-400" />
+          <div className="w-12 h-12 rounded-xl bg-[#1B303A] border border-[#314A56] flex items-center justify-center animate-spin">
+            <RefreshCw className="w-5 h-5 text-[#FFE3A6]" />
           </div>
-          <p className="text-xs font-mono text-zinc-400 tracking-wider">CHECKING SCANNER AUTHORIZATION...</p>
+          <p className="text-xs font-mono text-[#8A9BA8] tracking-wider uppercase">Checking Scanner Authorization...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col justify-between p-4 sm:p-6 lg:p-8 relative overflow-hidden">
-      {/* Background ambient lighting */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-orange-600/10 blur-[140px] rounded-full pointer-events-none" />
-
+    <div className="min-h-screen bg-[#10232D] text-[#ECEEF0] flex flex-col justify-between p-4 sm:p-6 lg:p-8 relative">
       {/* Top Bar */}
       <div className="flex items-center justify-between w-full max-w-2xl mx-auto z-10">
         <div
@@ -228,7 +225,7 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
           title="Return to Home"
         >
           <AppLogo />
-          <span className="hidden xs:inline-block text-xs font-mono font-bold text-zinc-400 group-hover:text-white transition">
+          <span className="hidden xs:inline-block text-xs font-mono font-bold text-[#8A9BA8] group-hover:text-white transition">
             Home
           </span>
         </div>
@@ -236,10 +233,10 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
           {onNavigateHome && (
             <button
               onClick={onNavigateHome}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-medium text-zinc-300 hover:text-white hover:border-zinc-700 transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1B303A] border border-[#314A56] text-xs font-medium text-[#ECEEF0] hover:border-[#FFE3A6] transition cursor-pointer"
               title="Return to Home Page"
             >
-              <Home className="w-3.5 h-3.5 text-indigo-400" />
+              <Home className="w-3.5 h-3.5 text-[#FFE3A6]" />
               <span>Home</span>
             </button>
           )}
@@ -256,41 +253,41 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -16 }}
-              className="bg-zinc-950/80 border border-zinc-800/80 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/80 space-y-6"
+              className="bg-[#1B303A] border border-[#314A56] rounded-2xl p-6 sm:p-8 space-y-6 shadow-none"
             >
               {accessRequest?.status === 'EXPIRED' && (
-                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-2.5">
-                  <Clock className="w-4 h-4 shrink-0 text-amber-400" />
+                <div className="p-3.5 rounded-xl bg-[#0C1B23] border border-[#E255A2]/30 text-[#E4A0B3] text-xs flex items-center gap-2.5">
+                  <Clock className="w-4 h-4 shrink-0 text-[#E255A2]" />
                   <span>Your previous scanner session expired. Enter a referral code to request new access.</span>
                 </div>
               )}
 
               <div className="space-y-2 text-center sm:text-left">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-bold font-mono uppercase tracking-wider">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[#0C1B23] border border-[#314A56] text-[#FFE3A6] text-xs font-bold font-mono uppercase tracking-wider">
                   <KeyRound className="w-3.5 h-3.5" />
                   <span>Gate Terminal Access</span>
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-black font-['Space_Grotesk'] text-white">
+                <h1 className="text-2xl sm:text-3xl font-bold text-[#ECEEF0]">
                   Connect to an Event
                 </h1>
-                <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                <p className="text-xs sm:text-sm text-[#8A9BA8] leading-relaxed">
                   Enter your operator display name and the referral code provided by your event administrator to request scanner authorization.
                 </p>
               </div>
 
               {/* Authenticated Identity Pill */}
-              <div className="p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 flex items-center justify-between gap-3">
+              <div className="p-3.5 rounded-xl bg-[#0C1B23] border border-[#314A56] flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
-                    <User className="w-4 h-4 text-orange-400" />
+                  <div className="w-8 h-8 rounded-lg bg-[#1B303A] border border-[#314A56] flex items-center justify-center shrink-0">
+                    <User className="w-4 h-4 text-[#FFE3A6]" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] uppercase font-mono text-zinc-500 font-bold">Operator Identity</p>
-                    <p className="text-xs font-medium text-zinc-200 truncate">{session.user.name} ({session.user.email})</p>
+                    <p className="text-[10px] uppercase font-mono text-[#8A9BA8] font-bold">Operator Identity</p>
+                    <p className="text-xs font-medium text-[#ECEEF0] truncate">{session.user.name} ({session.user.email})</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
-                  <ShieldCheck className="w-3 h-3" />
+                <div className="flex items-center gap-1 text-[10px] font-mono text-[#FFE3A6] bg-[#1B303A] border border-[#314A56] px-2 py-0.5 rounded-md shrink-0">
+                  <ShieldCheck className="w-3 h-3 text-[#FFE3A6]" />
                   <span>VERIFIED</span>
                 </div>
               </div>
@@ -298,7 +295,7 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
               {/* Form */}
               <form onSubmit={(e) => handleRequestAccess(e)} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label htmlFor="referral-code-input" className="text-xs font-mono font-bold text-zinc-300">
+                  <label htmlFor="referral-code-input" className="text-xs font-mono font-bold text-[#8A9BA8]">
                     EVENT REFERRAL CODE
                   </label>
                   <input
@@ -308,7 +305,7 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
                     value={referralCodeInput}
                     onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
                     placeholder="e.g. GTS26-K7P9"
-                    className="w-full px-4 py-3.5 bg-zinc-900 border border-zinc-800 rounded-2xl text-sm sm:text-base font-mono font-bold text-white placeholder:text-zinc-600 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 tracking-wider uppercase transition"
+                    className="w-full px-4 py-3 bg-[#0C1B23] border border-[#314A56] rounded-xl text-sm sm:text-base font-mono font-bold text-[#ECEEF0] placeholder:text-[#8A9BA8]/50 focus:outline-none focus:border-[#FFE3A6] focus:ring-1 focus:ring-[#FFE3A6]/30 tracking-wider uppercase transition"
                   />
                 </div>
 
@@ -316,9 +313,9 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
                   <motion.div
                     initial={{ opacity: 0, y: -6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs flex items-center gap-2"
+                    className="p-3 rounded-xl bg-[#0C1B23] border border-[#E255A2]/30 text-[#E4A0B3] text-xs flex items-center gap-2"
                   >
-                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                    <AlertTriangle className="w-4 h-4 text-[#E255A2] shrink-0" />
                     <span>{errorMessage}</span>
                   </motion.div>
                 )}
@@ -326,11 +323,11 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-[0.99] text-sm font-bold text-white shadow-xl shadow-orange-500/20 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full py-3.5 px-4 rounded-xl bg-[#FFE3A6] hover:bg-[#ffeac0] active:scale-[0.99] text-sm font-bold text-[#10232D] transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   {submitting ? (
                     <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <RefreshCw className="w-4 h-4 animate-spin text-[#10232D]" />
                       <span>Submitting Request...</span>
                     </>
                   ) : (
@@ -351,54 +348,54 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -16 }}
-              className="bg-zinc-950/80 border border-amber-500/30 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/80 space-y-6"
+              className="bg-[#1B303A] border border-[#314A56] rounded-2xl p-6 sm:p-8 space-y-6 shadow-none"
             >
               <div className="space-y-2 text-center sm:text-left">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold font-mono uppercase tracking-wider">
-                  <Clock className="w-3.5 h-3.5 animate-pulse" />
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[#0C1B23] border border-[#314A56] text-[#FFE3A6] text-xs font-bold font-mono uppercase tracking-wider">
+                  <Clock className="w-3.5 h-3.5" />
                   <span>Waiting for Admin Approval</span>
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-black font-['Space_Grotesk'] text-white">
+                <h1 className="text-2xl sm:text-3xl font-bold text-[#ECEEF0]">
                   Access Request Pending
                 </h1>
-                <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed font-medium">
+                <p className="text-xs sm:text-sm text-[#ECEEF0] leading-relaxed font-medium">
                   Access request pending. Waiting for admin approval.
                 </p>
-                <p className="text-xs text-zinc-400">
+                <p className="text-xs text-[#8A9BA8]">
                   Your request has been securely recorded in the database. When the event administrator approves your request, this terminal will unlock automatically.
                 </p>
               </div>
 
               {/* Event Card Info */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-3">
+              <div className="p-4 sm:p-5 rounded-xl bg-[#0C1B23] border border-[#314A56] space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <span className="text-[10px] font-mono uppercase text-orange-400 font-bold">Target Event</span>
-                    <h2 className="text-base sm:text-lg font-bold text-white">{accessRequest.event_title || 'Assigned Event'}</h2>
+                    <span className="text-[10px] font-mono uppercase text-[#FFE3A6] font-bold">Target Event</span>
+                    <h2 className="text-base sm:text-lg font-bold text-[#ECEEF0]">{accessRequest.event_title || 'Assigned Event'}</h2>
                   </div>
-                  <div className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-mono font-bold uppercase flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                  <div className="px-2.5 py-1 rounded-md bg-[#1B303A] border border-[#314A56] text-[#FFE3A6] text-[10px] font-mono font-bold uppercase flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#FFE3A6]" />
                     <span>PENDING</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-zinc-800/60 text-xs text-zinc-400">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-[#314A56] text-xs text-[#8A9BA8]">
                   <div className="flex items-center gap-2">
-                    <User className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                    <span className="truncate">Operator: <strong className="text-white font-medium">{accessRequest.user_name}</strong></span>
+                    <User className="w-3.5 h-3.5 text-[#8A9BA8] shrink-0" />
+                    <span className="truncate">Operator: <strong className="text-[#ECEEF0] font-medium">{accessRequest.user_name}</strong></span>
                   </div>
                   {accessRequest.referral_code && (
                     <div className="flex items-center gap-2">
-                      <KeyRound className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                      <span className="truncate font-mono">Code: <strong className="text-orange-400 font-bold">{accessRequest.referral_code}</strong></span>
+                      <KeyRound className="w-3.5 h-3.5 text-[#FFE3A6] shrink-0" />
+                      <span className="truncate font-mono">Code: <strong className="text-[#FFE3A6] font-bold">{accessRequest.referral_code}</strong></span>
                     </div>
                   )}
                   <div className="flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                    <MapPin className="w-3.5 h-3.5 text-[#8A9BA8] shrink-0" />
                     <span className="truncate">{accessRequest.event_venue || 'Main Venue'}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <User className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                    <User className="w-3.5 h-3.5 text-[#8A9BA8] shrink-0" />
                     <span className="truncate">Organizer: {accessRequest.admin_name || 'Event Admin'}</span>
                   </div>
                 </div>
@@ -409,7 +406,7 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
                 <button
                   onClick={handleRefresh}
                   disabled={isRefreshing}
-                  className="w-full py-3.5 px-4 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-[0.99] text-sm font-bold text-white shadow-xl shadow-orange-500/20 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full py-3.5 px-4 rounded-xl bg-[#FFE3A6] hover:bg-[#ffeac0] active:scale-[0.99] text-sm font-bold text-[#10232D] transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                   <span>Refresh Status</span>
@@ -417,7 +414,7 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
 
                 <button
                   onClick={handleResetRequest}
-                  className="w-full py-2.5 px-4 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition"
+                  className="w-full py-2.5 px-4 rounded-xl bg-[#0C1B23] hover:bg-[#1B303A] border border-[#314A56] text-xs font-medium text-[#8A9BA8] hover:text-[#ECEEF0] transition cursor-pointer"
                 >
                   Enter Another Referral Code
                 </button>
@@ -432,29 +429,29 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -16 }}
-              className="bg-zinc-950/80 border border-red-500/30 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/80 space-y-6"
+              className="bg-[#1B303A] border border-[#E255A2]/40 rounded-2xl p-6 sm:p-8 space-y-6 shadow-none"
             >
               <div className="space-y-2 text-center sm:text-left">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold font-mono uppercase tracking-wider">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[#0C1B23] border border-[#E255A2]/30 text-[#E255A2] text-xs font-bold font-mono uppercase tracking-wider">
                   <XCircle className="w-3.5 h-3.5" />
                   <span>Access Restricted</span>
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-black font-['Space_Grotesk'] text-white">
+                <h1 className="text-2xl sm:text-3xl font-bold text-[#ECEEF0]">
                   Access Blocked by Administrator
                 </h1>
-                <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                  The organizer of <span className="text-white font-medium">{accessRequest.event_title}</span> has restricted access requests for your account. You cannot submit another request until the administrator removes this restriction.
+                <p className="text-xs sm:text-sm text-[#8A9BA8] leading-relaxed">
+                  The organizer of <span className="text-[#ECEEF0] font-medium">{accessRequest.event_title}</span> has restricted access requests for your account. You cannot submit another request until the administrator removes this restriction.
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 space-y-1 text-xs text-red-300">
-                <p className="font-bold font-mono uppercase text-red-400">Policy Notice</p>
+              <div className="p-4 rounded-xl bg-[#0C1B23] border border-[#E255A2]/30 space-y-1 text-xs text-[#E4A0B3]">
+                <p className="font-bold font-mono uppercase text-[#E255A2]">Policy Notice</p>
                 <p>Scanner operations and new access requests are temporarily locked for this event. Please contact the event administrator to unblock your account.</p>
               </div>
 
               <button
                 onClick={handleResetRequest}
-                className="w-full py-3.5 px-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 active:scale-[0.99] text-sm font-bold text-white transition flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-4 rounded-xl bg-[#0C1B23] hover:bg-[#314A56]/30 border border-[#314A56] text-sm font-semibold text-[#ECEEF0] transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>Enter Another Referral Code</span>
                 <ArrowRight className="w-4 h-4" />
@@ -469,41 +466,41 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -16 }}
-              className="bg-zinc-950/80 border border-red-500/30 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/80 space-y-6"
+              className="bg-[#1B303A] border border-[#E255A2]/40 rounded-2xl p-6 sm:p-8 space-y-6 shadow-none"
             >
               <div className="space-y-2 text-center sm:text-left">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold font-mono uppercase tracking-wider">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[#0C1B23] border border-[#E255A2]/30 text-[#E255A2] text-xs font-bold font-mono uppercase tracking-wider">
                   <XCircle className="w-3.5 h-3.5" />
                   <span>Request Declined</span>
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-black font-['Space_Grotesk'] text-white">
+                <h1 className="text-2xl sm:text-3xl font-bold text-[#ECEEF0]">
                   Access Rejected
                 </h1>
-                <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed">
-                  Your request to access <span className="text-white font-medium">{accessRequest.event_title}</span> was rejected by the administrator.
+                <p className="text-xs sm:text-sm text-[#ECEEF0] leading-relaxed">
+                  Your request to access <span className="text-[#FFE3A6] font-medium">{accessRequest.event_title}</span> was rejected by the administrator.
                 </p>
               </div>
 
               {accessRequest.rejection_reason && (
-                <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 space-y-1">
-                  <p className="text-[10px] font-mono uppercase text-red-400 font-bold">Reason Provided by Admin</p>
-                  <p className="text-xs text-red-200">{accessRequest.rejection_reason}</p>
+                <div className="p-4 rounded-xl bg-[#0C1B23] border border-[#E255A2]/30 space-y-1">
+                  <p className="text-[10px] font-mono uppercase text-[#E255A2] font-bold">Reason Provided by Admin</p>
+                  <p className="text-xs text-[#E4A0B3]">{accessRequest.rejection_reason}</p>
                 </div>
               )}
 
               {/* Cooldown Timer or Re-request Action */}
               {cooldownRemaining > 0 ? (
-                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs space-y-2">
+                <div className="p-4 rounded-xl bg-[#0C1B23] border border-[#314A56] text-[#FFE3A6] text-xs space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 font-medium">
-                      <Clock className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+                      <Clock className="w-4 h-4 text-[#FFE3A6] shrink-0" />
                       <span>Cooldown Active</span>
                     </div>
-                    <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 font-mono font-bold text-amber-300 text-sm">
+                    <span className="px-2.5 py-1 rounded-md bg-[#1B303A] border border-[#314A56] font-mono font-bold text-[#FFE3A6] text-sm">
                       {formatCooldown(cooldownRemaining)}
                     </span>
                   </div>
-                  <p className="text-zinc-400 leading-relaxed">
+                  <p className="text-[#8A9BA8] leading-relaxed">
                     Your access request was rejected. You can request access again after the cooldown period.
                   </p>
                 </div>
@@ -512,37 +509,37 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
                   <button
                     onClick={handleRerequest}
                     disabled={submitting}
-                    className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-[0.99] text-sm font-bold text-white shadow-xl shadow-orange-500/20 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                    className="w-full py-3.5 px-4 rounded-xl bg-[#FFE3A6] hover:bg-[#ffeac0] active:scale-[0.99] text-sm font-bold text-[#10232D] transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                   >
                     {submitting ? (
                       <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <RefreshCw className="w-4 h-4 animate-spin text-[#10232D]" />
                         <span>Submitting Request...</span>
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-4 h-4 text-amber-200" />
+                        <Sparkles className="w-4 h-4 text-[#10232D]" />
                         <span>Request Access Again</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
                   </button>
-                  <p className="text-[11px] text-zinc-500 text-center">
+                  <p className="text-[11px] text-[#8A9BA8] text-center">
                     The 30-minute cooldown has elapsed. You can now submit another access request.
                   </p>
                 </div>
               )}
 
               {errorMessage && (
-                <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                <div className="p-3 rounded-xl bg-[#0C1B23] border border-[#E255A2]/30 text-[#E4A0B3] text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-[#E255A2] shrink-0" />
                   <span>{errorMessage}</span>
                 </div>
               )}
 
               <button
                 onClick={handleResetRequest}
-                className="w-full py-2.5 px-4 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition"
+                className="w-full py-2.5 px-4 rounded-xl bg-[#0C1B23] hover:bg-[#1B303A] border border-[#314A56] text-xs font-medium text-[#8A9BA8] hover:text-[#ECEEF0] transition cursor-pointer"
               >
                 Enter Another Referral Code
               </button>
@@ -556,18 +553,18 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -16 }}
-              className="bg-zinc-950/80 border border-zinc-800/80 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/80 space-y-6"
+              className="bg-[#1B303A] border border-[#314A56] rounded-2xl p-6 sm:p-8 space-y-6 shadow-none"
             >
               <div className="space-y-2 text-center sm:text-left">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-bold font-mono uppercase tracking-wider">
-                  <XCircle className="w-3.5 h-3.5 text-red-400" />
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[#0C1B23] border border-[#314A56] text-[#E255A2] text-xs font-bold font-mono uppercase tracking-wider">
+                  <XCircle className="w-3.5 h-3.5 text-[#E255A2]" />
                   <span>Access Revoked</span>
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-black font-['Space_Grotesk'] text-white">
+                <h1 className="text-2xl sm:text-3xl font-bold text-[#ECEEF0]">
                   Scanner Access Removed
                 </h1>
-                <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                  Your access to <span className="text-white font-medium">{accessRequest.event_title}</span> was removed by the administrator. You may request access again with a valid referral code.
+                <p className="text-xs sm:text-sm text-[#8A9BA8] leading-relaxed">
+                  Your access to <span className="text-[#ECEEF0] font-medium">{accessRequest.event_title}</span> was removed by the administrator. You may request access again with a valid referral code.
                 </p>
               </div>
 
@@ -575,16 +572,16 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
                 <button
                   onClick={handleRerequest}
                   disabled={submitting}
-                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-[0.99] text-sm font-bold text-white shadow-xl shadow-orange-500/20 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full py-3.5 px-4 rounded-xl bg-[#FFE3A6] hover:bg-[#ffeac0] active:scale-[0.99] text-sm font-bold text-[#10232D] transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   {submitting ? (
                     <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <RefreshCw className="w-4 h-4 animate-spin text-[#10232D]" />
                       <span>Submitting Request...</span>
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4 text-amber-200" />
+                      <Sparkles className="w-4 h-4 text-[#10232D]" />
                       <span>Request Access Again</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
@@ -593,7 +590,7 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
 
                 <button
                   onClick={handleResetRequest}
-                  className="w-full py-2.5 px-4 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition"
+                  className="w-full py-2.5 px-4 rounded-xl bg-[#0C1B23] hover:bg-[#1B303A] border border-[#314A56] text-xs font-medium text-[#8A9BA8] hover:text-[#ECEEF0] transition cursor-pointer"
                 >
                   Enter Another Referral Code
                 </button>
@@ -608,45 +605,45 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -16 }}
-              className="bg-zinc-950/80 border border-emerald-500/30 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl shadow-emerald-500/10 space-y-6"
+              className="bg-[#1B303A] border border-[#314A56] rounded-2xl p-6 sm:p-8 space-y-6 shadow-none"
             >
               <div className="space-y-2 text-center sm:text-left">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold font-mono uppercase tracking-wider">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[#0C1B23] border border-[#314A56] text-[#FFE3A6] text-xs font-bold font-mono uppercase tracking-wider">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#FFE3A6]" />
                   <span>Access Approved</span>
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-black font-['Space_Grotesk'] text-white">
+                <h1 className="text-2xl sm:text-3xl font-bold text-[#ECEEF0]">
                   Scanner Terminal Ready
                 </h1>
-                <p className="text-xs sm:text-sm text-emerald-300/90 leading-relaxed font-medium">
+                <p className="text-xs sm:text-sm text-[#FFE3A6] leading-relaxed font-medium">
                   Access approved. You can enter and use the scanner terminal for this event.
                 </p>
-                <p className="text-xs text-zinc-400 leading-relaxed">
+                <p className="text-xs text-[#8A9BA8] leading-relaxed">
                   Your scanner authorization remains active whenever you return or log into your account.
                 </p>
               </div>
 
               {/* Event & Gate Info Card */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-3.5">
+              <div className="p-4 sm:p-5 rounded-xl bg-[#0C1B23] border border-[#314A56] space-y-3.5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <span className="text-[10px] font-mono uppercase text-orange-400 font-bold">Assigned Event</span>
-                    <h2 className="text-base sm:text-lg font-bold text-white">{accessRequest.event_title}</h2>
-                    <p className="text-xs text-zinc-400 mt-0.5">{accessRequest.event_venue}</p>
+                    <span className="text-[10px] font-mono uppercase text-[#FFE3A6] font-bold">Assigned Event</span>
+                    <h2 className="text-base sm:text-lg font-bold text-[#ECEEF0]">{accessRequest.event_title}</h2>
+                    <p className="text-xs text-[#8A9BA8] mt-0.5">{accessRequest.event_venue}</p>
                   </div>
-                  <div className="px-3 py-1 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-mono font-bold shrink-0">
+                  <div className="px-3 py-1 rounded-md bg-[#1B303A] border border-[#314A56] text-[#FFE3A6] text-xs font-mono font-bold shrink-0">
                     {accessRequest.gate_name}
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-zinc-800/60 flex items-center justify-between text-xs text-zinc-400">
+                <div className="pt-3 border-t border-[#314A56] flex items-center justify-between text-xs text-[#8A9BA8]">
                   <div className="flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-zinc-500" />
+                    <User className="w-3.5 h-3.5 text-[#8A9BA8]" />
                     <span>Operator: {session.user.email}</span>
                   </div>
                   {accessRequest.referral_code && (
-                    <div className="flex items-center gap-1 text-[11px] font-mono text-zinc-400">
-                      <KeyRound className="w-3 h-3 text-orange-400" />
+                    <div className="flex items-center gap-1 text-[11px] font-mono text-[#8A9BA8]">
+                      <KeyRound className="w-3 h-3 text-[#FFE3A6]" />
                       <span>{accessRequest.referral_code}</span>
                     </div>
                   )}
@@ -656,11 +653,11 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
               {/* Start Terminal Button */}
               <button
                 onClick={() => onStartScanner(accessRequest)}
-                className="w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-[0.99] text-base font-black text-white shadow-xl shadow-emerald-500/20 transition flex items-center justify-center gap-2 font-['Space_Grotesk'] cursor-pointer"
+                className="w-full py-3.5 px-4 rounded-xl bg-[#FFE3A6] hover:bg-[#ffeac0] active:scale-[0.99] text-base font-bold text-[#10232D] transition flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Zap className="w-5 h-5 fill-current" />
+                <Zap className="w-5 h-5 fill-current text-[#10232D]" />
                 <span>Launch Scanner Terminal</span>
-                <ArrowRight className="w-5 h-5" />
+                <ArrowRight className="w-5 h-5 text-[#10232D]" />
               </button>
             </motion.div>
           )}
@@ -668,7 +665,7 @@ export const ScannerAccessGatekeeper: React.FC<ScannerAccessGatekeeperProps> = (
       </div>
 
       {/* Footer */}
-      <div className="text-center text-xs text-zinc-500 z-10">
+      <div className="text-center text-xs text-[#8A9BA8] z-10">
         ADMITTO Digital Event Access & Verification Platform
       </div>
     </div>

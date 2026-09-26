@@ -220,22 +220,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   return (
     <div
       id="login-page"
-      className="min-h-screen w-full flex flex-col items-center justify-center px-4 py-8 sm:py-12 relative overflow-x-hidden selection:bg-indigo-500 selection:text-white"
+      className="min-h-screen w-full flex flex-col items-center justify-center px-4 py-8 sm:py-12 relative overflow-x-hidden bg-[#10232D] selection:bg-[#FFE3A6] selection:text-[#10232D]"
     >
-      {/* Top Left: Small Back to Home Button */}
+      {/* Top Left: Back to Home Button */}
       <button
         type="button"
         id="login-back-to-home-btn"
         onClick={onNavigateHome}
-        className="fixed top-4 left-4 sm:top-6 sm:left-8 z-30 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 hover:border-white/25 text-xs font-medium text-slate-300 hover:text-white backdrop-blur-md shadow-lg transition-all cursor-pointer group"
+        className="fixed top-4 left-4 sm:top-6 sm:left-8 z-30 flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#1B303A] border border-[#314A56] hover:border-[#FFE3A6]/40 text-xs font-medium text-[#ECEEF0] transition-colors cursor-pointer group"
       >
-        <ArrowLeft className="w-3.5 h-3.5 text-slate-400 group-hover:text-white group-hover:-translate-x-0.5 transition-transform" />
+        <ArrowLeft className="w-3.5 h-3.5 text-[#8A9BA8] group-hover:text-[#ECEEF0] group-hover:-translate-x-0.5 transition-transform" />
         <span>Back to Home</span>
       </button>
-
-      {/* Ambient background glows */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] sm:w-[500px] h-[350px] sm:h-[400px] bg-indigo-500/20 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-[250px] sm:w-[350px] h-[250px] bg-purple-500/15 blur-[100px] rounded-full pointer-events-none" />
 
       {/* Main Container */}
       <div className="w-full max-w-[440px] space-y-6 relative z-10 my-auto">
@@ -245,16 +241,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             onClick={onNavigateHome}
             className="inline-flex items-center gap-3 cursor-pointer group justify-center"
           >
-            <AppLogo size="md" className="group-hover:scale-105 shadow-xl shadow-orange-500/20" />
-            <span className="text-2xl sm:text-3xl font-black text-white font-['Space_Grotesk'] tracking-tight">
+            <AppLogo size="md" className="group-hover:scale-105" />
+            <span className="text-2xl sm:text-3xl font-bold text-[#ECEEF0] tracking-tight">
               ADMITTO
             </span>
           </div>
 
           <div className="space-y-1 pt-1">
             {returnTo && (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] sm:text-[11px] font-bold font-mono uppercase tracking-wider mb-1">
-                <Shield className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1B303A] border border-[#FFE3A6]/30 text-[#FFE3A6] text-[10px] sm:text-[11px] font-semibold font-mono uppercase tracking-wider mb-1">
+                <Shield className="w-3.5 h-3.5 text-[#FFE3A6] shrink-0" />
                 <span>
                   {returnTo.startsWith('/admin')
                     ? 'Login Required to Create or Manage Events'
@@ -262,10 +258,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </span>
               </div>
             )}
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight font-['Space_Grotesk']">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#ECEEF0] tracking-tight">
               {authMode === 'SUPABASE' ? (returnTo?.startsWith('/admin') ? 'Administrator Sign In' : 'Welcome back') : 'Gate Scanner Login'}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400">
+            <p className="text-xs sm:text-sm text-[#8A9BA8]">
               {authMode === 'SUPABASE'
                 ? (returnTo === '/scan' || initialRole === 'SCANNER'
                     ? 'Sign in with your account or scanner station credentials.'
@@ -275,10 +271,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           </div>
         </div>
 
-        <div className="glass-card rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl border border-white/10 backdrop-blur-2xl">
+        <div className="bg-[#1B303A] rounded-2xl p-6 sm:p-8 space-y-5 border border-[#314A56]">
           {error && (
-            <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+            <div className="p-3.5 rounded-lg bg-[#E255A2]/10 border border-[#E255A2]/30 text-[#E255A2] text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[#E255A2]" />
               <span className="leading-relaxed">{error}</span>
             </div>
           )}
@@ -286,9 +282,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           {authMode === 'SUPABASE' ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300 block">Email or Station Access Code</label>
+                <label className="text-xs font-medium text-[#ECEEF0] block">Email or Station Access Code</label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Mail className="w-4 h-4 text-[#8A9BA8] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     id="login-email-input"
                     type="text"
@@ -297,27 +293,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     placeholder="name@company.com or GATE-XXXX"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full glass-input rounded-xl pl-10 pr-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 transition-colors"
+                    className="w-full bg-[#0C1B23] border border-[#314A56] rounded-lg pl-10 pr-4 py-3 text-xs sm:text-sm text-[#ECEEF0] placeholder-[#8A9BA8]/50 focus:outline-none focus:border-[#FFE3A6] transition-colors"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-300 block">Password</label>
+                  <label className="text-xs font-medium text-[#ECEEF0] block">Password</label>
                   {onNavigateForgotPassword && (
                     <button
                       type="button"
                       id="login-forgot-password-link"
                       onClick={onNavigateForgotPassword}
-                      className="text-[11px] sm:text-xs text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
+                      className="text-[11px] sm:text-xs text-[#FFE3A6] hover:underline transition-colors cursor-pointer"
                     >
                       Forgot password?
                     </button>
                   )}
                 </div>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Lock className="w-4 h-4 text-[#8A9BA8] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     id="login-password-input"
                     type={showPassword ? 'text' : 'password'}
@@ -326,12 +322,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full glass-input rounded-xl pl-10 pr-10 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 transition-colors"
+                    className="w-full bg-[#0C1B23] border border-[#314A56] rounded-lg pl-10 pr-10 py-3 text-xs sm:text-sm text-[#ECEEF0] placeholder-[#8A9BA8]/50 focus:outline-none focus:border-[#FFE3A6] transition-colors"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#8A9BA8] hover:text-[#ECEEF0] transition-colors cursor-pointer"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -342,11 +338,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 id="login-submit-btn"
                 type="submit"
                 disabled={loading || googleLoading}
-                className="w-full py-3 sm:py-3.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-[0.98] shadow-lg shadow-indigo-500/25 border border-indigo-400/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                className="w-full py-3 sm:py-3.5 rounded-lg text-xs sm:text-sm font-semibold text-[#10232D] bg-[#FFE3A6] hover:bg-[#fff0cb] active:scale-[0.99] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
                 {loading ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span className="w-4 h-4 border-2 border-[#10232D]/30 border-t-[#10232D] rounded-full animate-spin" />
                     <span>Signing in...</span>
                   </>
                 ) : (
@@ -358,8 +354,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </button>
 
               <div className="relative flex items-center justify-center pt-2">
-                <div className="border-t border-white/10 w-full" />
-                <span className="bg-[#0b0c16] px-3 text-[11px] font-mono text-slate-500 uppercase tracking-widest absolute">
+                <div className="border-t border-[#314A56] w-full" />
+                <span className="bg-[#1B303A] px-3 text-[11px] font-mono text-[#8A9BA8] uppercase tracking-widest absolute">
                   or continue with
                 </span>
               </div>
@@ -369,11 +365,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 type="button"
                 onClick={handleGoogleSignIn}
                 disabled={googleLoading || loading}
-                className="w-full py-3 rounded-xl text-xs sm:text-sm font-semibold text-white bg-white/[0.05] hover:bg-white/[0.1] active:scale-[0.98] border border-white/10 transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-60"
+                className="w-full py-3 rounded-lg text-xs sm:text-sm font-semibold text-[#ECEEF0] bg-[#10232D] hover:bg-[#152834] border border-[#314A56] transition-colors flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-60"
               >
                 {googleLoading ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span className="w-4 h-4 border-2 border-[#ECEEF0]/30 border-t-[#ECEEF0] rounded-full animate-spin" />
                     <span>Connecting to Google...</span>
                   </>
                 ) : (
@@ -387,11 +383,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label htmlFor="scanner-email-input" className="text-xs font-semibold text-slate-300 block">
+                <label htmlFor="scanner-email-input" className="text-xs font-medium text-[#ECEEF0] block">
                   Admin-Generated Scanner Email
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-purple-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Mail className="w-4 h-4 text-[#E4A0B3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     id="scanner-email-input"
                     type="email"
@@ -400,20 +396,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     placeholder="e.g. scanner-main-gate@event.admitto.local"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full glass-input rounded-xl pl-10 pr-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-400 transition-colors"
+                    className="w-full bg-[#0C1B23] border border-[#314A56] rounded-lg pl-10 pr-4 py-3 text-xs sm:text-sm text-[#ECEEF0] placeholder-[#8A9BA8]/50 focus:outline-none focus:border-[#E4A0B3] transition-colors"
                   />
                 </div>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-[#8A9BA8]">
                   Enter the scanner email created by the event administrator.
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="scanner-referral-input" className="text-xs font-semibold text-slate-300 block">
+                <label htmlFor="scanner-referral-input" className="text-xs font-medium text-[#ECEEF0] block">
                   Event Referral Code
                 </label>
                 <div className="relative">
-                  <KeyRound className="w-4 h-4 text-purple-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <KeyRound className="w-4 h-4 text-[#E4A0B3] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     id="scanner-referral-input"
                     type="text"
@@ -421,10 +417,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     placeholder="e.g. GTS26-K7P9"
                     value={scannerReferralCode}
                     onChange={(e) => setScannerReferralCode(e.target.value.toUpperCase())}
-                    className="w-full glass-input rounded-xl pl-10 pr-4 py-3 text-xs sm:text-sm text-white font-mono placeholder-slate-500 uppercase tracking-wider focus:outline-none focus:border-purple-400 transition-colors"
+                    className="w-full bg-[#0C1B23] border border-[#314A56] rounded-lg pl-10 pr-4 py-3 text-xs sm:text-sm text-[#ECEEF0] font-mono placeholder-[#8A9BA8]/50 uppercase tracking-wider focus:outline-none focus:border-[#E4A0B3] transition-colors"
                   />
                 </div>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-[#8A9BA8]">
                   Enter the referral code provided for this event.
                 </p>
               </div>
@@ -433,11 +429,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 id="scanner-referral-submit-btn"
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 sm:py-3.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.98] shadow-lg shadow-purple-500/25 border border-purple-400/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                className="w-full py-3 sm:py-3.5 rounded-lg text-xs sm:text-sm font-semibold text-[#10232D] bg-[#E4A0B3] hover:bg-[#ebafbf] active:scale-[0.99] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
                 {loading ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span className="w-4 h-4 border-2 border-[#10232D]/30 border-t-[#10232D] rounded-full animate-spin" />
                     <span>Verifying Credentials...</span>
                   </>
                 ) : (
@@ -450,16 +446,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </form>
           )}
 
-          <div className="pt-2 border-t border-white/10 space-y-3 text-center">
+          <div className="pt-2 border-t border-[#314A56] space-y-3 text-center">
             {authMode === 'SUPABASE' ? (
               <>
-                <p className="text-xs sm:text-sm text-slate-400">
+                <p className="text-xs sm:text-sm text-[#8A9BA8]">
                   Don't have an account?{' '}
                   <button
                     type="button"
                     id="login-to-signup-link"
                     onClick={onNavigateSignUp}
-                    className="font-bold text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer ml-1 underline decoration-indigo-400/40 underline-offset-2"
+                    className="font-semibold text-[#FFE3A6] hover:underline transition-colors cursor-pointer ml-1"
                   >
                     Create an account
                   </button>
@@ -472,7 +468,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       setAuthMode('SCANNER_CODE');
                       setError(null);
                     }}
-                    className="text-[11px] text-slate-400 hover:text-purple-300 transition-colors flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
+                    className="text-[11px] text-[#8A9BA8] hover:text-[#E4A0B3] transition-colors flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
                   >
                     <Smartphone className="w-3.5 h-3.5" />
                     <span>Looking for Gate Scanner? Sign in with Scanner Email & Referral Code</span>
@@ -486,7 +482,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   setAuthMode('SUPABASE');
                   setError(null);
                 }}
-                className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold transition-colors cursor-pointer"
+                className="text-xs text-[#FFE3A6] hover:underline font-medium transition-colors cursor-pointer"
               >
                 ← Back to ADMITTO Account Login
               </button>
@@ -498,7 +494,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           <button
             type="button"
             onClick={onNavigateHome}
-            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer py-1"
+            className="inline-flex items-center gap-1.5 text-xs text-[#8A9BA8] hover:text-[#ECEEF0] transition-colors cursor-pointer py-1"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Home</span>
@@ -507,23 +503,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       </div>
 
       {showLoginRequiredModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-zinc-950 border border-purple-500/30 rounded-3xl p-6 sm:p-7 space-y-5 shadow-2xl shadow-purple-500/10 text-center">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+        <div className="fixed inset-0 z-50 bg-[#10232D]/80 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#1B303A] border border-[#314A56] rounded-2xl p-6 sm:p-7 space-y-5 text-center">
+            <div className="w-14 h-14 mx-auto rounded-xl bg-[#10232D] border border-[#314A56] flex items-center justify-center text-[#FFE3A6]">
               <Shield className="w-7 h-7" />
             </div>
 
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] sm:text-[11px] font-mono font-bold uppercase tracking-wider">
-                <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#10232D] border border-[#FFE3A6]/30 text-[#FFE3A6] text-[10px] sm:text-[11px] font-mono font-semibold uppercase tracking-wider">
+                <AlertCircle className="w-3.5 h-3.5 text-[#FFE3A6] shrink-0" />
                 <span>Login Required</span>
               </div>
-              <h2 className="text-xl font-black text-white font-['Space_Grotesk'] tracking-tight">
+              <h2 className="text-xl font-bold text-[#ECEEF0] tracking-tight">
                 Sign In to Connect Scanner
               </h2>
-              <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto">
+              <p className="text-xs text-[#8A9BA8] leading-relaxed max-w-sm mx-auto">
                 You must be logged in to your ADMITTO account before connecting to an event with referral code{' '}
-                <span className="font-mono font-bold text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">
+                <span className="font-mono font-bold text-[#FFE3A6] bg-[#10232D] px-1.5 py-0.5 rounded border border-[#314A56]">
                   {scannerReferralCode.trim() || 'CODE'}
                 </span>
                 . Please log in or create an account to proceed.
@@ -539,7 +535,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   setShowLoginRequiredModal(false);
                   setAuthMode('SUPABASE');
                 }}
-                className="w-full py-3 sm:py-3.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.98] shadow-lg shadow-purple-500/25 border border-purple-400/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3 sm:py-3.5 rounded-lg text-xs sm:text-sm font-semibold text-[#10232D] bg-[#FFE3A6] hover:bg-[#fff0cb] transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 <LogIn className="w-4 h-4" />
                 <span>Go to Login & Continue</span>
@@ -548,7 +544,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <button
                 type="button"
                 onClick={() => setShowLoginRequiredModal(false)}
-                className="w-full py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer"
+                className="w-full py-2.5 rounded-lg text-xs font-medium text-[#8A9BA8] hover:text-[#ECEEF0] transition-colors cursor-pointer"
               >
                 Cancel
               </button>

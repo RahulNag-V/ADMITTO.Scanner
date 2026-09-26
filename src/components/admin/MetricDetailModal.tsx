@@ -209,19 +209,16 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       {/* 1. Backdrop Overlay */}
       <div
         onClick={onClose}
-        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md transition-opacity animate-fade-in"
+        className="fixed inset-0 bg-[#10232D]/80 transition-opacity animate-fade-in"
       />
 
       {/* 2. Modal Main Card */}
       <div
-        className="relative w-full max-w-3xl max-h-[92dvh] h-auto bg-[#0d122b] border border-white/20 rounded-3xl sm:rounded-[2rem] shadow-[0_25px_80px_rgba(0,0,0,0.95)] flex flex-col overflow-hidden z-10 animate-scale-up"
+        className="relative w-full max-w-3xl max-h-[92dvh] h-auto bg-[#1B303A] border border-[#314A56] rounded-2xl flex flex-col overflow-hidden z-10 animate-scale-up"
         style={{ animationDuration: '200ms' }}
       >
-        {/* Top Gradient Ambient Line */}
-        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-500" />
-
         {/* Modal Top Bar Header */}
-        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-white/10 flex items-center justify-between shrink-0 bg-white/[0.04]">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#314A56] flex items-center justify-between shrink-0 bg-[#1B303A]">
           <div className="flex items-center gap-3 min-w-0">
             <div
               className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${

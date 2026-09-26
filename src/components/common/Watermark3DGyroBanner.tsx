@@ -150,52 +150,26 @@ export const Watermark3DGyroBanner: React.FC = () => {
   return (
     <div
       id="watermark-3d-gyro-section"
-      className="relative max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 pt-6 sm:pt-10 pb-4 my-6 sm:my-10 select-none w-full"
+      className="relative max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 pb-2 my-4 select-none w-full"
       style={{ perspective: 1400 }}
     >
       <div
         ref={containerRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        className="relative w-full rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-10 lg:p-12 transition-transform duration-100 ease-out overflow-hidden border border-white/20 bg-gradient-to-b from-[#181d3d] via-[#10142e] to-[#090c20] shadow-[0_25px_70px_-15px_rgba(99,102,241,0.45)] group"
+        className="relative w-full rounded-2xl p-6 sm:p-10 lg:p-12 transition-transform duration-100 ease-out overflow-hidden border border-[#314A56] bg-[#1B303A] group"
         style={{
           transform: `rotateX(${safeRotX}deg) rotateY(${safeRotY}deg)`,
           willChange: 'transform',
         }}
       >
-        {/* Dynamic Holographic Glare Shimmer */}
-        <div
-          className="absolute inset-0 pointer-events-none transition-opacity duration-300 rounded-3xl sm:rounded-[2.5rem] opacity-40 z-20"
-          style={{
-            background: `radial-gradient(circle 500px at ${glarePosition.x}% ${glarePosition.y}%, rgba(255, 255, 255, 0.22), rgba(99, 102, 241, 0.12) 40%, transparent 80%)`,
-          }}
-        />
-
-        {/* Ambient Glow Orbs */}
-        <div className="absolute -top-20 left-1/4 w-72 sm:w-96 h-40 bg-indigo-500/25 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-20 right-1/4 w-72 sm:w-96 h-40 bg-purple-500/25 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Exact Card-Width 3D Background Watermark Typography with Vibrant Gradient */}
-        <div className="absolute inset-x-0 sm:inset-x-0 inset-y-0 flex items-center justify-center pointer-events-none overflow-hidden z-0">
+        {/* Subtle Watermark Typography */}
+        <div className="absolute inset-x-0 inset-y-0 flex items-center justify-center pointer-events-none overflow-hidden z-0">
           <svg
             viewBox="0 0 1000 220"
-            className="w-full h-auto max-h-full opacity-[0.14] sm:opacity-[0.18] select-none filter drop-shadow-[0_0_90px_rgba(139,92,246,0.6)]"
+            className="w-full h-auto max-h-full opacity-15 select-none"
             preserveAspectRatio="xMidYMid meet"
           >
-            <defs>
-              <linearGradient id="cardWatermarkGrad" x1="0%" y1="0%" x2="100%" y2="80%">
-                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.95" />
-                <stop offset="25%" stopColor="#818cf8" stopOpacity="0.9" />
-                <stop offset="55%" stopColor="#c084fc" stopOpacity="0.85" />
-                <stop offset="80%" stopColor="#f472b6" stopOpacity="0.85" />
-                <stop offset="100%" stopColor="#fb923c" stopOpacity="0.9" />
-              </linearGradient>
-              <linearGradient id="cardWatermarkStrokeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
-                <stop offset="50%" stopColor="#c084fc" stopOpacity="0.5" />
-                <stop offset="100%" stopColor="#f472b6" stopOpacity="0.4" />
-              </linearGradient>
-            </defs>
             <text
               x="500"
               y="120"
@@ -203,11 +177,11 @@ export const Watermark3DGyroBanner: React.FC = () => {
               dominantBaseline="central"
               fontSize="215"
               fontWeight="900"
-              fontFamily="'Space Grotesk', system-ui, sans-serif"
+              fontFamily="Poppins, system-ui, sans-serif"
               letterSpacing="0.04em"
-              fill="url(#cardWatermarkGrad)"
-              stroke="url(#cardWatermarkStrokeGrad)"
-              strokeWidth="2"
+              fill="none"
+              stroke="#314A56"
+              strokeWidth="3"
             >
               ADMITTO
             </text>
@@ -216,37 +190,35 @@ export const Watermark3DGyroBanner: React.FC = () => {
 
         {/* Foreground Content Card */}
         <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-3 sm:space-y-4">
-          {/* Centered Logo with Animated Glow */}
           <div className="relative">
-            <div className="absolute -inset-3 bg-gradient-to-r from-orange-500/40 via-indigo-500/50 to-pink-500/40 rounded-full blur-xl animate-pulse" />
-            <AppLogo size="lg" className="shadow-2xl shadow-orange-500/35 relative z-10" />
+            <AppLogo size="lg" className="relative z-10" />
           </div>
 
           {/* Title & Tagline */}
           <div className="space-y-1">
-            <h3 className="text-2xl sm:text-4xl lg:text-5xl font-black font-['Space_Grotesk'] tracking-tight text-white drop-shadow-[0_4px_25px_rgba(0,0,0,0.8)]">
+            <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-[#ECEEF0]">
               ADMITTO
             </h3>
 
-            <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto font-medium leading-relaxed px-2">
+            <p className="text-xs sm:text-sm text-[#8A9BA8] max-w-lg mx-auto font-medium leading-relaxed px-2">
               Industrial Digital Token Validation & High-Throughput Gate Admission Engine
             </p>
           </div>
 
           {/* Feature Badges */}
           <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/[0.06] border border-white/12 text-slate-200 text-[11px] sm:text-xs font-semibold shadow-md">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#10232D] border border-[#314A56] text-[#ECEEF0] text-[11px] sm:text-xs font-medium">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#FFE3A6] shrink-0" />
               <span>Atomic Check-In</span>
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/[0.06] border border-white/12 text-slate-200 text-[11px] sm:text-xs font-semibold shadow-md">
-              <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#10232D] border border-[#314A56] text-[#ECEEF0] text-[11px] sm:text-xs font-medium">
+              <Zap className="w-3.5 h-3.5 text-[#FFE3A6] shrink-0" />
               <span>Sub-50ms Optical Scan</span>
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/[0.06] border border-white/12 text-slate-200 text-[11px] sm:text-xs font-semibold shadow-md">
-              <Compass className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#10232D] border border-[#314A56] text-[#ECEEF0] text-[11px] sm:text-xs font-medium">
+              <Compass className="w-3.5 h-3.5 text-[#E4A0B3] shrink-0" />
               <span>Multi-Gate Sync</span>
             </div>
           </div>

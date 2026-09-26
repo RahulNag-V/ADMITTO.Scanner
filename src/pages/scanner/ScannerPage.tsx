@@ -1228,21 +1228,21 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
   return (
     <div
       id="scanner-terminal-app"
-      className="h-full h-[100dvh] max-h-[100dvh] w-full overflow-hidden mesh-bg text-slate-100 flex flex-col selection:bg-indigo-500 selection:text-white relative"
+      className="h-full h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-[#10232D] text-[#ECEEF0] flex flex-col selection:bg-[#FFE3A6] selection:text-[#10232D] relative"
     >
       {/* Floating Live Sync Toast from Peer Scanners */}
       {peerNotification && (
-        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 max-w-md w-[92%] sm:w-auto bg-[#181d33]/95 border border-indigo-500/40 backdrop-blur-2xl rounded-2xl p-3 sm:px-4 sm:py-2.5 shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-3 duration-200">
-          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 max-w-md w-[92%] sm:w-auto bg-[#1B303A] border border-[#314A56] rounded-xl p-3 sm:px-4 sm:py-2.5 shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-3 duration-200">
+          <div className="w-8 h-8 rounded-lg bg-[#10232D] border border-[#314A56] text-[#FFE3A6] flex items-center justify-center shrink-0">
             <CheckCheck className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-xs font-bold text-white truncate flex items-center gap-1.5">
-              <span className="text-indigo-300 font-semibold">{peerNotification.scannerName}</span>
-              <span className="text-slate-400 font-normal">checked in</span>
-              <span className="text-emerald-300">{peerNotification.studentName}</span>
+            <div className="text-xs font-bold text-[#ECEEF0] truncate flex items-center gap-1.5">
+              <span className="text-[#FFE3A6] font-semibold">{peerNotification.scannerName}</span>
+              <span className="text-[#8A9BA8] font-normal">checked in</span>
+              <span className="text-[#E4A0B3]">{peerNotification.studentName}</span>
             </div>
-            <div className="text-[11px] text-slate-300 font-mono truncate flex items-center gap-2">
+            <div className="text-[11px] text-[#8A9BA8] font-mono truncate flex items-center gap-2">
               <span>{peerNotification.usn}</span>
               {peerNotification.branch && <span>• {peerNotification.branch}</span>}
               {(peerNotification.year || peerNotification.section) && (
@@ -1254,14 +1254,14 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
       )}
 
       {/* 1. Universal Top Header Bar with Refresh Action */}
-      <header className="glass-header border-b border-white/[0.08] px-3.5 sm:px-6 py-2.5 sm:py-3 sticky top-0 z-40 flex items-center justify-between shadow-lg shrink-0">
+      <header className="bg-[#10232D] border-b border-[#314A56] px-3.5 sm:px-6 py-2.5 sm:py-3 sticky top-0 z-40 flex items-center justify-between shrink-0">
         <div
           onClick={onNavigateHome}
           className={`flex items-center gap-2.5 sm:gap-3 min-w-0 ${onNavigateHome ? 'cursor-pointer group select-none' : ''}`}
           title={onNavigateHome ? 'Return to Home Page' : undefined}
         >
           {event?.banner_url ? (
-            <div className="relative w-9 h-9 rounded-xl overflow-hidden border border-white/20 shrink-0 shadow-md bg-zinc-900 group-hover:scale-105 transition-transform">
+            <div className="relative w-9 h-9 rounded-lg overflow-hidden border border-[#314A56] shrink-0 bg-[#0C1B23] group-hover:scale-105 transition-transform">
               <img
                 src={event.banner_url}
                 alt={event.title || 'Event Poster'}
@@ -1269,13 +1269,13 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
               />
             </div>
           ) : (
-            <AppLogo size="sm" className="shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform" />
+            <AppLogo size="sm" className="group-hover:scale-105 transition-transform" />
           )}
           <div className="min-w-0">
-            <h1 className="text-sm font-extrabold text-white tracking-tight leading-tight truncate group-hover:text-orange-400 transition-colors">
+            <h1 className="text-sm font-bold text-[#ECEEF0] tracking-tight leading-tight truncate group-hover:text-[#FFE3A6] transition-colors">
               {scannerName}
             </h1>
-            <p className="text-[11px] text-slate-400 truncate max-w-[180px] sm:max-w-md font-medium">
+            <p className="text-[11px] text-[#8A9BA8] truncate max-w-[180px] sm:max-w-md font-medium">
               {event?.title || initialEventTitle}
             </p>
           </div>
@@ -1288,10 +1288,10 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
               id="scanner-header-home-btn"
               type="button"
               onClick={onNavigateHome}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.07] hover:bg-white/[0.14] active:scale-95 border border-white/10 text-xs font-semibold text-slate-200 transition-all cursor-pointer shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1B303A] hover:bg-[#223b47] border border-[#314A56] text-xs font-medium text-[#ECEEF0] transition-colors cursor-pointer"
               title="Return to Home Page"
             >
-              <Home className="w-3.5 h-3.5 text-indigo-400" />
+              <Home className="w-3.5 h-3.5 text-[#FFE3A6]" />
               <span className="text-[11px] font-medium hidden xs:inline sm:inline">
                 Home
               </span>
@@ -1303,22 +1303,22 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
             type="button"
             onClick={handleManualRefresh}
             disabled={isRefreshing || isLoadingData}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.07] hover:bg-white/[0.14] active:scale-95 border border-white/10 text-xs font-semibold text-slate-200 transition-all cursor-pointer disabled:opacity-60 shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1B303A] hover:bg-[#223b47] border border-[#314A56] text-xs font-medium text-[#ECEEF0] transition-colors cursor-pointer disabled:opacity-60"
             title="Refresh Roster & Sync Scans"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-indigo-400 ${isRefreshing ? 'animate-spin text-indigo-300' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-[#FFE3A6] ${isRefreshing ? 'animate-spin' : ''}`} />
             <span className="text-[11px] font-mono font-medium hidden xs:inline sm:inline">
               {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </span>
           </button>
 
           <div
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] sm:text-[11px] font-mono border ${
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono border ${
               syncStatus.isSyncing
-                ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300 animate-pulse'
+                ? 'bg-[#1B303A] border-[#E4A0B3]/50 text-[#E4A0B3]'
                 : isOnline
-                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
-                : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+                ? 'bg-[#1B303A] border-[#FFE3A6]/40 text-[#FFE3A6]'
+                : 'bg-[#1B303A] border-[#314A56] text-[#8A9BA8]'
             }`}
             title={
               syncStatus.isSyncing
@@ -1331,13 +1331,13 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
             <span
               className={`w-1.5 h-1.5 rounded-full ${
                 syncStatus.isSyncing
-                  ? 'bg-indigo-400 animate-spin'
+                  ? 'bg-[#E4A0B3] animate-spin'
                   : isOnline
-                  ? 'bg-emerald-400 animate-pulse'
-                  : 'bg-amber-400'
+                  ? 'bg-[#FFE3A6]'
+                  : 'bg-[#8A9BA8]'
               }`}
             />
-            <span className="font-bold">
+            <span className="font-semibold">
               {syncStatus.isSyncing
                 ? `SYNCING ${syncStatus.pendingCount}`
                 : isOnline

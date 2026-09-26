@@ -22,25 +22,16 @@ export const ScrollingCautionTape: React.FC<CautionTapeProps> = ({ className = '
       id="scrolling-caution-tape-section"
       className={`relative w-full py-4 overflow-hidden select-none my-2 ${className}`}
     >
-      {/* Tape 1: Slanted Left-to-Right Scrolling Hazard Ribbon */}
-      <div className="relative -rotate-1 scale-105 sm:scale-100 shadow-xl shadow-amber-500/10">
-        <div className="relative w-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-black py-2 sm:py-2.5 font-black tracking-wider uppercase font-['Space_Grotesk'] text-xs sm:text-sm border-y-2 border-black/80 flex items-center overflow-hidden shadow-2xl">
+      {/* Tape 1: Slanted Left-to-Right Ribbon */}
+      <div className="relative -rotate-1 scale-105 sm:scale-100">
+        <div className="relative w-full bg-[#FFE3A6] text-[#10232D] py-1.5 sm:py-2 font-semibold tracking-wider uppercase font-['Poppins'] text-xs sm:text-sm border-y border-[#314A56] flex items-center overflow-hidden">
           
-          {/* Animated Hazard Striped Background Accent Overlay */}
-          <div
-            className="absolute inset-0 opacity-15 pointer-events-none"
-            style={{
-              backgroundImage:
-                'repeating-linear-gradient(45deg, #000 0, #000 20px, transparent 20px, transparent 40px)',
-            }}
-          />
-
           {/* Marquee Track 1 */}
           <div className="flex shrink-0 animate-marquee whitespace-nowrap items-center">
             {tapeTextItems.map((text, i) => (
-              <span key={`tape1-a-${i}`} className="inline-flex items-center gap-2 mx-4 font-mono font-black">
+              <span key={`tape1-a-${i}`} className="inline-flex items-center gap-2 mx-4 font-mono font-bold">
                 <span>{text}</span>
-                <span className="text-black/60">•</span>
+                <span className="text-[#10232D]/40">•</span>
               </span>
             ))}
           </div>
@@ -48,18 +39,18 @@ export const ScrollingCautionTape: React.FC<CautionTapeProps> = ({ className = '
           {/* Marquee Track 1 Duplicate for Seamless Loop */}
           <div className="flex shrink-0 animate-marquee whitespace-nowrap items-center" aria-hidden="true">
             {tapeTextItems.map((text, i) => (
-              <span key={`tape1-b-${i}`} className="inline-flex items-center gap-2 mx-4 font-mono font-black">
+              <span key={`tape1-b-${i}`} className="inline-flex items-center gap-2 mx-4 font-mono font-bold">
                 <span>{text}</span>
-                <span className="text-black/60">•</span>
+                <span className="text-[#10232D]/40">•</span>
               </span>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Tape 2: Counter-Slanted Reverse Scrolling Dark Neon Ribbon */}
-      <div className="relative rotate-1 -mt-2.5 scale-105 sm:scale-100 opacity-95">
-        <div className="relative w-full bg-[#080b18] text-amber-400 py-1.5 sm:py-2 font-mono font-bold tracking-widest uppercase text-[11px] sm:text-xs border-y border-amber-400/30 flex items-center overflow-hidden shadow-xl backdrop-blur-md">
+      {/* Tape 2: Counter-Slanted Reverse Scrolling Ribbon */}
+      <div className="relative rotate-1 -mt-2 scale-105 sm:scale-100">
+        <div className="relative w-full bg-[#1B303A] text-[#FFE3A6] py-1.5 sm:py-2 font-mono font-medium tracking-widest uppercase text-[11px] sm:text-xs border-y border-[#314A56] flex items-center overflow-hidden">
           
           {/* Marquee Track 2 (Reverse Direction) */}
           <div className="flex shrink-0 animate-marquee-reverse whitespace-nowrap items-center">

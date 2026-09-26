@@ -165,22 +165,18 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   return (
     <div
       id="signup-page"
-      className="min-h-screen w-full flex flex-col items-center justify-center px-4 py-8 sm:py-12 relative overflow-x-hidden selection:bg-indigo-500 selection:text-white"
+      className="min-h-screen w-full flex flex-col items-center justify-center px-4 py-8 sm:py-12 relative overflow-x-hidden bg-[#10232D] selection:bg-[#FFE3A6] selection:text-[#10232D]"
     >
-      {/* Top Left: Small Back to Home Button */}
+      {/* Top Left: Back to Home Button */}
       <button
         type="button"
         id="signup-back-to-home-btn"
         onClick={onNavigateHome}
-        className="fixed top-4 left-4 sm:top-6 sm:left-8 z-30 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 hover:border-white/25 text-xs font-medium text-slate-300 hover:text-white backdrop-blur-md shadow-lg transition-all cursor-pointer group"
+        className="fixed top-4 left-4 sm:top-6 sm:left-8 z-30 flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#1B303A] border border-[#314A56] hover:border-[#FFE3A6]/40 text-xs font-medium text-[#ECEEF0] transition-colors cursor-pointer group"
       >
-        <ArrowLeft className="w-3.5 h-3.5 text-slate-400 group-hover:text-white group-hover:-translate-x-0.5 transition-transform" />
+        <ArrowLeft className="w-3.5 h-3.5 text-[#8A9BA8] group-hover:text-[#ECEEF0] group-hover:-translate-x-0.5 transition-transform" />
         <span>Back to Home</span>
       </button>
-
-      {/* Ambient background glows */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] sm:w-[500px] h-[350px] sm:h-[400px] bg-indigo-500/20 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-1/4 left-1/4 w-[250px] sm:w-[350px] h-[250px] bg-purple-500/15 blur-[100px] rounded-full pointer-events-none" />
 
       {/* Main Container */}
       <div className="w-full max-w-[440px] space-y-6 relative z-10 my-auto">
@@ -190,28 +186,28 @@ export const SignupPage: React.FC<SignupPageProps> = ({
             onClick={onNavigateHome}
             className="inline-flex items-center gap-3 cursor-pointer group justify-center"
           >
-            <AppLogo size="md" className="group-hover:scale-105 shadow-xl shadow-orange-500/20" />
-            <span className="text-2xl sm:text-3xl font-black text-white font-['Space_Grotesk'] tracking-tight">
+            <AppLogo size="md" className="group-hover:scale-105" />
+            <span className="text-2xl sm:text-3xl font-bold text-[#ECEEF0] tracking-tight">
               ADMITTO
             </span>
           </div>
 
           <div className="space-y-1 pt-1">
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight font-['Space_Grotesk']">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#ECEEF0] tracking-tight">
               Create your account
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400">
+            <p className="text-xs sm:text-sm text-[#8A9BA8]">
               Get started with enterprise digital event access
             </p>
           </div>
         </div>
 
         {/* Card */}
-        <div className="glass-card rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl border border-white/10 backdrop-blur-2xl">
+        <div className="bg-[#1B303A] rounded-2xl p-6 sm:p-8 space-y-5 border border-[#314A56]">
           {/* Error Alert */}
           {error && (
-            <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+            <div className="p-3.5 rounded-lg bg-[#E255A2]/10 border border-[#E255A2]/30 text-[#E255A2] text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[#E255A2]" />
               <span className="leading-relaxed">{error}</span>
             </div>
           )}
@@ -222,16 +218,16 @@ export const SignupPage: React.FC<SignupPageProps> = ({
             type="button"
             onClick={handleGoogleSignUp}
             disabled={googleLoading || loading}
-            className="w-full py-3.5 rounded-xl text-xs sm:text-sm font-semibold text-white bg-white/[0.08] hover:bg-white/[0.14] active:scale-[0.98] border border-white/15 hover:border-white/25 shadow-lg shadow-black/20 transition-all flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60 group"
+            className="w-full py-3.5 rounded-lg text-xs sm:text-sm font-semibold text-[#ECEEF0] bg-[#10232D] hover:bg-[#152834] active:scale-[0.99] border border-[#314A56] transition-colors flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60 group"
           >
             {googleLoading ? (
               <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-[#ECEEF0]/30 border-t-[#ECEEF0] rounded-full animate-spin" />
                 <span>Connecting to Google...</span>
               </>
             ) : (
               <>
-                <GoogleIcon className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                <GoogleIcon className="w-4 h-4" />
                 <span>Sign up with Google</span>
               </>
             )}
@@ -239,8 +235,8 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
           {/* Elegant Divider */}
           <div className="relative flex items-center justify-center py-1">
-            <div className="border-t border-white/10 w-full" />
-            <span className="bg-[#0b0c16] px-3 text-[11px] font-mono text-slate-500 uppercase tracking-wider absolute">
+            <div className="border-t border-[#314A56] w-full" />
+            <span className="bg-[#1B303A] px-3 text-[11px] font-mono text-[#8A9BA8] uppercase tracking-wider absolute">
               or continue with email
             </span>
           </div>
@@ -248,11 +244,11 @@ export const SignupPage: React.FC<SignupPageProps> = ({
           <form onSubmit={handleSubmit} className="space-y-4 pt-1">
             {/* Full Name */}
             <div className="space-y-1.5">
-              <label htmlFor="signup-name-input" className="text-xs font-semibold text-slate-300 block">
+              <label htmlFor="signup-name-input" className="text-xs font-medium text-[#ECEEF0] block">
                 Full Name
               </label>
               <div className="relative">
-                <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <User className="w-4 h-4 text-[#8A9BA8] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   id="signup-name-input"
                   type="text"
@@ -261,18 +257,18 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                   placeholder="e.g. Alex Morgan"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full glass-input rounded-xl pl-10 pr-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 transition-colors"
+                  className="w-full bg-[#0C1B23] border border-[#314A56] rounded-lg pl-10 pr-4 py-3 text-xs sm:text-sm text-[#ECEEF0] placeholder-[#8A9BA8]/50 focus:outline-none focus:border-[#FFE3A6] transition-colors"
                 />
               </div>
             </div>
 
             {/* Email Address */}
             <div className="space-y-1.5">
-              <label htmlFor="signup-email-input" className="text-xs font-semibold text-slate-300 block">
+              <label htmlFor="signup-email-input" className="text-xs font-medium text-[#ECEEF0] block">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Mail className="w-4 h-4 text-[#8A9BA8] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   id="signup-email-input"
                   type="email"
@@ -281,19 +277,19 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                   placeholder="name@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full glass-input rounded-xl pl-10 pr-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 transition-colors"
+                  className="w-full bg-[#0C1B23] border border-[#314A56] rounded-lg pl-10 pr-4 py-3 text-xs sm:text-sm text-[#ECEEF0] placeholder-[#8A9BA8]/50 focus:outline-none focus:border-[#FFE3A6] transition-colors"
                 />
               </div>
             </div>
 
             {/* Phone Number */}
             <div className="space-y-1.5">
-              <label htmlFor="signup-phone-input" className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+              <label htmlFor="signup-phone-input" className="text-xs font-medium text-[#ECEEF0] flex items-center justify-between">
                 <span>Phone Number</span>
-                <span className="text-[11px] font-normal text-slate-500">Optional</span>
+                <span className="text-[11px] font-normal text-[#8A9BA8]">Optional</span>
               </label>
               <div className="relative">
-                <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Phone className="w-4 h-4 text-[#8A9BA8] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   id="signup-phone-input"
                   type="tel"
@@ -301,18 +297,18 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                   placeholder="e.g. +1 (555) 234-5678"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full glass-input rounded-xl pl-10 pr-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 transition-colors"
+                  className="w-full bg-[#0C1B23] border border-[#314A56] rounded-lg pl-10 pr-4 py-3 text-xs sm:text-sm text-[#ECEEF0] placeholder-[#8A9BA8]/50 focus:outline-none focus:border-[#FFE3A6] transition-colors"
                 />
               </div>
             </div>
 
             {/* Password */}
             <div className="space-y-1.5">
-              <label htmlFor="signup-password-input" className="text-xs font-semibold text-slate-300 block">
+              <label htmlFor="signup-password-input" className="text-xs font-medium text-[#ECEEF0] block">
                 Password
               </label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Lock className="w-4 h-4 text-[#8A9BA8] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   id="signup-password-input"
                   type={showPassword ? 'text' : 'password'}
@@ -321,12 +317,12 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                   placeholder="At least 6 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full glass-input rounded-xl pl-10 pr-10 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 transition-colors"
+                  className="w-full bg-[#0C1B23] border border-[#314A56] rounded-lg pl-10 pr-10 py-3 text-xs sm:text-sm text-[#ECEEF0] placeholder-[#8A9BA8]/50 focus:outline-none focus:border-[#FFE3A6] transition-colors"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#8A9BA8] hover:text-[#ECEEF0] transition-colors cursor-pointer"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -336,11 +332,11 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
             {/* Confirm Password */}
             <div className="space-y-1.5">
-              <label htmlFor="signup-confirm-password-input" className="text-xs font-semibold text-slate-300 block">
+              <label htmlFor="signup-confirm-password-input" className="text-xs font-medium text-[#ECEEF0] block">
                 Confirm Password
               </label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Lock className="w-4 h-4 text-[#8A9BA8] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   id="signup-confirm-password-input"
                   type={showConfirmPassword ? 'text' : 'password'}
@@ -349,12 +345,12 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                   placeholder="Re-enter password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full glass-input rounded-xl pl-10 pr-10 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 transition-colors"
+                  className="w-full bg-[#0C1B23] border border-[#314A56] rounded-lg pl-10 pr-10 py-3 text-xs sm:text-sm text-[#ECEEF0] placeholder-[#8A9BA8]/50 focus:outline-none focus:border-[#FFE3A6] transition-colors"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#8A9BA8] hover:text-[#ECEEF0] transition-colors cursor-pointer"
                   aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                 >
                   {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -367,11 +363,11 @@ export const SignupPage: React.FC<SignupPageProps> = ({
               id="signup-submit-btn"
               type="submit"
               disabled={loading || googleLoading}
-              className="w-full mt-2 py-3 sm:py-3.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-[0.98] shadow-lg shadow-indigo-500/25 border border-indigo-400/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full mt-2 py-3 sm:py-3.5 rounded-lg text-xs sm:text-sm font-semibold text-[#10232D] bg-[#FFE3A6] hover:bg-[#fff0cb] active:scale-[0.99] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-[#10232D]/30 border-t-[#10232D] rounded-full animate-spin" />
                   <span>Creating account...</span>
                 </>
               ) : (
@@ -384,14 +380,14 @@ export const SignupPage: React.FC<SignupPageProps> = ({
           </form>
 
           {/* Link to Login */}
-          <div className="pt-2 border-t border-white/10 text-center">
-            <p className="text-xs sm:text-sm text-slate-400">
+          <div className="pt-2 border-t border-[#314A56] text-center">
+            <p className="text-xs sm:text-sm text-[#8A9BA8]">
               Already have an account?{' '}
               <button
                 type="button"
                 id="signup-to-login-link"
                 onClick={onNavigateLogin}
-                className="font-bold text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer ml-1 underline decoration-indigo-400/40 underline-offset-2"
+                className="font-semibold text-[#FFE3A6] hover:underline transition-colors cursor-pointer ml-1"
               >
                 Sign in
               </button>
@@ -400,8 +396,8 @@ export const SignupPage: React.FC<SignupPageProps> = ({
         </div>
 
         {/* Security assurance */}
-        <div className="flex items-center justify-center gap-2 text-[11px] text-slate-500">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+        <div className="flex items-center justify-center gap-2 text-[11px] text-[#8A9BA8]">
+          <ShieldCheck className="w-3.5 h-3.5 text-[#FFE3A6]" />
           <span>256-bit encrypted SSL & secure OAuth 2.0 authentication</span>
         </div>
 
@@ -410,7 +406,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
           <button
             type="button"
             onClick={onNavigateHome}
-            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer py-1"
+            className="inline-flex items-center gap-1.5 text-xs text-[#8A9BA8] hover:text-[#ECEEF0] transition-colors cursor-pointer py-1"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Home</span>

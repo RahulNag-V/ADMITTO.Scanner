@@ -2703,19 +2703,19 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                   <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 space-y-4">
                     <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800/80">
                       <div>
-                        <div className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-2">
-                          <Sliders className="w-3.5 h-3.5 text-orange-400" />
+                        <div className="text-xs font-bold text-[#ECEEF0] uppercase tracking-wider flex items-center gap-2 font-mono">
+                          <Sliders className="w-3.5 h-3.5 text-[#FFE3A6]" />
                           <span>BARCODE EXTRACTION CONFIGURATION</span>
                         </div>
-                        <p className="text-[11px] text-zinc-400 mt-0.5">
-                          Configure which part of <strong className="text-orange-400">{activeBarcodeTargetKey}</strong> is used for barcode identification.
+                        <p className="text-[11px] text-[#8A9BA8] mt-0.5">
+                          Configure which part of <strong className="text-[#FFE3A6]">{activeBarcodeTargetKey}</strong> is used for barcode identification.
                         </p>
                       </div>
                     </div>
 
                     {/* Extraction Mode: Custom Portion vs Full ID */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+                      <label className="text-[11px] font-semibold text-[#8A9BA8] uppercase tracking-wider">
                         Extraction Mode
                       </label>
                       <div className="grid grid-cols-2 gap-2">
@@ -2724,11 +2724,11 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                           onClick={() => setBarcodeExtractionMode('custom')}
                           className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                             barcodeExtractionMode === 'custom'
-                              ? 'bg-orange-500/20 border-orange-500/60 text-orange-300 ring-1 ring-orange-500/30'
-                              : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                              ? 'bg-[#FFE3A6]/15 border-[#FFE3A6] text-[#FFE3A6]'
+                              : 'bg-[#0C1B23] border-[#314A56] text-[#8A9BA8] hover:text-[#ECEEF0] hover:bg-[#314A56]/30'
                           }`}
                         >
-                          <span className={`w-2 h-2 rounded-full ${barcodeExtractionMode === 'custom' ? 'bg-orange-400 shadow-sm shadow-orange-400/50' : 'bg-zinc-600'}`} />
+                          <span className={`w-2 h-2 rounded-full ${barcodeExtractionMode === 'custom' ? 'bg-[#FFE3A6]' : 'bg-[#8A9BA8]'}`} />
                           <span>Custom Portion</span>
                         </button>
 
@@ -2737,11 +2737,11 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                           onClick={() => setBarcodeExtractionMode('full_id')}
                           className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                             barcodeExtractionMode === 'full_id'
-                              ? 'bg-orange-500/20 border-orange-500/60 text-orange-300 ring-1 ring-orange-500/30'
-                              : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                              ? 'bg-[#FFE3A6]/15 border-[#FFE3A6] text-[#FFE3A6]'
+                              : 'bg-[#0C1B23] border-[#314A56] text-[#8A9BA8] hover:text-[#ECEEF0] hover:bg-[#314A56]/30'
                           }`}
                         >
-                          <span className={`w-2 h-2 rounded-full ${barcodeExtractionMode === 'full_id' ? 'bg-orange-400 shadow-sm shadow-orange-400/50' : 'bg-zinc-600'}`} />
+                          <span className={`w-2 h-2 rounded-full ${barcodeExtractionMode === 'full_id' ? 'bg-[#FFE3A6]' : 'bg-[#8A9BA8]'}`} />
                           <span>Full ID</span>
                         </button>
                       </div>
@@ -2749,22 +2749,22 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
                   {/* 3. Custom Portion Configuration (Position + Character Count) */}
                   {barcodeExtractionMode === 'custom' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2 sm:space-y-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-[#0C1B23] border border-[#314A56] space-y-2 sm:space-y-0">
                       {/* Extraction Position */}
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-zinc-300 flex items-center gap-1.5">
+                        <label className="text-[11px] font-medium text-[#8A9BA8] flex items-center gap-1.5">
                           <span>Extract From</span>
                         </label>
                         <select
                           value={barcodeExtractionPosition}
                           onChange={(e) => setBarcodeExtractionPosition(e.target.value as 'front' | 'end')}
                           style={{ colorScheme: 'dark' }}
-                          className="w-full bg-zinc-900 border border-zinc-700 focus:border-orange-500 rounded-xl px-3 py-2 text-xs text-white focus:outline-none cursor-pointer"
+                          className="w-full bg-[#1B303A] border border-[#314A56] focus:border-[#FFE3A6] rounded-xl px-3 py-2 text-xs text-[#ECEEF0] focus:outline-none cursor-pointer"
                         >
-                          <option value="front" className="bg-zinc-900 text-zinc-100 py-1.5">
+                          <option value="front" className="bg-[#1B303A] text-[#ECEEF0] py-1.5">
                             From Front (Beginning)
                           </option>
-                          <option value="end" className="bg-zinc-900 text-zinc-100 py-1.5">
+                          <option value="end" className="bg-[#1B303A] text-[#ECEEF0] py-1.5">
                             From End (Trailing)
                           </option>
                         </select>
@@ -2773,10 +2773,10 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                       {/* Number of Characters Input */}
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <label className="text-[11px] font-medium text-zinc-300">
+                          <label className="text-[11px] font-medium text-[#8A9BA8]">
                             Number of Characters
                           </label>
-                          <span className="text-[10px] font-mono text-zinc-500">
+                          <span className="text-[10px] font-mono text-[#8A9BA8]">
                             Min: 3 • Max: {maxBarcodeIdLength}
                           </span>
                         </div>
@@ -2789,15 +2789,15 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                             const val = parseInt(e.target.value, 10);
                             setBarcodeCharCount(isNaN(val) ? 0 : val);
                           }}
-                          className={`w-full bg-zinc-900 border rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none ${
+                          className={`w-full bg-[#1B303A] border rounded-xl px-3 py-2 text-xs font-mono text-[#ECEEF0] focus:outline-none ${
                             barcodeCharCountError
-                              ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30'
-                              : 'border-zinc-700 focus:border-orange-500'
+                              ? 'border-[#E255A2] focus:border-[#E255A2]'
+                              : 'border-[#314A56] focus:border-[#FFE3A6]'
                           }`}
                         />
                         {barcodeCharCountError && (
-                          <p className="text-[11px] text-rose-400 font-medium flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3 shrink-0" />
+                          <p className="text-[11px] text-[#E4A0B3] font-medium flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3 shrink-0 text-[#E255A2]" />
                             <span>{barcodeCharCountError}</span>
                           </p>
                         )}
@@ -2806,26 +2806,26 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                   )}
 
                   {/* 4. Optional Advanced Prefix / Suffix Collapsible */}
-                  <div className="rounded-xl border border-zinc-800 overflow-hidden">
+                  <div className="rounded-xl border border-[#314A56] overflow-hidden">
                     <button
                       type="button"
                       onClick={() => setShowAdvancedBarcode(!showAdvancedBarcode)}
-                      className="w-full px-3.5 py-2.5 bg-zinc-900/50 hover:bg-zinc-900 flex items-center justify-between text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                      className="w-full px-3.5 py-2.5 bg-[#0C1B23] hover:bg-[#1B303A] flex items-center justify-between text-xs text-[#8A9BA8] hover:text-[#ECEEF0] transition-colors cursor-pointer"
                     >
                       <span className="flex items-center gap-1.5 font-medium">
-                        <Sliders className="w-3.5 h-3.5 text-zinc-500" />
+                        <Sliders className="w-3.5 h-3.5 text-[#8A9BA8]" />
                         <span>Optional Fixed Prefix / Suffix</span>
                         {(barcodeFixedPrefix || barcodeFixedSuffix) && (
-                          <span className="w-2 h-2 rounded-full bg-orange-400" />
+                          <span className="w-2 h-2 rounded-full bg-[#FFE3A6]" />
                         )}
                       </span>
                       {showAdvancedBarcode ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     </button>
 
                     {showAdvancedBarcode && (
-                      <div className="p-3.5 bg-zinc-950/60 border-t border-zinc-800 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="p-3.5 bg-[#0C1B23] border-t border-[#314A56] grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-zinc-400">
+                          <label className="text-[11px] font-medium text-[#8A9BA8]">
                             Fixed Prefix (Optional)
                           </label>
                           <input
@@ -2833,11 +2833,11 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                             placeholder="e.g. EVENT-"
                             value={barcodeFixedPrefix}
                             onChange={(e) => setBarcodeFixedPrefix(e.target.value)}
-                            className="w-full bg-zinc-900 border border-zinc-700 focus:border-orange-500 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none"
+                            className="w-full bg-[#1B303A] border border-[#314A56] focus:border-[#FFE3A6] rounded-xl px-3 py-1.5 text-xs text-[#ECEEF0] focus:outline-none"
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-zinc-400">
+                          <label className="text-[11px] font-medium text-[#8A9BA8]">
                             Fixed Suffix (Optional)
                           </label>
                           <input
@@ -2845,7 +2845,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                             placeholder="e.g. -2026"
                             value={barcodeFixedSuffix}
                             onChange={(e) => setBarcodeFixedSuffix(e.target.value)}
-                            className="w-full bg-zinc-900 border border-zinc-700 focus:border-orange-500 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none"
+                            className="w-full bg-[#1B303A] border border-[#314A56] focus:border-[#FFE3A6] rounded-xl px-3 py-1.5 text-xs text-[#ECEEF0] focus:outline-none"
                           />
                         </div>
                       </div>
@@ -2853,46 +2853,46 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                   </div>
 
                   {/* 5. Live Barcode Preview (Section 6 & 7) */}
-                  <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-3">
+                  <div className="p-4 rounded-2xl bg-[#0C1B23] border border-[#314A56] space-y-3">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-orange-400" />
+                      <span className="font-bold text-[#ECEEF0] uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                        <Sparkles className="w-3.5 h-3.5 text-[#FFE3A6]" />
                         <span>Live Barcode Preview</span>
                       </span>
-                      <span className="text-[10px] font-mono text-zinc-500">
+                      <span className="text-[10px] font-mono text-[#8A9BA8]">
                         {rawSpreadsheetRows.length > 0 ? 'Using Real Uploaded Data' : 'Sample Data'}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-center bg-zinc-950 p-3.5 rounded-xl border border-zinc-800/80">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-center bg-[#1B303A] p-3.5 rounded-xl border border-[#314A56]">
                       {/* Original ID */}
                       <div className="text-center sm:text-left space-y-0.5">
-                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">
+                        <span className="text-[10px] font-mono text-[#8A9BA8] uppercase tracking-wider block">
                           Original ID ({activeBarcodeTargetKey})
                         </span>
-                        <span className="text-xs font-mono font-bold text-zinc-200 break-all">
+                        <span className="text-xs font-mono font-bold text-[#ECEEF0] break-all">
                           {sampleOriginalId}
                         </span>
                       </div>
 
                       {/* Direction / Rule Indicator */}
                       <div className="flex flex-col items-center justify-center text-center py-1 sm:py-0">
-                        <span className="text-[10px] font-mono font-semibold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/20">
+                        <span className="text-[10px] font-mono font-semibold text-[#FFE3A6] bg-[#0C1B23] px-2 py-0.5 rounded-md border border-[#314A56]">
                           {barcodeExtractionMode === 'full_id'
                             ? 'Full ID Match'
                             : barcodeExtractionPosition === 'end'
                             ? `Last ${barcodeCharCount} Characters`
                             : `First ${barcodeCharCount} Characters`}
                         </span>
-                        <div className="text-orange-400 text-xs sm:text-sm mt-0.5">↓</div>
+                        <div className="text-[#FFE3A6] text-xs sm:text-sm mt-0.5">↓</div>
                       </div>
 
                       {/* Resulting Barcode Identifier */}
                       <div className="text-center sm:text-right space-y-0.5">
-                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">
+                        <span className="text-[10px] font-mono text-[#8A9BA8] uppercase tracking-wider block">
                           Barcode Identifier
                         </span>
-                        <div className="inline-block px-3 py-1.5 rounded-xl bg-orange-500/15 border border-orange-500/40 text-orange-300 font-mono font-bold text-sm tracking-wide shadow-sm shadow-orange-500/10">
+                        <div className="inline-block px-3 py-1.5 rounded-xl bg-[#0C1B23] border border-[#FFE3A6]/40 text-[#FFE3A6] font-mono font-bold text-sm tracking-wide">
                           {sampleExtractedBarcode || '—'}
                         </div>
                       </div>

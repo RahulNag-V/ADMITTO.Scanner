@@ -38,16 +38,9 @@ export const AppleScrollProgress: React.FC<AppleScrollProgressProps> = ({
         isVisible ? 'opacity-100' : 'opacity-0'
       } ${className}`}
     >
-      {/* Ambient Glow Bar */}
-      <motion.div
-        id="apple-scroll-progress-glow"
-        className={`h-[3px] w-full bg-gradient-to-r ${colorGradient} origin-left blur-[2px] opacity-70`}
-        style={{ scaleX }}
-      />
-      {/* Crisp Foreground Indicator */}
       <motion.div
         id="apple-scroll-progress-bar"
-        className={`h-[2px] w-full bg-gradient-to-r ${colorGradient} origin-left shadow-[0_0_12px_rgba(168,85,247,0.8)] -mt-[3px]`}
+        className="h-[2px] w-full bg-[#FFE3A6] origin-left"
         style={{ scaleX }}
       />
     </div>
