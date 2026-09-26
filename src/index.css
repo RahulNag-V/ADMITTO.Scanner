@@ -497,3 +497,41 @@ tr:hover td {
   border: 1px solid var(--border) !important;
   border-radius: var(--radius) !important;
 }
+
+/* =========================================================
+   MARQUEE CAUTION TAPE CONTINUOUS TICKER ANIMATIONS
+   ========================================================= */
+
+@keyframes marquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-100%, 0, 0);
+  }
+}
+
+@keyframes marquee-reverse {
+  0% {
+    transform: translate3d(-100%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-marquee {
+  display: flex !important;
+  flex-shrink: 0 !important;
+  min-width: 100% !important;
+  animation: marquee 32s linear infinite !important;
+  will-change: transform;
+}
+
+.animate-marquee-reverse {
+  display: flex !important;
+  flex-shrink: 0 !important;
+  min-width: 100% !important;
+  animation: marquee-reverse 32s linear infinite !important;
+  will-change: transform;
+}
