@@ -52,6 +52,14 @@
 - **Audio & Haptic Feedback**: Distinct acoustic signals and vibration cues for success, duplicate, or invalid scans.
 - **Audit Logs & Export**: Comprehensive search, filter, and export of attendance records to CSV/Excel.
 
+### 5. 👥 Interactive Animated Crowd Experience (`Skiper39`)
+- **GPU-Accelerated 2D Canvas Crowd Engine**: High-performance GSAP ticker-driven sprite animation simulating hundreds of event attendees walking in real-time.
+- **Dynamic Multi-Depth Layering**: Multi-tier vertical perspective with varying walking paces, natural step-bounce bobbing, and random directional journeys.
+- **Adaptive Viewport Scaling**:
+  - **Desktop (`>= 1024px`)**: Sleek, prominent layered crowd walking behind the live telemetry metrics and action portals.
+  - **Mobile (`< 640px`)**: Compact, well-proportioned silhouettes docked along the bottom fold above the caution tape ribbon without obscuring controls.
+- **Resilient Multi-Tier Asset Pipeline**: Automatic base-URL resolution for subpath-hosted deployments (GitHub Pages) and local roots, with zero-CORS CDN sprite fallback.
+
 ---
 
 ## 🏗️ Architecture & Technology Stack
@@ -59,6 +67,7 @@
 | Layer | Technologies |
 | :--- | :--- |
 | **Frontend UI** | React 19, TypeScript, Tailwind CSS, Motion, Lucide Icons |
+| **Crowd & Motion FX** | HTML5 Canvas 2D, GSAP (GreenSock) Ticker & Timelines, OpenPeeps |
 | **Client Storage** | IndexedDB via `idb` for offline high-capacity roster caching |
 | **Scanning Engines** | `html5-qrcode`, Native BarcodeDetector API, HID Keyboard Wedge Listener |
 | **Data Parsing** | PapaParse (CSV), SheetJS `xlsx` (Excel) |
@@ -71,6 +80,9 @@
 ## 📁 Repository Structure
 
 ```text
+├── components/
+│   └── ui/
+│       └── skiper39.tsx    # High-performance 2D Canvas crowd walking engine
 ├── src/
 │   ├── components/         # Reusable UI components & modals
 │   │   ├── AddStudentModal.tsx
@@ -79,10 +91,13 @@
 │   ├── lib/                # Core domain logic & validators
 │   │   ├── barcodeValidator.ts    # Barcode extraction, rules & collision logic
 │   │   ├── offlineDB.ts           # IndexedDB offline store & synchronization
+│   │   ├── router.ts              # Base-aware routing & asset resolution
 │   │   ├── soundEffects.ts        # Audio cues for scan verification
 │   │   ├── supabase.ts            # Supabase client instance
 │   │   └── utils.ts               # Formatting and general utilities
 │   ├── pages/              # Primary application views
+│   │   ├── public/
+│   │   │   └── HomePage.tsx       # Landing page with interactive hero crowd
 │   │   ├── ScannerPage.tsx        # High-speed QR & Barcode verification terminal
 │   │   ├── admin/
 │   │   │   ├── DashboardPage.tsx  # Event analytics & overview
