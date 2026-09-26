@@ -103,8 +103,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     { label: 'How It Works', path: '/how-it-works' },
     { label: 'Features', path: '/features' },
     { label: 'Security', path: '/security' },
-    { label: 'Reviews', path: '/reviews' },
-    { label: 'Blog', path: '/blog' },
     { label: 'FAQ', path: '/faq' },
     { label: 'About', path: '/about' },
   ];

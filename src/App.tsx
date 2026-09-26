@@ -17,8 +17,6 @@ import { HomePage } from './pages/public/HomePage';
 import { HowItWorksPage } from './pages/public/HowItWorksPage';
 import { FeaturesPage } from './pages/public/FeaturesPage';
 import { SecurityPage } from './pages/public/SecurityPage';
-import { ReviewsPage } from './pages/public/ReviewsPage';
-import { BlogPage, BlogDetailPage } from './pages/public/BlogPage';
 import { FaqPage } from './pages/public/FaqPage';
 import { AboutPage } from './pages/public/AboutPage';
 
@@ -56,15 +54,6 @@ export default function App() {
   // Page Transition Skeleton Delay State (0.5s)
   const [isPageChanging, setIsPageChanging] = useState(false);
 
-  // Blog Sub-routing
-  const [selectedBlogSlug, setSelectedBlogSlug] = useState<string | null>(() => {
-    const path = getAppPath(window.location.pathname);
-    if (path.startsWith('/blog/')) {
-      const slug = path.replace(/^\/blog\//, '').trim();
-      return slug || null;
-    }
-    return null;
-  });
 
   // Auth State
   const [session, setSession] = useState<AuthSession | null>(() => getSession());
@@ -81,14 +70,14 @@ export default function App() {
   // Delete Account Confirmation Modal State
   const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false);
 
-  // Trigger 0.5s skeleton delay on path or blog slug change
+  // Trigger 0.5s skeleton delay on path change
   useEffect(() => {
     setIsPageChanging(true);
     const timer = setTimeout(() => {
       setIsPageChanging(false);
     }, 400);
     return () => clearTimeout(timer);
-  }, [currentPath, selectedBlogSlug]);
+  }, [currentPath]);
 
   // Direct APK Download Redirect Route
   useEffect(() => {
@@ -191,8 +180,6 @@ export default function App() {
     '/how-it-works',
     '/features',
     '/security',
-    '/reviews',
-    '/blog',
     '/faq',
     '/about',
   ];
@@ -278,11 +265,6 @@ export default function App() {
         }
       }
 
-      if (path.startsWith('/blog/')) {
-        setSelectedBlogSlug(path.replace(/^\/blog\//, '').trim());
-      } else if (path === '/blog') {
-        setSelectedBlogSlug(null);
-      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -427,11 +409,6 @@ export default function App() {
       }
     }
 
-    if (appRoute.startsWith('/blog/')) {
-      setSelectedBlogSlug(appRoute.replace(/^\/blog\//, '').trim());
-    } else if (appRoute === '/blog') {
-      setSelectedBlogSlug(null);
-    }
 
     const mainEl = document.getElementById('app-main-viewport');
     if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
@@ -823,7 +800,7 @@ export default function App() {
           <PublicPageSkeletonView path={currentPath} />
         ) : (
           <>
-            {(currentPath === '/' || (!['/how-it-works', '/features', '/security', '/reviews', '/blog', '/faq', '/about'].includes(currentPath) && !currentPath.startsWith('/blog/'))) && (
+            {(currentPath === '/' || !['/how-it-works', '/features', '/security', '/faq', '/about'].includes(currentPath)) && (
               <HomePage
                 onOpenStartNow={handleOpenStartNow}
                 onNavigate={navigate}
@@ -839,32 +816,6 @@ export default function App() {
             {currentPath === '/features' && <FeaturesPage onOpenStartNow={handleOpenStartNow} />}
 
             {currentPath === '/security' && <SecurityPage />}
-
-            {currentPath === '/reviews' && <ReviewsPage />}
-
-            {(currentPath === '/blog' || currentPath.startsWith('/blog/')) && (
-              selectedBlogSlug ? (
-                <BlogDetailPage
-                  slug={selectedBlogSlug}
-                  onBack={() => {
-                    setSelectedBlogSlug(null);
-                    navigate('/blog');
-                  }}
-                  onSelectPost={(slug) => {
-                    setSelectedBlogSlug(slug);
-                    navigate(`/blog/${slug}`);
-                  }}
-                />
-              ) : (
-                <BlogPage
-                  onSelectPost={(slug) => {
-                    setSelectedBlogSlug(slug);
-                    navigate(`/blog/${slug}`);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                />
-              )
-            )}
 
             {currentPath === '/faq' && <FaqPage />}
 
