@@ -49,10 +49,10 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7, className }: CrowdCanvasProps) 
     const getRandomFromArray = (array: any[]) => array[randomIndex(array) | 0];
 
     const getStageScale = (w: number) => {
-      if (w < 480) return 0.35; // Compact on small phones: ~84px wide
-      if (w < 640) return 0.42; // Large phones: ~100px wide
-      if (w < 1024) return 0.58; // Tablets: ~140px wide
-      return 0.80; // Desktops: prominent & visible like Image 2 (~192px wide, ~260px tall)
+      if (w < 480) return 0.28; // Small phones: ~67px wide
+      if (w < 640) return 0.35; // Large phones / narrow viewports: ~84px wide
+      if (w < 1024) return 0.48; // Tablets: ~115px wide
+      return 0.68; // Desktops: sleek, refined crowd scale (~163px wide)
     };
 
     // TWEEN FACTORIES
@@ -63,11 +63,11 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7, className }: CrowdCanvasProps) 
       const effectiveH = peep.height * peep.scale;
 
       const isMobile = stage.width < 640;
-      // On mobile, elevate them by ~38px so feet walk neatly above the docked caution tape ribbon
-      // On desktop, provide multi-depth vertical layering across 180px just like Image 2
+      // On mobile, elevate them by ~36px so feet walk neatly above the docked caution tape ribbon
+      // On desktop, provide multi-depth vertical layering across 150px
       const offsetY = isMobile
-        ? -38 - (22 * gsap.parseEase("power2.in")(Math.random()))
-        : 45 - (180 * gsap.parseEase("power2.in")(Math.random()));
+        ? -36 - (18 * gsap.parseEase("power2.in")(Math.random()))
+        : 35 - (150 * gsap.parseEase("power2.in")(Math.random()));
       const startY = stage.height - effectiveH + offsetY;
       let startX: number;
       let endX: number;
