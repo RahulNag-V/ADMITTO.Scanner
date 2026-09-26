@@ -343,14 +343,6 @@ export default function App() {
             setSession(restoredSession);
             saveSession(restoredSession);
           }
-        } else if (!stored) {
-          // If no session and first-time visitor opening the root page, route to login
-          const hasVisited = localStorage.getItem('admitto_visited');
-          if (!hasVisited && getAppPath(window.location.pathname) === '/') {
-            if (isMounted) {
-              navigate('/login');
-            }
-          }
         }
       } catch (err) {
         console.warn('[ADMITTO Auth] Session check error:', err);

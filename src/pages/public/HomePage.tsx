@@ -25,6 +25,7 @@ import { ScrollingCautionTape } from '../../components/common/ScrollingCautionTa
 import { Watermark3DGyroBanner } from '../../components/common/Watermark3DGyroBanner';
 import { AuthSession } from '../../types';
 import { toBrowserPath } from '../../lib/router';
+import { CrowdCanvas } from '@/components/ui/skiper39';
 
 interface HomePageProps {
   onNavigate: (path: string) => void;
@@ -106,6 +107,31 @@ export const HomePage: React.FC<HomePageProps> = ({
           }}
           className="absolute top-1/3 right-10 w-[450px] h-[350px] bg-purple-500/15 rounded-full blur-[120px] pointer-events-none"
         />
+
+        {/* Animated OpenPeeps Crowd Canvas Background with Edge Blending */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden"
+        >
+          {/* Edge blending overlays: Top dissolve, lateral fades, and text-contrast shield */}
+          <div className="absolute inset-x-0 top-0 h-24 sm:h-48 bg-gradient-to-b from-[#030408] via-[#030408]/90 to-transparent z-10 pointer-events-none" />
+          <div className="absolute inset-x-0 bottom-0 h-16 sm:h-28 bg-gradient-to-t from-[#030408] via-[#030408]/70 to-transparent z-10 pointer-events-none" />
+          <div className="absolute inset-y-0 left-0 w-16 sm:w-36 bg-gradient-to-r from-[#030408] via-[#030408]/80 to-transparent z-10 pointer-events-none" />
+          <div className="absolute inset-y-0 right-0 w-16 sm:w-36 bg-gradient-to-l from-[#030408] via-[#030408]/80 to-transparent z-10 pointer-events-none" />
+
+          {/* Radial readability shield behind interactive buttons & metrics */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_75%_50%_at_50%_45%,#030408_40%,transparent_100%)] opacity-80 z-10 pointer-events-none" />
+
+          {/* Crowd Canvas Layer - scaled and docked cleanly into the bottom fold on both mobile & desktop */}
+          <div className="w-full h-full opacity-45 [filter:invert(1)_brightness(1.25)]">
+            <CrowdCanvas
+              src="/peeps.png"
+              rows={15}
+              cols={7}
+              className="absolute bottom-0 left-0 w-full h-[40vh] sm:h-[60vh] md:h-[70vh] lg:h-[75vh] pointer-events-none"
+            />
+          </div>
+        </div>
 
         {/* Floating Left Telemetry Badge (Desktop only) */}
         <div className="hidden xl:flex absolute left-8 top-1/3 -translate-y-1/2 z-10 flex-col gap-3 pointer-events-none select-none">
