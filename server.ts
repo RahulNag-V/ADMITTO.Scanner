@@ -1089,8 +1089,14 @@ app.post('/api/events', requireAdminAuth, async (req: Request, res: Response) =>
       scan_config,
     } = req.body;
 
-    if (!title) {
+    if (!title || !title.trim()) {
       res.status(422).json({ error: 'VALIDATION_ERROR', message: 'Event title is required.' });
+      return;
+    }
+
+    const contactPhone = (admin_phone || req.body.phone || '').trim();
+    if (!contactPhone) {
+      res.status(422).json({ error: 'VALIDATION_ERROR', message: 'Organizer phone number is mandatory for creating an event.' });
       return;
     }
 
@@ -1100,7 +1106,7 @@ app.post('/api/events', requireAdminAuth, async (req: Request, res: Response) =>
       venue,
       event_date,
       admin_name: admin_name || admin.name,
-      admin_phone,
+      admin_phone: contactPhone,
       admin_email: admin_email || admin.email,
       banner_url,
       attendee_type,

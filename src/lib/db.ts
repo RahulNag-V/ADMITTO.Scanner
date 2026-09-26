@@ -715,7 +715,7 @@ class DatabaseService {
       venue: data.venue?.trim() || 'Main Auditorium',
       event_date: data.event_date || new Date().toISOString(),
       admin_name: data.admin_name?.trim() || profile?.name || 'Event Organizer',
-      admin_phone: data.admin_phone?.trim() || '',
+      admin_phone: data.admin_phone?.trim() || (data as any).phone?.trim() || profile?.phone || '',
       admin_email: data.admin_email?.trim() || profile?.email || '',
       banner_url: data.banner_url?.trim() || '',
       status: 'ACTIVE',

@@ -20,10 +20,11 @@ import {
   ShieldCheck,
   QrCode,
   Tag,
+  Phone,
 } from 'lucide-react';
 import { AttendeeType, EventItem } from '../../types';
 import { ATTENDEE_TYPE_PRESETS, getPresetByType } from '../../lib/attendeeTypes';
-import { eventsApi } from '../../lib/api';
+import { eventsApi, getStoredSession } from '../../lib/api';
 
 interface CreateEventModalProps {
   isOpen: boolean;
@@ -54,6 +55,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
   const [eventTitle, setEventTitle] = useState('');
   const [venue, setVenue] = useState('');
   const [eventDate, setEventDate] = useState('');
+  const [phone, setPhone] = useState('');
   const [attendeeType, setAttendeeType] = useState<AttendeeType>('STUDENTS');
   const [customSingular, setCustomSingular] = useState('Member');
   const [customPlural, setCustomPlural] = useState('Members');
@@ -64,21 +66,25 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
     title?: string;
     venue?: string;
     date?: string;
+    phone?: string;
     submit?: string;
   }>({});
   const [touched, setTouched] = useState<{
     title?: boolean;
     venue?: boolean;
     date?: boolean;
+    phone?: boolean;
   }>({});
 
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
+      const session = getStoredSession();
       setStep('FORM');
       setEventTitle('');
       setVenue('');
       setEventDate('');
+      setPhone(session?.user?.phone || '');
       setAttendeeType('STUDENTS');
       setCustomSingular('Member');
       setCustomPlural('Members');
@@ -115,7 +121,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
 
   // Validation
   const validateForm = () => {
-    const newErrors: { title?: string; venue?: string; date?: string } = {};
+    const newErrors: { title?: string; venue?: string; date?: string; phone?: string } = {};
 
     if (!eventTitle.trim()) {
       newErrors.title = 'Event title is required.';
@@ -129,11 +135,18 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
       newErrors.date = 'Select an event date and time.';
     }
 
+    const cleanPhone = phone.trim();
+    if (!cleanPhone) {
+      newErrors.phone = 'Phone number is mandatory for creating an event.';
+    } else if (cleanPhone.replace(/\D/g, '').length < 7) {
+      newErrors.phone = 'Please enter a valid phone number (at least 7 digits).';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleBlur = (field: 'title' | 'venue' | 'date') => {
+  const handleBlur = (field: 'title' | 'venue' | 'date' | 'phone') => {
     setTouched((prev) => ({ ...prev, [field]: true }));
     if (field === 'title' && !eventTitle.trim()) {
       setErrors((prev) => ({ ...prev, title: 'Event title is required.' }));
@@ -144,12 +157,20 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
     if (field === 'date' && !eventDate.trim()) {
       setErrors((prev) => ({ ...prev, date: 'Select an event date and time.' }));
     }
+    if (field === 'phone') {
+      const cleanPhone = phone.trim();
+      if (!cleanPhone) {
+        setErrors((prev) => ({ ...prev, phone: 'Phone number is mandatory for creating an event.' }));
+      } else if (cleanPhone.replace(/\D/g, '').length < 7) {
+        setErrors((prev) => ({ ...prev, phone: 'Please enter a valid phone number (at least 7 digits).' }));
+      }
+    }
   };
 
   // Click "Finish": validate and transition to the Preview step
   const handleFinishToPreview = (e: React.FormEvent) => {
     e.preventDefault();
-    setTouched({ title: true, venue: true, date: true });
+    setTouched({ title: true, venue: true, date: true, phone: true });
 
     if (!validateForm()) {
       return;
@@ -186,6 +207,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
         title: eventTitle.trim(),
         venue: venue.trim(),
         event_date: new Date(eventDate).toISOString(),
+        admin_phone: phone.trim(),
         attendee_type: attendeeType,
         attendee_label_singular: singular,
         attendee_label_plural: plural,
@@ -548,6 +570,46 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
               </div>
             </div>
 
+            {/* Organizer Contact Phone Number (Mandatory) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="event-phone-input"
+                  className="text-xs sm:text-sm font-medium text-zinc-200"
+                >
+                  Contact / Organizer Phone Number <span className="text-rose-400">*</span>
+                </label>
+                <span className="text-[11px] text-rose-400/90 font-medium">Mandatory</span>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-400">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <input
+                  id="event-phone-input"
+                  type="tel"
+                  placeholder="e.g. +91 98765 43210 or 10-digit mobile"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
+                  }}
+                  onBlur={() => handleBlur('phone')}
+                  className={`w-full h-11 pl-10 pr-3.5 rounded-xl text-sm text-white placeholder-zinc-500 transition-all focus:outline-none ${
+                    errors.phone && touched.phone
+                      ? 'bg-rose-500/[0.05] border border-rose-500/60 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                      : 'bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-indigo-500 focus:bg-white/[0.07] focus:ring-2 focus:ring-indigo-500/20'
+                  }`}
+                />
+              </div>
+              {errors.phone && touched.phone && (
+                <p className="text-xs text-rose-400 font-medium flex items-center gap-1 mt-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" />
+                  {errors.phone}
+                </p>
+              )}
+            </div>
+
           </form>
         )}
 
@@ -582,8 +644,8 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                 </h3>
               </div>
 
-              {/* Location & Time Pills */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              {/* Location, Time & Phone Pills */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
                 <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/5">
                   <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0">
                     <MapPin className="w-4 h-4" />
@@ -601,6 +663,16 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                   <div className="min-w-0">
                     <div className="text-[10px] text-zinc-400 uppercase font-medium">Date & Time</div>
                     <div className="text-xs font-semibold text-white truncate">{formatReadableDate(eventDate)}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/5">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0">
+                    <Phone className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-zinc-400 uppercase font-medium">Contact Phone</div>
+                    <div className="text-xs font-semibold text-white truncate">{phone}</div>
                   </div>
                 </div>
               </div>
