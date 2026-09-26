@@ -12,7 +12,7 @@ export default defineConfig(({ command, mode }) => {
     ...loadEnv(mode, process.cwd(), ''),
   };
   const isProduction = mode === 'production' || process.env.NODE_ENV === 'production';
-  const base = process.env.VITE_BASE || (command === 'build' || isProduction ? '/ADMITTO.Scanner/' : '/');
+  const base = (command === 'build' || isProduction) ? '/ADMITTO.Scanner/' : (process.env.VITE_BASE || '/');
 
   const rawSbUrl = (process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || env.SUPABASE_URL || '').trim();
   const rawSbKey = (process.env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || '').trim();

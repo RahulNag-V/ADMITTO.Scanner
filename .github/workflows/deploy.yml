@@ -38,7 +38,7 @@ jobs:
         run: rm -rf dist
 
       - name: Build Vite Production Frontend
-        run: npm run build:client
+        run: npm run build
         env:
           NODE_ENV: production
           GITHUB_PAGES: 'true'
@@ -88,14 +88,6 @@ jobs:
           echo "  - Found $CSS_COUNT hashed CSS bundle(s)"
           ls -la dist
           ls -la dist/assets
-
-      - name: Deploy to gh-pages branch (Fallback & Dual-Hosting Support)
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          keep_files: false
-          force_orphan: true
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
