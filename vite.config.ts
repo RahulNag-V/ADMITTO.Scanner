@@ -48,6 +48,11 @@ export default defineConfig(({ command, mode }) => {
             fs.copyFileSync(source404, dest404);
             console.log('[ADMITTO Build] Verified dist/404.html GitHub Pages SPA fallback from public/404.html');
           }
+          const nojekyllDest = path.resolve(__dirname, 'dist/.nojekyll');
+          if (!fs.existsSync(nojekyllDest)) {
+            fs.writeFileSync(nojekyllDest, '');
+            console.log('[ADMITTO Build] Verified dist/.nojekyll for GitHub Pages');
+          }
         },
       },
       VitePWA({

@@ -28,9 +28,16 @@ export function setupPWA() {
       updateSW().catch(() => {});
     }, 60 * 1000);
 
-    // Refresh page when new controller takes over to prevent stale script references
+    // Only reload when a NEW controller replaces an ALREADY EXISTING active controller.
+    // On fresh visits/other devices, navigator.serviceWorker.controller is initially null;
+    // reloading immediately upon first client claim causes blank screen / aborted module loads.
+    let hadExistingController = Boolean(navigator.serviceWorker.controller);
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadExistingController) {
+        hadExistingController = true;
+        return;
+      }
       if (!refreshing) {
         refreshing = true;
         window.location.reload();

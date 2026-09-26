@@ -823,7 +823,7 @@ export default function App() {
           <PublicPageSkeletonView path={currentPath} />
         ) : (
           <>
-            {currentPath === '/' && (
+            {(currentPath === '/' || (!['/how-it-works', '/features', '/security', '/reviews', '/blog', '/faq', '/about'].includes(currentPath) && !currentPath.startsWith('/blog/'))) && (
               <HomePage
                 onOpenStartNow={handleOpenStartNow}
                 onNavigate={navigate}

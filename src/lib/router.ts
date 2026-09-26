@@ -20,8 +20,15 @@ export const getAppPath = (pathname: string = typeof window !== 'undefined' ? wi
 
   const base = getBaseUrl();
   const baseNoTrailing = base.replace(/\/$/, '');
-  if (baseNoTrailing && (normalized === baseNoTrailing || normalized.startsWith(baseNoTrailing + '/'))) {
-    normalized = normalized.slice(baseNoTrailing.length);
+  if (baseNoTrailing) {
+    if (normalized === baseNoTrailing || normalized.startsWith(baseNoTrailing + '/')) {
+      normalized = normalized.slice(baseNoTrailing.length);
+    } else if (
+      normalized.toLowerCase() === baseNoTrailing.toLowerCase() ||
+      normalized.toLowerCase().startsWith(baseNoTrailing.toLowerCase() + '/')
+    ) {
+      normalized = normalized.slice(baseNoTrailing.length);
+    }
   }
   normalized = normalized.replace(/\/+/g, '/');
   if (!normalized || !normalized.startsWith('/')) {
@@ -30,6 +37,10 @@ export const getAppPath = (pathname: string = typeof window !== 'undefined' ? wi
   // Trim trailing slash for consistent route matching (except root '/')
   if (normalized.length > 1 && normalized.endsWith('/')) {
     normalized = normalized.slice(0, -1);
+  }
+  // If the browser loaded /index.html directly, normalize to root '/'
+  if (normalized === '/index.html') {
+    normalized = '/';
   }
   return normalized;
 };
