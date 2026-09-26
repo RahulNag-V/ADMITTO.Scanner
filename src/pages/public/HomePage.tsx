@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { AppleScrollReveal, AppleScrollStagger, AppleScrollCard } from '../../components/common/AppleScrollReveal';
 import { ScrollingCautionTape } from '../../components/common/ScrollingCautionTape';
-import { Watermark3DGyroBanner } from '../../components/common/Watermark3DGyroBanner';
 import { AuthSession } from '../../types';
 import { toBrowserPath } from '../../lib/router';
 import { CrowdCanvas } from '@/components/ui/skiper39';
@@ -319,9 +318,6 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* SUBSEQUENT SECTIONS CONTAINER */}
       <div className="space-y-8 sm:space-y-12 mt-6 sm:mt-10">
-        {/* 3D GYROSCOPE SPATIAL WATERMARK BANNER */}
-        <Watermark3DGyroBanner />
-
         {/* 2. CHOOSE YOUR ACCESS PORTAL SECTION (BOTH OPTIONS PROMINENT ON HOME PAGE) */}
         <section id="portals-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-2 space-y-6">
         <AppleScrollReveal direction="up" distance={25}>
