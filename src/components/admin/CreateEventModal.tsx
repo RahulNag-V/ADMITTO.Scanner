@@ -514,7 +514,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                       if (errors.venue) setErrors((prev) => ({ ...prev, venue: undefined }));
                     }}
                     onBlur={() => handleBlur('venue')}
-                    className={`w-full h-11 pl-10 pr-3.5 rounded-xl text-sm text-white placeholder-zinc-500 transition-all focus:outline-none ${
+                    className={`w-full h-11 pl-11 pr-3.5 rounded-xl text-sm text-white placeholder-zinc-500 transition-all focus:outline-none ${
                       errors.venue && touched.venue
                         ? 'bg-rose-500/[0.05] border border-rose-500/60 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
                         : 'bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-indigo-500 focus:bg-white/[0.07] focus:ring-2 focus:ring-indigo-500/20'
@@ -554,7 +554,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                       if (errors.date) setErrors((prev) => ({ ...prev, date: undefined }));
                     }}
                     onBlur={() => handleBlur('date')}
-                    className={`w-full h-11 pl-10 pr-3.5 rounded-xl text-sm text-white transition-all focus:outline-none ${
+                    className={`w-full h-11 pl-11 pr-3.5 rounded-xl text-sm text-white transition-all focus:outline-none ${
                       errors.date && touched.date
                         ? 'bg-rose-500/[0.05] border border-rose-500/60 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
                         : 'bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-indigo-500 focus:bg-white/[0.07] focus:ring-2 focus:ring-indigo-500/20'
@@ -595,7 +595,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                     if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
                   }}
                   onBlur={() => handleBlur('phone')}
-                  className={`w-full h-11 pl-10 pr-3.5 rounded-xl text-sm text-white placeholder-zinc-500 transition-all focus:outline-none ${
+                  className={`w-full h-11 pl-11 pr-3.5 rounded-xl text-sm text-white placeholder-zinc-500 transition-all focus:outline-none ${
                     errors.phone && touched.phone
                       ? 'bg-rose-500/[0.05] border border-rose-500/60 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
                       : 'bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-indigo-500 focus:bg-white/[0.07] focus:ring-2 focus:ring-indigo-500/20'
