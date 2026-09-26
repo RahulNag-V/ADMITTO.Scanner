@@ -120,15 +120,15 @@ export const HomePage: React.FC<HomePageProps> = ({
           <div className="absolute inset-y-0 right-0 w-16 sm:w-36 bg-gradient-to-l from-[#030408] via-[#030408]/80 to-transparent z-10 pointer-events-none" />
 
           {/* Radial readability shield behind interactive buttons & metrics */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_75%_50%_at_50%_45%,#030408_40%,transparent_100%)] opacity-80 z-10 pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_75%_50%_at_50%_45%,#030408_35%,transparent_100%)] opacity-70 z-10 pointer-events-none" />
 
-          {/* Crowd Canvas Layer - scaled and docked cleanly into the bottom fold on both mobile & desktop */}
-          <div className="w-full h-full opacity-45 [filter:invert(1)_brightness(1.25)]">
+          {/* Crowd Canvas Layer - prominent desktop walking crowd matching original aesthetic while compact & fitted on mobile */}
+          <div className="w-full h-full opacity-65 [filter:invert(1)_brightness(1.35)] pointer-events-none">
             <CrowdCanvas
-              src="/peeps.png"
+              src={toBrowserPath('/peeps.png')}
               rows={15}
               cols={7}
-              className="absolute bottom-0 left-0 w-full h-[40vh] sm:h-[60vh] md:h-[70vh] lg:h-[75vh] pointer-events-none"
+              className="absolute bottom-0 left-0 w-full h-[42vh] sm:h-[65vh] md:h-[75vh] lg:h-[82vh] pointer-events-none"
             />
           </div>
         </div>

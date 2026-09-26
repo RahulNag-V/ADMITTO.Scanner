@@ -26,6 +26,17 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7, className }: CrowdCanvasProps) 
       cols,
     };
 
+    const resolveAssetPath = (path: string): string => {
+      if (!path) return '';
+      if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+        return path;
+      }
+      const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
+      const baseNoTrailing = base.endsWith('/') ? base.slice(0, -1) : base;
+      const cleanPath = path.startsWith('/') ? path : `/${path}`;
+      return `${baseNoTrailing}${cleanPath}`;
+    };
+
     // UTILS
     const randomRange = (min: number, max: number) =>
       min + Math.random() * (max - min);
@@ -38,10 +49,10 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7, className }: CrowdCanvasProps) 
     const getRandomFromArray = (array: any[]) => array[randomIndex(array) | 0];
 
     const getStageScale = (w: number) => {
-      if (w < 480) return 0.34; // Compact on small phones: ~80px wide by ~110px tall
-      if (w < 640) return 0.40; // Large phones: ~96px wide
-      if (w < 1024) return 0.52; // Tablets: ~125px wide
-      return 0.70; // Desktops: ~168px wide
+      if (w < 480) return 0.35; // Compact on small phones: ~84px wide
+      if (w < 640) return 0.42; // Large phones: ~100px wide
+      if (w < 1024) return 0.58; // Tablets: ~140px wide
+      return 0.80; // Desktops: prominent & visible like Image 2 (~192px wide, ~260px tall)
     };
 
     // TWEEN FACTORIES
@@ -52,10 +63,11 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7, className }: CrowdCanvasProps) 
       const effectiveH = peep.height * peep.scale;
 
       const isMobile = stage.width < 640;
-      // On mobile, elevate them by ~40px so feet walk neatly above the docked caution tape ribbon
-      const bottomMargin = isMobile ? 38 : 12;
-      const jitterRange = isMobile ? 20 : 50;
-      const offsetY = -bottomMargin - (jitterRange * gsap.parseEase("power2.in")(Math.random()));
+      // On mobile, elevate them by ~38px so feet walk neatly above the docked caution tape ribbon
+      // On desktop, provide multi-depth vertical layering across 180px just like Image 2
+      const offsetY = isMobile
+        ? -38 - (22 * gsap.parseEase("power2.in")(Math.random()))
+        : 45 - (180 * gsap.parseEase("power2.in")(Math.random()));
       const startY = stage.height - effectiveH + offsetY;
       let startX: number;
       let endX: number;
@@ -214,8 +226,15 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7, className }: CrowdCanvasProps) 
       }
     };
 
+    const getMaxCrowd = (w: number) => {
+      if (w < 480) return 7;
+      if (w < 768) return 12;
+      if (w < 1024) return 18;
+      return 28;
+    };
+
     const initCrowd = () => {
-      const maxCrowd = stage.width < 480 ? 7 : (stage.width < 768 ? 10 : (stage.width < 1024 ? 15 : availablePeeps.length));
+      const maxCrowd = getMaxCrowd(stage.width);
       while (availablePeeps.length && crowd.length < maxCrowd) {
         addPeepToCrowd().walk.progress(Math.random());
       }
@@ -231,7 +250,7 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7, className }: CrowdCanvasProps) 
         }),
       }).eventCallback("onComplete", () => {
         removePeepFromCrowd(peep);
-        const maxCrowd = stage.width < 480 ? 7 : (stage.width < 768 ? 10 : 25);
+        const maxCrowd = getMaxCrowd(stage.width);
         if (crowd.length < maxCrowd) {
           addPeepToCrowd();
         }
@@ -290,19 +309,29 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7, className }: CrowdCanvasProps) 
       gsap.ticker.add(render);
     };
 
+    const localAssetPath = resolveAssetPath('/peeps.png');
+    const primarySrc = resolveAssetPath(config.src || '/peeps.png');
+    const cdnFallback = "https://cdn.21st.dev/assets/localized/abdb8990a7bef8c2f5af3e45f0a3c969c4b0603fba8be92e81347de4ea4e1ed7.png";
+
+    let fallbackTried = false;
     img.onerror = () => {
-      const fallbackSrc = '/peeps.png';
-      if (img.src !== fallbackSrc && !img.src.endsWith(fallbackSrc)) {
-        console.warn('Skiper39: CDN sprite load failed, switching to local /peeps.png');
-        img.src = fallbackSrc;
+      if (!fallbackTried) {
+        fallbackTried = true;
+        const nextSrc = (img.src.includes('cdn.21st.dev')) ? localAssetPath : cdnFallback;
+        if (img.src !== nextSrc) {
+          console.warn('Skiper39: Primary sprite failed, trying fallback:', nextSrc);
+          img.src = nextSrc;
+          return;
+        }
       }
+      console.error('Skiper39: Failed to load crowd sprite sheet.');
     };
 
     img.onload = () => {
       init();
     };
 
-    img.src = config.src || '/peeps.png';
+    img.src = primarySrc;
     if (img.complete && img.naturalWidth > 0) {
       init();
     }
