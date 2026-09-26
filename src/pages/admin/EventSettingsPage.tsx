@@ -39,7 +39,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { EventItem, QrMode, EventScanConfig, AttendeeType, BarcodeMatchingMode, BarcodeConfig } from '../../types';
-import { eventsApi, getStoredSession } from '../../lib/api';
+import { eventsApi, studentsApi, getStoredSession } from '../../lib/api';
 import { ATTENDEE_TYPE_PRESETS, getPresetByType } from '../../lib/attendeeTypes';
 import { TabSkeletonView } from '../../components/common/Skeleton';
 import { CreateEventModal } from '../../components/admin/CreateEventModal';
@@ -145,6 +145,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
   // Barcode Identification Configuration States
+  const [availableColumns, setAvailableColumns] = useState<string[]>([]);
   const [barcodeMode, setBarcodeMode] = useState<BarcodeMatchingMode>('prefix');
   const [barcodeValue, setBarcodeValue] = useState('1BH');
   const [barcodeIdentifierField, setBarcodeIdentifierField] = useState('usn');
@@ -221,21 +222,56 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
       setPrimaryScanField(res.event.primary_scan_field || 'usn');
       setSecondaryScanField(res.event.secondary_scan_field || '');
       setQrMode(res.event.qr_mode || 'SECURE_TOKEN');
-      setBarcodeField(res.event.barcode_field || 'usn');
+      const initialBarcodeCol = res.event.barcode_field || res.event.scan_config?.barcode_field || res.event.barcode_config?.identifier_field || res.event.primary_scan_field || 'usn';
+      setBarcodeField(initialBarcodeCol);
+      setBarcodeIdentifierField(initialBarcodeCol);
+
+      // Extract detected columns from scan_config and uploaded attendee list
+      const scanFields = res.event.scan_config?.available_fields || [];
+      const colConfigs = res.event.scan_config?.column_configs || [];
+      let detectedCols: string[] = [];
+      if (Array.isArray(scanFields) && scanFields.length > 0) {
+        detectedCols = [...scanFields];
+      } else if (Array.isArray(colConfigs) && colConfigs.length > 0) {
+        detectedCols = colConfigs.map((c: any) => c.name);
+      }
+
+      try {
+        const stdRes = await studentsApi.list(res.event.id);
+        if (stdRes.students && stdRes.students.length > 0) {
+          const colSet = new Set<string>(detectedCols);
+          stdRes.students.slice(0, 30).forEach((st) => {
+            if (st.usn) colSet.add('usn');
+            if (st.name) colSet.add('name');
+            if (st.email) colSet.add('email');
+            if (st.phone_number) colSet.add('phone_number');
+            if (st.branch) colSet.add('branch');
+            if (st.department) colSet.add('department');
+            if (st.year) colSet.add('year');
+            if (st.section) colSet.add('section');
+            if (st.barcode) colSet.add('barcode');
+            if (st.meta && typeof st.meta === 'object') {
+              Object.keys(st.meta).forEach((k) => colSet.add(k));
+            }
+          });
+          detectedCols = Array.from(colSet);
+        }
+      } catch (err) {
+        console.warn('Could not inspect students for column keys:', err);
+      }
+      setAvailableColumns(detectedCols);
 
       const bc = res.event.barcode_config || res.event.scan_config?.barcode_config;
       if (bc) {
-        setBarcodeMode(bc.mode || 'prefix');
+        setBarcodeMode(bc.mode || 'full');
         setBarcodeValue(bc.value || '');
-        setBarcodeIdentifierField(bc.identifier_field || res.event.primary_scan_field || 'usn');
         setBarcodeCaseSensitive(Boolean(bc.case_sensitive));
         setBarcodeLengthValidation(Boolean(bc.min_length || bc.max_length));
         setBarcodeMinLength(bc.min_length ? String(bc.min_length) : '');
         setBarcodeMaxLength(bc.max_length ? String(bc.max_length) : '');
       } else {
-        setBarcodeMode('prefix');
-        setBarcodeValue('1BH');
-        setBarcodeIdentifierField(res.event.primary_scan_field || 'usn');
+        setBarcodeMode('full');
+        setBarcodeValue('');
         setBarcodeCaseSensitive(false);
         setBarcodeLengthValidation(false);
         setBarcodeMinLength('');
@@ -460,13 +496,14 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
     setSuccessMsg(null);
 
     try {
+      const selectedBarcodeCol = (barcodeField || primaryScanField || 'usn').trim();
       const currentBarcodeConfig: BarcodeConfig = {
-        mode: barcodeMode,
-        value: barcodeValue.trim(),
-        identifier_field: barcodeIdentifierField || primaryScanField || 'usn',
-        case_sensitive: barcodeCaseSensitive,
-        min_length: barcodeLengthValidation && barcodeMinLength ? parseInt(barcodeMinLength, 10) : null,
-        max_length: barcodeLengthValidation && barcodeMaxLength ? parseInt(barcodeMaxLength, 10) : null,
+        mode: 'full',
+        value: '',
+        identifier_field: selectedBarcodeCol,
+        case_sensitive: false,
+        min_length: null,
+        max_length: null,
       };
 
       const res = await eventsApi.update(eventId, {
@@ -481,6 +518,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
         attendee_type: attendeeType,
         attendee_label_singular: attendeeSingular.trim() || 'Attendee',
         attendee_label_plural: attendeePlural.trim() || 'Attendees',
+        barcode_field: selectedBarcodeCol,
         barcode_config: currentBarcodeConfig,
       });
 
@@ -489,7 +527,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
         primary_scan_field: primaryScanField.trim().toLowerCase(),
         secondary_scan_field: secondaryScanField.trim() ? secondaryScanField.trim().toLowerCase() : null,
         qr_mode: qrMode,
-        barcode_field: barcodeIdentifierField || barcodeField,
+        barcode_field: selectedBarcodeCol,
         barcode_config: currentBarcodeConfig,
         is_uniqueness_verified: true,
       });
@@ -527,20 +565,26 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
     setSavingBarcodeConfig(true);
     setBarcodeConfigSavedMessage(null);
     try {
+      const selectedBarcodeCol = (barcodeField || primaryScanField || 'usn').trim();
       const barcodeConfig: BarcodeConfig = {
-        mode: barcodeMode,
-        value: barcodeValue.trim(),
-        identifier_field: barcodeIdentifierField || primaryScanField || 'usn',
-        case_sensitive: barcodeCaseSensitive,
-        min_length: barcodeLengthValidation && barcodeMinLength ? parseInt(barcodeMinLength, 10) : null,
-        max_length: barcodeLengthValidation && barcodeMaxLength ? parseInt(barcodeMaxLength, 10) : null,
+        mode: 'full',
+        value: '',
+        identifier_field: selectedBarcodeCol,
+        case_sensitive: false,
+        min_length: null,
+        max_length: null,
       };
+
+      await eventsApi.update(eventId, {
+        barcode_field: selectedBarcodeCol,
+        barcode_config: barcodeConfig,
+      });
 
       const res = await eventsApi.updateScanConfig(eventId, {
         primary_scan_field: primaryScanField.trim().toLowerCase(),
         secondary_scan_field: secondaryScanField.trim() ? secondaryScanField.trim().toLowerCase() : null,
         qr_mode: qrMode,
-        barcode_field: barcodeIdentifierField || barcodeField || 'usn',
+        barcode_field: selectedBarcodeCol,
         barcode_config: barcodeConfig,
         is_uniqueness_verified: true,
       });
@@ -551,7 +595,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
         setEvents((prev) => prev.map((ev) => (ev.id === updatedEv.id ? updatedEv : ev)));
         await broadcastEventUpdated(eventId, updatedEv);
         window.dispatchEvent(new CustomEvent('admitto:events-changed'));
-        setBarcodeConfigSavedMessage('Barcode identification configuration saved successfully.');
+        setBarcodeConfigSavedMessage(`Barcode column updated to '${selectedBarcodeCol}' successfully.`);
         setTimeout(() => setBarcodeConfigSavedMessage(null), 3500);
       }
     } catch (err: any) {
@@ -1611,16 +1655,16 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
               </div>
             </div>
 
-            {/* Dedicated Barcode Identification Card */}
+            {/* Dedicated Barcode Identification Column Selection Card */}
             <div className="pt-4 border-t border-[#314A56] space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                 <div>
                   <h3 className="text-xs sm:text-sm font-bold text-[#ECEEF0] flex items-center gap-2 font-mono">
                     <Barcode className="w-4 h-4 text-[#FFE3A6]" />
-                    <span>BARCODE IDENTIFICATION</span>
+                    <span>BARCODE IDENTIFICATION COLUMN</span>
                   </h3>
                   <p className="text-xs text-[#8A9BA8] mt-0.5">
-                    How should attendee barcodes be identified?
+                    Select which column from the uploaded attendee data is used to identify attendee barcodes during scanning.
                   </p>
                 </div>
                 {barcodeConfigSavedMessage && (
@@ -1631,217 +1675,88 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                 )}
               </div>
 
-              {/* Warning Notice */}
-              <div className="p-3.5 bg-[#0C1B23] rounded-2xl border border-[#314A56] text-xs text-[#ECEEF0] flex items-start gap-2.5">
-                <AlertTriangle className="w-4 h-4 shrink-0 text-[#FFE3A6] mt-0.5" />
-                <div>
-                  <div className="font-semibold text-[#FFE3A6]">
-                    Changing barcode identification rules may affect attendee verification for this event.
+              {/* Status & Selected Column Banner */}
+              <div className="p-4 bg-[#0C1B23] rounded-2xl border border-[#314A56] space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-semibold text-[#8A9BA8] uppercase tracking-wider">
+                      Current Barcode Column:
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-[#FFE3A6]/15 border border-[#FFE3A6]/30 text-[#FFE3A6] text-xs font-mono font-bold flex items-center gap-1.5">
+                      <Barcode className="w-3.5 h-3.5" />
+                      {barcodeField || primaryScanField || 'usn'}
+                    </span>
                   </div>
-                  <div className="text-[11px] text-[#8A9BA8] mt-0.5">
-                    Modifying this configuration does NOT alter existing attendee barcodes in the database. Only scanner interpretation and validation rules are changed.
-                  </div>
+
+                  {event?.scan_config?.dataset_name ? (
+                    <span className="text-[11px] text-[#8A9BA8] flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                      <span>Dataset: <strong className="text-[#ECEEF0]">{event.scan_config.dataset_name}</strong></span>
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-[#8A9BA8] flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[#FFE3A6]" />
+                      <span>Default Schema Key</span>
+                    </span>
+                  )}
                 </div>
+
+                <p className="text-xs text-[#8A9BA8] leading-relaxed">
+                  This column was selected during attendee data upload or configured here. When physical barcodes are scanned at the gate, attendee records are matched against this column.
+                </p>
               </div>
 
-              {/* Barcode Matching Type Selector */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#8A9BA8]">
-                  Barcode Matching Type
+              {/* Column Selection Dropdown */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-[#ECEEF0] flex items-center justify-between">
+                  <span>Choose Barcode Identification Column</span>
+                  <span className="text-[11px] text-[#FFE3A6] font-mono">
+                    {availableColumns.length > 0 ? `${availableColumns.length} Columns Available` : 'Standard Fields'}
+                  </span>
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['prefix', 'suffix', 'full'] as BarcodeMatchingMode[]).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setBarcodeMode(mode)}
-                      className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                        barcodeMode === mode
-                          ? 'bg-[#FFE3A6]/15 border-[#FFE3A6] text-[#FFE3A6]'
-                          : 'bg-[#0C1B23] border-[#314A56] text-[#8A9BA8] hover:text-[#ECEEF0] hover:bg-[#314A56]/30'
-                      }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full ${barcodeMode === mode ? 'bg-[#FFE3A6]' : 'bg-[#8A9BA8]'}`} />
-                      <span className="capitalize">{mode === 'full' ? 'Full Barcode' : mode}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
 
-              {/* Configured Value and Unique Identifier Field */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {barcodeMode !== 'full' ? (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-[#8A9BA8]">
-                      {barcodeMode === 'prefix' ? 'Prefix Value' : 'Suffix Value'}
-                    </label>
-                    <input
-                      type="text"
-                      placeholder={barcodeMode === 'prefix' ? 'e.g. 1BH' : 'e.g. 2026'}
-                      value={barcodeValue}
-                      onChange={(e) => setBarcodeValue(e.target.value)}
-                      className="w-full h-11 px-3.5 rounded-xl bg-[#0C1B23] border border-[#314A56] text-xs text-[#ECEEF0] placeholder-[#8A9BA8]/50 focus:outline-none focus:border-[#FFE3A6]"
-                    />
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-[#8A9BA8]">
-                      Matching Rule
-                    </label>
-                    <div className="h-11 px-3.5 rounded-xl bg-[#0C1B23] border border-[#314A56] text-xs text-[#8A9BA8] flex items-center">
-                      Exact full barcode lookup against attendee record
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-[#8A9BA8]">
-                    Unique Identifier Field
-                  </label>
+                <div className="relative">
                   <select
-                    value={barcodeIdentifierField}
-                    onChange={(e) => setBarcodeIdentifierField(e.target.value)}
+                    value={barcodeField}
+                    onChange={(e) => setBarcodeField(e.target.value)}
                     style={{ colorScheme: 'dark' }}
-                    className="w-full h-11 px-3 rounded-xl bg-[#0C1B23] border border-[#314A56] text-xs text-[#ECEEF0] focus:outline-none focus:border-[#FFE3A6] cursor-pointer"
+                    className="w-full h-12 px-4 rounded-xl bg-[#0C1B23] border border-[#314A56] hover:border-white/20 text-xs sm:text-sm text-[#ECEEF0] focus:outline-none focus:border-[#FFE3A6] cursor-pointer transition-colors"
                   >
-                    <option value="usn" className="bg-[#0C1B23] text-[#ECEEF0]">USN / Roll Number</option>
-                    <option value="roll_number" className="bg-[#0C1B23] text-[#ECEEF0]">Roll Number</option>
-                    <option value="employee_id" className="bg-[#0C1B23] text-[#ECEEF0]">Employee ID</option>
-                    <option value="registration_id" className="bg-[#0C1B23] text-[#ECEEF0]">Registration ID</option>
-                    <option value="participant_id" className="bg-[#0C1B23] text-[#ECEEF0]">Participant ID</option>
-                    <option value="email" className="bg-[#0C1B23] text-[#ECEEF0]">Email</option>
-                    <option value="membership_id" className="bg-[#0C1B23] text-[#ECEEF0]">Membership ID</option>
-                    <option value="custom_id" className="bg-[#0C1B23] text-[#ECEEF0]">Custom ID</option>
-                    <option value="barcode" className="bg-[#0C1B23] text-[#ECEEF0]">Barcode</option>
-                    {/* Add any event custom fields dynamically */}
-                    {event?.scan_config?.available_fields?.filter((f) => !['usn', 'roll_number', 'employee_id', 'registration_id', 'participant_id', 'email', 'membership_id', 'custom_id', 'barcode'].includes(f.toLowerCase())).map((f) => (
-                      <option key={f} value={f} className="bg-[#0C1B23] text-[#ECEEF0]">
-                        {f} (Custom Field)
+                    {/* Primary Scanning Key Option */}
+                    <option value={primaryScanField || 'usn'} className="bg-[#0C1B23] text-[#FFE3A6] font-semibold py-2">
+                      ⭐ Primary Scanning Key ({primaryScanField || 'usn'})
+                    </option>
+
+                    {secondaryScanField && (
+                      <option value={secondaryScanField} className="bg-[#0C1B23] text-[#ECEEF0] py-2">
+                        Secondary Verification Key ({secondaryScanField})
                       </option>
-                    ))}
+                    )}
+
+                    {/* Uploaded Dataset Columns */}
+                    {availableColumns.length > 0 && (
+                      <optgroup label="Uploaded Dataset Columns" className="bg-[#10232D] text-[#8A9BA8] font-bold">
+                        {availableColumns
+                          .filter((col) => col !== (primaryScanField || 'usn') && col !== secondaryScanField)
+                          .map((col) => (
+                            <option key={col} value={col} className="bg-[#0C1B23] text-[#ECEEF0] py-2 font-normal">
+                              Column: {col}
+                            </option>
+                          ))}
+                      </optgroup>
+                    )}
+
+                    {/* Standard Attendee Attributes */}
+                    <optgroup label="Standard Attendee Attributes" className="bg-[#10232D] text-[#8A9BA8] font-bold">
+                      {['usn', 'roll_number', 'registration_id', 'employee_id', 'barcode', 'email', 'phone_number', 'name', 'branch', 'section']
+                        .filter((f) => !availableColumns.includes(f) && f !== (primaryScanField || 'usn') && f !== secondaryScanField)
+                        .map((f) => (
+                          <option key={f} value={f} className="bg-[#0C1B23] text-[#ECEEF0] py-2 font-normal">
+                            Standard: {f}
+                          </option>
+                        ))}
+                    </optgroup>
                   </select>
-                </div>
-              </div>
-
-              {/* Toggles: Case Sensitivity & Length Validation */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-[#314A56]">
-                {/* Case Sensitivity */}
-                <div className="flex items-center justify-between p-3 rounded-xl bg-[#0C1B23] border border-[#314A56]">
-                  <div>
-                    <div className="text-xs font-medium text-[#ECEEF0]">Case Sensitive</div>
-                    <div className="text-[10px] text-[#8A9BA8]">Match upper/lowercase strictly</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setBarcodeCaseSensitive(!barcodeCaseSensitive)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      barcodeCaseSensitive ? 'bg-[#FFE3A6]' : 'bg-[#314A56]'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-md ring-0 transition duration-200 ease-in-out ${
-                        barcodeCaseSensitive ? 'translate-x-4 bg-[#10232D]' : 'translate-x-0 bg-[#8A9BA8]'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Optional Length Validation Toggle */}
-                <div className="flex items-center justify-between p-3 rounded-xl bg-[#0C1B23] border border-[#314A56]">
-                  <div>
-                    <div className="text-xs font-medium text-[#ECEEF0]">Optional Length Validation</div>
-                    <div className="text-[10px] text-[#8A9BA8]">Enforce min & max length limits</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setBarcodeLengthValidation(!barcodeLengthValidation)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      barcodeLengthValidation ? 'bg-[#FFE3A6]' : 'bg-[#314A56]'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-md ring-0 transition duration-200 ease-in-out ${
-                        barcodeLengthValidation ? 'translate-x-4 bg-[#10232D]' : 'translate-x-0 bg-[#8A9BA8]'
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              {/* Length Validation Inputs (if enabled) */}
-              {barcodeLengthValidation && (
-                <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-[#0C1B23] border border-[#314A56]">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-medium text-[#8A9BA8]">Minimum Barcode Length</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 9"
-                      value={barcodeMinLength}
-                      onChange={(e) => setBarcodeMinLength(e.target.value)}
-                      className="w-full h-9 px-3 rounded-lg bg-[#1B303A] border border-[#314A56] text-xs text-[#ECEEF0] placeholder-[#8A9BA8]/50 focus:outline-none focus:border-[#FFE3A6]"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-medium text-[#8A9BA8]">Maximum Barcode Length</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 12"
-                      value={barcodeMaxLength}
-                      onChange={(e) => setBarcodeMaxLength(e.target.value)}
-                      className="w-full h-9 px-3 rounded-lg bg-[#1B303A] border border-[#314A56] text-xs text-[#ECEEF0] placeholder-[#8A9BA8]/50 focus:outline-none focus:border-[#FFE3A6]"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Barcode Preview */}
-              <div className="p-4 rounded-xl bg-[#0C1B23] border border-[#314A56] space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-[#FFE3A6] uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                    <Sparkles className="w-3.5 h-3.5 text-[#FFE3A6]" />
-                    Barcode Preview
-                  </span>
-                  <span className="text-[#8A9BA8] capitalize font-mono text-[10px]">{barcodeMode} Mode</span>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap text-xs">
-                  {barcodeMode === 'prefix' && (
-                    <>
-                      <div className="px-3 py-1 rounded-lg bg-[#FFE3A6]/20 border border-[#FFE3A6]/40 text-[#FFE3A6] font-mono font-bold">
-                        {barcodeValue.trim() || '1BH'}
-                      </div>
-                      <span className="text-[#8A9BA8] font-bold">+</span>
-                      <div className="px-3 py-1 rounded-lg bg-[#E4A0B3]/20 border border-[#E4A0B3]/40 text-[#E4A0B3] font-mono font-bold">
-                        24CS051
-                      </div>
-                    </>
-                  )}
-                  {barcodeMode === 'suffix' && (
-                    <>
-                      <div className="px-3 py-1 rounded-lg bg-[#E4A0B3]/20 border border-[#E4A0B3]/40 text-[#E4A0B3] font-mono font-bold">
-                        24CS051
-                      </div>
-                      <span className="text-[#8A9BA8] font-bold">+</span>
-                      <div className="px-3 py-1 rounded-lg bg-[#FFE3A6]/20 border border-[#FFE3A6]/40 text-[#FFE3A6] font-mono font-bold">
-                        {barcodeValue.trim() || '2026'}
-                      </div>
-                    </>
-                  )}
-                  {barcodeMode === 'full' && (
-                    <div className="px-3 py-1 rounded-lg bg-[#FFE3A6]/20 border border-[#FFE3A6]/40 text-[#FFE3A6] font-mono font-bold">
-                      1BH24CS051
-                    </div>
-                  )}
-                  <span className="text-[#8A9BA8] text-xs">→</span>
-                  <span className="text-xs text-[#8A9BA8]">
-                    Example: <strong className="text-[#ECEEF0] font-mono">{
-                      barcodeMode === 'prefix'
-                        ? `${barcodeValue.trim() || '1BH'}24CS051`
-                        : barcodeMode === 'suffix'
-                        ? `24CS051${barcodeValue.trim() || '2026'}`
-                        : '1BH24CS051'
-                    }</strong>
-                  </span>
                 </div>
               </div>
 
@@ -1851,10 +1766,10 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                   type="button"
                   onClick={handleSaveBarcodeConfig}
                   disabled={savingBarcodeConfig}
-                  className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white shadow-lg shadow-orange-500/20 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all select-none"
+                  className="px-5 py-2.5 rounded-xl bg-[#FFE3A6] hover:bg-[#ffeac0] active:scale-95 text-xs font-bold text-[#10232D] shadow-lg shadow-black/20 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all select-none"
                 >
-                  <Save className={`w-3.5 h-3.5 ${savingBarcodeConfig ? 'animate-spin' : ''}`} />
-                  <span>{savingBarcodeConfig ? 'Saving Barcode Rules...' : 'Save Barcode Configuration'}</span>
+                  <Save className={`w-3.5 h-3.5 text-[#10232D] ${savingBarcodeConfig ? 'animate-spin' : ''}`} />
+                  <span>{savingBarcodeConfig ? 'Updating Column...' : 'Save Barcode Column'}</span>
                 </button>
               </div>
             </div>
