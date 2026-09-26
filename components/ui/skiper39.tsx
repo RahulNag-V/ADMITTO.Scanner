@@ -49,9 +49,9 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7, className }: CrowdCanvasProps) 
     const getRandomFromArray = (array: any[]) => array[randomIndex(array) | 0];
 
     const getStageScale = (w: number) => {
-      if (w < 480) return 0.28; // Small phones: ~67px wide
-      if (w < 640) return 0.35; // Large phones / narrow viewports: ~84px wide
-      if (w < 1024) return 0.48; // Tablets: ~115px wide
+      if (w < 480) return 0.35; // Mobile: ~84px wide, clearly visible and well-proportioned
+      if (w < 640) return 0.40; // Large phones / narrow viewports: ~96px wide
+      if (w < 1024) return 0.50; // Tablets: ~120px wide
       return 0.68; // Desktops: sleek, refined crowd scale (~163px wide)
     };
 
