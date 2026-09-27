@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ADMITTO — Digital Event Access & Token Validation</title>
+    <script type="text/javascript">
+      // Single Page Apps for GitHub Pages
+      // MIT License
+      // https://github.com/rafgraph/spa-github-pages
+      // Keep 1 segment (/ADMITTO.Scanner/) if hosted on github.io, 0 if custom domain
+      var pathSegmentsToKeep = window.location.hostname.endsWith('.github.io') ? 1 : 0;
+
+      var l = window.location;
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash
+      );
+    </script>
+  </head>
+  <body style="margin: 0; padding: 0; background-color: #090d16; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #94a3b8; display: flex; align-items: center; justify-content: center; min-height: 100vh;">
+    <div style="text-align: center; padding: 2rem;">
+      <div style="width: 48px; height: 48px; border: 3px solid rgba(99, 102, 241, 0.2); border-top-color: #6366f1; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1.5rem auto;"></div>
+      <h2 style="color: #ffffff; font-size: 1.25rem; font-weight: 600; margin: 0 0 0.5rem 0;">Redirecting to ADMITTO...</h2>
+      <p style="font-size: 0.875rem; margin: 0;">Restoring requested route...</p>
+    </div>
+    <style>
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </body>
+</html>
