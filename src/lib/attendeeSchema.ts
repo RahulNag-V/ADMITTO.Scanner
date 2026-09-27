@@ -505,13 +505,30 @@ export function deleteUploadedDataset(eventId: string, datasetName: string): voi
   }
 }
 
-export function clearAllUploadedDatasets(eventId: string): void {
+export function clearAllUploadedDatasets(eventId?: string): void {
   try {
     const storage = getSafeStorage();
-    storage.removeItem(`admitto_datasets_${eventId}`);
-    storage.removeItem(`admitto_schema_${eventId}`);
-    storage.removeItem(`admitto_raw_headers_${eventId}`);
+    if (eventId) {
+      storage.removeItem(`admitto_datasets_${eventId}`);
+      storage.removeItem(`admitto_schema_${eventId}`);
+      storage.removeItem(`admitto_raw_headers_${eventId}`);
+    }
     storage.removeItem('admitto_latest_dataset_columns');
+
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
+        if (k && (eventId ? k.includes(eventId) : k.startsWith('admitto_datasets_'))) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => {
+        try {
+          window.localStorage.removeItem(k);
+        } catch {}
+      });
+    }
   } catch (e) {
     console.warn('Failed to clear uploaded datasets:', e);
   }

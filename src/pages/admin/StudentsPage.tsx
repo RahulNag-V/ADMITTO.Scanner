@@ -1622,148 +1622,144 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
             })()}
           </div>
 
-          {/* Categorize by Uploaded Data Dropdown Menu */}
-          <div className="relative w-full md:w-auto md:shrink-0 z-50" ref={datasetDropdownRef}>
-            {(() => {
-              const currentDataset = availableDatasets.find(
-                (d) => d.name.toLowerCase() === selectedDatasetFilter.toLowerCase()
-              );
-              const currentLabel = selectedDatasetFilter === 'ALL'
-                ? 'All Uploaded Data'
-                : (currentDataset?.name || selectedDatasetFilter);
-              const currentCount = selectedDatasetFilter === 'ALL'
-                ? students.length
-                : (currentDataset?.count ?? students.filter(s => (s.meta?.dataset_name || '').toLowerCase() === selectedDatasetFilter.toLowerCase()).length);
+          {/* Categorize by Uploaded Data Dropdown Menu (Only shown when active datasets exist) */}
+          {availableDatasets.length > 0 && (
+            <div className="relative w-full md:w-auto md:shrink-0 z-50" ref={datasetDropdownRef}>
+              {(() => {
+                const currentDataset = availableDatasets.find(
+                  (d) => d.name.toLowerCase() === selectedDatasetFilter.toLowerCase()
+                );
+                const currentLabel = selectedDatasetFilter === 'ALL'
+                  ? 'All Uploaded Data'
+                  : (currentDataset?.name || selectedDatasetFilter);
+                const currentCount = selectedDatasetFilter === 'ALL'
+                  ? students.length
+                  : (currentDataset?.count ?? students.filter(s => (s.meta?.dataset_name || '').toLowerCase() === selectedDatasetFilter.toLowerCase()).length);
 
-              return (
-                <>
-                  <button
-                    id="categorize-dataset-dropdown-btn"
-                    type="button"
-                    onClick={() => {
-                      setIsDatasetDropdownOpen(!isDatasetDropdownOpen);
-                    }}
-                    className="w-full md:w-auto h-10 px-3 rounded-xl bg-zinc-950/40 hover:bg-zinc-900/60 border border-white/10 text-xs font-bold text-white flex items-center justify-between gap-1.5 transition-all cursor-pointer shadow-md select-none backdrop-blur-md"
-                    aria-haspopup="true"
-                    aria-expanded={isDatasetDropdownOpen}
-                    title="Categorize attendee roster based on uploaded data"
-                  >
-                    <div className="flex items-center gap-1.5 truncate">
-                      <Database className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                      <span className="truncate max-w-[120px] sm:max-w-[160px]">{currentLabel}</span>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono border bg-indigo-500/20 border-indigo-500/40 text-indigo-300">
-                        {currentCount}
-                      </span>
-                      <ChevronDown
-                        className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-200 ${
-                          isDatasetDropdownOpen ? 'rotate-180 text-indigo-400' : ''
-                        }`}
-                      />
-                    </div>
-                  </button>
-
-                  {/* Floating Dataset Categorization Dropdown Menu */}
-                  {isDatasetDropdownOpen && (
-                    <div className="absolute right-0 sm:left-0 top-full mt-2 w-64 sm:w-72 bg-[#0c1020]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-1.5 shadow-[0_30px_70px_rgba(0,0,0,0.95)] z-[100] animate-in fade-in slide-in-from-top-2 duration-150 max-w-[calc(100vw-32px)]">
-                      <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 flex items-center justify-between">
-                        <span>Categorize by Uploaded Data</span>
-                        <span className="font-mono text-indigo-400 text-[10px] font-normal lowercase">{availableDatasets.length} category</span>
+                return (
+                  <>
+                    <button
+                      id="categorize-dataset-dropdown-btn"
+                      type="button"
+                      onClick={() => {
+                        setIsDatasetDropdownOpen(!isDatasetDropdownOpen);
+                      }}
+                      className="w-full md:w-auto h-10 px-3 rounded-xl bg-zinc-950/40 hover:bg-zinc-900/60 border border-white/10 text-xs font-bold text-white flex items-center justify-between gap-1.5 transition-all cursor-pointer shadow-md select-none backdrop-blur-md"
+                      aria-haspopup="true"
+                      aria-expanded={isDatasetDropdownOpen}
+                      title="Categorize attendee roster based on uploaded data"
+                    >
+                      <div className="flex items-center gap-1.5 truncate">
+                        <Database className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                        <span className="truncate max-w-[120px] sm:max-w-[160px]">{currentLabel}</span>
                       </div>
-                      <div className="p-1 space-y-1 max-h-60 overflow-y-auto">
-                        {/* All Uploaded Data Option */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedDatasetFilter('ALL');
-                            setIsDatasetDropdownOpen(false);
-                          }}
-                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                            selectedDatasetFilter === 'ALL'
-                              ? 'bg-indigo-600 text-white shadow-md'
-                              : 'text-slate-300 hover:text-white hover:bg-white/10'
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono border bg-indigo-500/20 border-indigo-500/40 text-indigo-300">
+                          {currentCount}
+                        </span>
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-200 ${
+                            isDatasetDropdownOpen ? 'rotate-180 text-indigo-400' : ''
                           }`}
-                        >
-                          <div className="flex items-center gap-2.5 truncate">
-                            <Users className={`w-4 h-4 shrink-0 ${selectedDatasetFilter === 'ALL' ? 'text-white' : 'text-zinc-400'}`} />
-                            <span className="truncate">All Uploaded Data</span>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${
-                                selectedDatasetFilter === 'ALL'
-                                  ? 'bg-white/20 border-white/30 text-white'
-                                  : 'bg-zinc-800 text-zinc-300 border-zinc-700'
-                              }`}
-                            >
-                              {students.length}
-                            </span>
-                            {selectedDatasetFilter === 'ALL' && <Check className="w-3.5 h-3.5 text-white" />}
-                          </div>
-                        </button>
+                        />
+                      </div>
+                    </button>
 
-                        {/* Individual Uploaded Datasets */}
-                        {availableDatasets.map((ds) => {
-                          const isSelected = selectedDatasetFilter.toLowerCase() === ds.name.toLowerCase();
-                          return (
-                            <div key={ds.name} className="flex items-center gap-1 group/ds">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedDatasetFilter(ds.name);
-                                  setIsDatasetDropdownOpen(false);
-                                }}
-                                className={`flex-1 flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                                  isSelected
-                                    ? 'bg-indigo-600 text-white shadow-md'
-                                    : 'text-slate-300 hover:text-white hover:bg-white/10'
+                    {/* Floating Dataset Categorization Dropdown Menu */}
+                    {isDatasetDropdownOpen && (
+                      <div className="absolute right-0 sm:left-0 top-full mt-2 w-64 sm:w-72 bg-[#0c1020]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-1.5 shadow-[0_30px_70px_rgba(0,0,0,0.95)] z-[100] animate-in fade-in slide-in-from-top-2 duration-150 max-w-[calc(100vw-32px)]">
+                        <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 flex items-center justify-between">
+                          <span>Categorize by Uploaded Data</span>
+                          <span className="font-mono text-indigo-400 text-[10px] font-normal lowercase">{availableDatasets.length} category</span>
+                        </div>
+                        <div className="p-1 space-y-1 max-h-60 overflow-y-auto">
+                          {/* All Uploaded Data Option */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDatasetFilter('ALL');
+                              setIsDatasetDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                              selectedDatasetFilter === 'ALL'
+                                ? 'bg-indigo-600 text-white shadow-md'
+                                : 'text-slate-300 hover:text-white hover:bg-white/10'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 truncate">
+                              <Users className={`w-4 h-4 shrink-0 ${selectedDatasetFilter === 'ALL' ? 'text-white' : 'text-zinc-400'}`} />
+                              <span className="truncate">All Uploaded Data</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+                                  selectedDatasetFilter === 'ALL'
+                                    ? 'bg-white/20 border-white/30 text-white'
+                                    : 'bg-zinc-800 text-zinc-300 border-zinc-700'
                                 }`}
                               >
-                                <div className="flex items-center gap-2.5 truncate">
-                                  <FileSpreadsheet className={`w-4 h-4 shrink-0 ${isSelected ? 'text-white' : 'text-indigo-400'}`} />
-                                  <span className="truncate" title={ds.name}>{ds.name}</span>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <span
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${
-                                      isSelected
-                                        ? 'bg-white/20 border-white/30 text-white'
-                                        : 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
-                                    }`}
-                                  >
-                                    {ds.count}
-                                  </span>
-                                  {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
-                                </div>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteEntireDataset(ds.name);
-                                }}
-                                title={`Delete dataset "${ds.name}" and all ${ds.count} attendees`}
-                                className="p-2 rounded-xl text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0 opacity-70 group-hover/ds:opacity-100"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                                {students.length}
+                              </span>
+                              {selectedDatasetFilter === 'ALL' && <Check className="w-3.5 h-3.5 text-white" />}
                             </div>
-                          );
-                        })}
+                          </button>
 
-                        {availableDatasets.length === 0 && (
-                          <div className="px-3 py-3 text-center text-xs text-zinc-500 italic">
-                            No uploaded datasets available
-                          </div>
-                        )}
+                          {/* Individual Uploaded Datasets */}
+                          {availableDatasets.map((ds) => {
+                            const isSelected = selectedDatasetFilter.toLowerCase() === ds.name.toLowerCase();
+                            return (
+                              <div key={ds.name} className="flex items-center gap-1 group/ds">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedDatasetFilter(ds.name);
+                                    setIsDatasetDropdownOpen(false);
+                                  }}
+                                  className={`flex-1 flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-indigo-600 text-white shadow-md'
+                                      : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5 truncate">
+                                    <FileSpreadsheet className={`w-4 h-4 shrink-0 ${isSelected ? 'text-white' : 'text-indigo-400'}`} />
+                                    <span className="truncate" title={ds.name}>{ds.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+                                        isSelected
+                                          ? 'bg-white/20 border-white/30 text-white'
+                                          : 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                                      }`}
+                                    >
+                                      {ds.count}
+                                    </span>
+                                    {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                                  </div>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteEntireDataset(ds.name);
+                                  }}
+                                  title={`Delete dataset "${ds.name}" and all ${ds.count} attendees`}
+                                  className="p-2 rounded-xl text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0 opacity-70 group-hover/ds:opacity-100"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </div>
       </div>
 
