@@ -412,11 +412,15 @@ export interface UploadedDatasetRecord {
 
 const memoryStorageFallback: Record<string, string> = {};
 
-function getSafeStorage(): { getItem: (k: string) => string | null; setItem: (k: string, v: string) => void } {
+function getSafeStorage(): {
+  getItem: (k: string) => string | null;
+  setItem: (k: string, v: string) => void;
+  removeItem: (k: string) => void;
+} {
   try {
-    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
-    if (typeof localStorage !== 'undefined' && localStorage.getItem) return localStorage;
-    if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage?.getItem) {
+    if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.removeItem === 'function') return window.localStorage;
+    if (typeof localStorage !== 'undefined' && typeof localStorage.removeItem === 'function') return localStorage;
+    if (typeof globalThis !== 'undefined' && typeof (globalThis as any).localStorage?.removeItem === 'function') {
       return (globalThis as any).localStorage;
     }
   } catch {}
@@ -424,6 +428,9 @@ function getSafeStorage(): { getItem: (k: string) => string | null; setItem: (k:
     getItem: (k: string) => memoryStorageFallback[k] ?? null,
     setItem: (k: string, v: string) => {
       memoryStorageFallback[k] = v;
+    },
+    removeItem: (k: string) => {
+      delete memoryStorageFallback[k];
     },
   };
 }
@@ -486,3 +493,43 @@ export function loadLocalSchema(eventId: string): { columns: ColumnConfig[]; dat
   }
   return null;
 }
+
+export function deleteUploadedDataset(eventId: string, datasetName: string): void {
+  try {
+    const storage = getSafeStorage();
+    const existing = loadAllUploadedDatasets(eventId);
+    const updated = existing.filter((d) => d.name.toLowerCase() !== datasetName.toLowerCase());
+    storage.setItem(`admitto_datasets_${eventId}`, JSON.stringify(updated));
+  } catch (e) {
+    console.warn('Failed to delete uploaded dataset:', e);
+  }
+}
+
+export function clearAllUploadedDatasets(eventId: string): void {
+  try {
+    const storage = getSafeStorage();
+    storage.removeItem(`admitto_datasets_${eventId}`);
+    storage.removeItem(`admitto_schema_${eventId}`);
+    storage.removeItem(`admitto_raw_headers_${eventId}`);
+    storage.removeItem('admitto_latest_dataset_columns');
+  } catch (e) {
+    console.warn('Failed to clear uploaded datasets:', e);
+  }
+}
+
+export function syncUploadedDatasetsWithActive(eventId: string, activeDatasetNames: string[]): void {
+  try {
+    const storage = getSafeStorage();
+    if (!activeDatasetNames || activeDatasetNames.length === 0) {
+      storage.removeItem(`admitto_datasets_${eventId}`);
+      return;
+    }
+    const existing = loadAllUploadedDatasets(eventId);
+    const activeLower = new Set(activeDatasetNames.map((n) => n.toLowerCase()));
+    const updated = existing.filter((d) => activeLower.has(d.name.toLowerCase()));
+    storage.setItem(`admitto_datasets_${eventId}`, JSON.stringify(updated));
+  } catch (e) {
+    console.warn('Failed to sync uploaded datasets with active list:', e);
+  }
+}
+

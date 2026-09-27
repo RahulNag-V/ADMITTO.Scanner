@@ -78,6 +78,9 @@ import {
   loadLocalSchema,
   saveUploadedDataset,
   loadAllUploadedDatasets,
+  deleteUploadedDataset,
+  clearAllUploadedDatasets,
+  syncUploadedDatasetsWithActive,
   UploadedDatasetRecord,
   isQrCodeColumn,
   isPrimaryKeyColumn,
@@ -375,48 +378,95 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
-  // Distinct datasets computed from registry, active state, and attendee records
+  // Distinct datasets computed from attendee records (only active datasets with existing records)
   const availableDatasets = useMemo(() => {
+    if (!students || students.length === 0) {
+      return [];
+    }
+
     const registry = loadAllUploadedDatasets(eventId);
     const map = new Map<string, { name: string; count: number; columns: ColumnConfig[] }>();
 
-    // 1. From saved multi-dataset registry
-    registry.forEach((d) => {
-      if (d.name) {
-        map.set(d.name.toLowerCase(), {
-          name: d.name,
-          count: 0,
-          columns: d.columns && d.columns.length > 0 ? d.columns : columns,
-        });
-      }
-    });
-
-    // 2. From current active uploaded dataset if known
-    if (uploadedDatasetName && !map.has(uploadedDatasetName.toLowerCase())) {
-      map.set(uploadedDatasetName.toLowerCase(), {
-        name: uploadedDatasetName,
-        count: 0,
-        columns: columns,
-      });
-    }
-
-    // 3. From attendee metadata
+    // Count datasets directly from current student records
     students.forEach((s) => {
-      const dsName = (s.meta?.dataset_name as string) || (uploadedDatasetName ? uploadedDatasetName : 'General Dataset');
+      const dsName = (s.meta?.dataset_name as string) || (uploadedDatasetName ? uploadedDatasetName : '');
+      if (!dsName) return;
       const key = dsName.toLowerCase();
       if (!map.has(key)) {
+        const regItem = registry.find((r) => r.name.toLowerCase() === key);
         map.set(key, {
           name: dsName,
           count: 0,
-          columns: columns,
+          columns: regItem?.columns && regItem.columns.length > 0 ? regItem.columns : columns,
         });
       }
       const item = map.get(key)!;
       item.count += 1;
     });
 
-    return Array.from(map.values());
+    return Array.from(map.values()).filter((d) => d.count > 0);
   }, [eventId, students, uploadedDatasetName, columns]);
+
+  // Ensure deleted files and datasets are purged when attendee records are deleted
+  useEffect(() => {
+    if (!eventId) return;
+    if (students.length === 0) {
+      clearAllUploadedDatasets(eventId);
+      if (uploadedDatasetName) setUploadedDatasetName(null);
+      if (selectedDatasetFilter !== 'ALL') setSelectedDatasetFilter('ALL');
+      if (targetDatasetName) setTargetDatasetName('');
+    } else {
+      const activeNames = Array.from(
+        new Set(
+          students
+            .map((s) => (s.meta?.dataset_name as string) || uploadedDatasetName || '')
+            .filter(Boolean)
+        )
+      );
+      syncUploadedDatasetsWithActive(eventId, activeNames);
+      if (
+        selectedDatasetFilter !== 'ALL' &&
+        !activeNames.some((n) => n.toLowerCase() === selectedDatasetFilter.toLowerCase())
+      ) {
+        setSelectedDatasetFilter('ALL');
+      }
+    }
+  }, [eventId, students.length, uploadedDatasetName, selectedDatasetFilter]);
+
+  const handleDeleteEntireDataset = async (datasetName: string) => {
+    const attendeesInDataset = students.filter(
+      (s) => (s.meta?.dataset_name || uploadedDatasetName || '').toLowerCase() === datasetName.toLowerCase()
+    );
+    if (
+      !window.confirm(
+        `Are you sure you want to delete dataset "${datasetName}"?\n\nThis will remove all ${attendeesInDataset.length} attendee(s) in this dataset.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      if (attendeesInDataset.length > 0) {
+        await Promise.all(
+          attendeesInDataset.map((s) =>
+            studentsApi.delete(eventId, s.id).catch(() => studentsApi.delete(s.id))
+          )
+        );
+      }
+      deleteUploadedDataset(eventId, datasetName);
+      setStudents((prev) =>
+        prev.filter(
+          (s) => (s.meta?.dataset_name || uploadedDatasetName || '').toLowerCase() !== datasetName.toLowerCase()
+        )
+      );
+      if (selectedDatasetFilter.toLowerCase() === datasetName.toLowerCase()) {
+        setSelectedDatasetFilter('ALL');
+      }
+    } catch (err: any) {
+      console.error('Failed to delete dataset:', err);
+      alert('Failed to delete dataset: ' + (err.message || 'Unknown error'));
+    }
+  };
 
   const handleSelectTargetDataset = (dsName: string) => {
     if (dsName === '__NEW__') {
@@ -436,10 +486,16 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
     setFormErrors({});
     const initialTarget = selectedDatasetFilter !== 'ALL'
       ? selectedDatasetFilter
-      : (uploadedDatasetName || (availableDatasets[0]?.name ?? 'General Dataset'));
+      : (uploadedDatasetName || (availableDatasets[0]?.name ?? ''));
     setTargetDatasetName(initialTarget);
-    setIsCreatingNewDataset(false);
-    setNewDatasetInputName('');
+
+    if (availableDatasets.length === 0) {
+      setIsCreatingNewDataset(true);
+      setNewDatasetInputName('');
+    } else {
+      setIsCreatingNewDataset(false);
+      setNewDatasetInputName('');
+    }
 
     const found = availableDatasets.find((d) => d.name.toLowerCase() === initialTarget.toLowerCase());
     if (found && found.columns && found.columns.length > 0) {
@@ -971,15 +1027,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
             dataset_name: dsTag,
           })
           .catch(console.warn);
-
-        // Save each valid dataset individually into multi-dataset catalog
-        summary.files.filter((f) => f.isValid).forEach((f) => {
-          saveUploadedDataset(eventId, {
-            name: f.name,
-            columns: detectSchemaFromRows(f.headers, f.rows),
-            primaryKey: guessedPrimary,
-          });
-        });
       }
     } catch (err: any) {
       console.error('Failed to validate spreadsheet files:', err);
@@ -1251,11 +1298,21 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
       setImportSummary({ imported: totalImported, duplicates: totalDuplicates, errors: allErrors });
       saveLocalSchema(eventId, columns, scanConfig.dataset_name);
-      saveUploadedDataset(eventId, {
-        name: datasetTag,
-        columns,
-        primaryKey: primaryKeyField,
-      });
+      if (validationSummary && validationSummary.files && validationSummary.files.length > 0) {
+        validationSummary.files.filter((f) => f.isValid).forEach((f) => {
+          saveUploadedDataset(eventId, {
+            name: f.name,
+            columns: detectSchemaFromRows(f.headers, f.rows),
+            primaryKey: primaryKeyField,
+          });
+        });
+      } else {
+        saveUploadedDataset(eventId, {
+          name: datasetTag,
+          columns,
+          primaryKey: primaryKeyField,
+        });
+      }
       try {
         localStorage.setItem(`admitto_raw_headers_${eventId}`, JSON.stringify(columns.map((c) => c.name)));
         localStorage.setItem('admitto_latest_dataset_columns', JSON.stringify(columns.map((c) => c.name)));
@@ -1650,38 +1707,56 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                         {availableDatasets.map((ds) => {
                           const isSelected = selectedDatasetFilter.toLowerCase() === ds.name.toLowerCase();
                           return (
-                            <button
-                              key={ds.name}
-                              type="button"
-                              onClick={() => {
-                                setSelectedDatasetFilter(ds.name);
-                                setIsDatasetDropdownOpen(false);
-                              }}
-                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                                isSelected
-                                  ? 'bg-indigo-600 text-white shadow-md'
-                                  : 'text-slate-300 hover:text-white hover:bg-white/10'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2.5 truncate">
-                                <FileSpreadsheet className={`w-4 h-4 shrink-0 ${isSelected ? 'text-white' : 'text-indigo-400'}`} />
-                                <span className="truncate" title={ds.name}>{ds.name}</span>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <span
-                                  className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${
-                                    isSelected
-                                      ? 'bg-white/20 border-white/30 text-white'
-                                      : 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
-                                  }`}
-                                >
-                                  {ds.count}
-                                </span>
-                                {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
-                              </div>
-                            </button>
+                            <div key={ds.name} className="flex items-center gap-1 group/ds">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedDatasetFilter(ds.name);
+                                  setIsDatasetDropdownOpen(false);
+                                }}
+                                className={`flex-1 flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-indigo-600 text-white shadow-md'
+                                    : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 truncate">
+                                  <FileSpreadsheet className={`w-4 h-4 shrink-0 ${isSelected ? 'text-white' : 'text-indigo-400'}`} />
+                                  <span className="truncate" title={ds.name}>{ds.name}</span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+                                      isSelected
+                                        ? 'bg-white/20 border-white/30 text-white'
+                                        : 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                                    }`}
+                                  >
+                                    {ds.count}
+                                  </span>
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                                </div>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteEntireDataset(ds.name);
+                                }}
+                                title={`Delete dataset "${ds.name}" and all ${ds.count} attendees`}
+                                className="p-2 rounded-xl text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0 opacity-70 group-hover/ds:opacity-100"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           );
                         })}
+
+                        {availableDatasets.length === 0 && (
+                          <div className="px-3 py-3 text-center text-xs text-zinc-500 italic">
+                            No uploaded datasets available
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -2295,8 +2370,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                         </option>
                       ))}
                       {availableDatasets.length === 0 && (
-                        <option value="General Dataset" className="bg-zinc-900 text-white py-1">
-                          General Dataset (0 attendees)
+                        <option value="" disabled className="bg-zinc-900 text-zinc-500 py-1">
+                          No datasets available (create one below)
                         </option>
                       )}
                       <option value="__NEW__" className="bg-zinc-900 text-orange-400 font-bold py-1">

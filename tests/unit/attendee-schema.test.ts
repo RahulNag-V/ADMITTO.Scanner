@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   DEFAULT_COLUMNS,
   inferColumnType,
@@ -9,6 +9,9 @@ import {
   ColumnConfig,
   saveUploadedDataset,
   loadAllUploadedDatasets,
+  deleteUploadedDataset,
+  clearAllUploadedDatasets,
+  syncUploadedDatasetsWithActive,
   isQrCodeColumn,
   isPrimaryKeyColumn,
   isBarcodeColumn,
@@ -470,4 +473,54 @@ describe('Dynamic Attendee Schema Engine', () => {
       expect(mapped.meta?.['Barcode']).toBe('BC-999888');
     });
   });
+
+  describe('9. Dataset Cleanup & Syncing on File/Data Deletion', () => {
+    const eventId = 'test-cleanup-event-123';
+
+    beforeEach(() => {
+      clearAllUploadedDatasets(eventId);
+    });
+
+    it('saves and deletes an uploaded dataset from registry', () => {
+      saveUploadedDataset(eventId, {
+        name: 'batch_alpha.csv',
+        columns: [{ id: '1', name: 'USN', type: 'text', required: true }],
+      });
+      saveUploadedDataset(eventId, {
+        name: 'batch_beta.xlsx',
+        columns: [{ id: '2', name: 'ID', type: 'text', required: true }],
+      });
+
+      let loaded = loadAllUploadedDatasets(eventId);
+      expect(loaded.length).toBe(2);
+
+      deleteUploadedDataset(eventId, 'batch_alpha.csv');
+      loaded = loadAllUploadedDatasets(eventId);
+      expect(loaded.length).toBe(1);
+      expect(loaded[0].name).toBe('batch_beta.xlsx');
+    });
+
+    it('syncs uploaded datasets with active dataset names, pruning deleted ones', () => {
+      saveUploadedDataset(eventId, { name: 'file1.csv', columns: [] });
+      saveUploadedDataset(eventId, { name: 'file2.csv', columns: [] });
+      saveUploadedDataset(eventId, { name: 'file3.csv', columns: [] });
+
+      expect(loadAllUploadedDatasets(eventId).length).toBe(3);
+
+      // Only file2 still has attendees; file1 and file3 were deleted
+      syncUploadedDatasetsWithActive(eventId, ['file2.csv']);
+      const updated = loadAllUploadedDatasets(eventId);
+      expect(updated.length).toBe(1);
+      expect(updated[0].name).toBe('file2.csv');
+    });
+
+    it('clears all uploaded datasets when all data is deleted', () => {
+      saveUploadedDataset(eventId, { name: 'fileA.xlsx', columns: [] });
+      saveUploadedDataset(eventId, { name: 'fileB.xlsx', columns: [] });
+
+      clearAllUploadedDatasets(eventId);
+      expect(loadAllUploadedDatasets(eventId)).toEqual([]);
+    });
+  });
 });
+
