@@ -414,7 +414,13 @@ export const ScannerRosterTab: React.FC<ScannerRosterTabProps> = ({
 
                       <div className="flex flex-wrap items-center gap-2">
                         {/* High-contrast USN Pill */}
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-amber-500/15 text-amber-900 dark:text-amber-300 border border-amber-500/30 text-xs font-mono font-bold tracking-wide">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-lg border text-xs font-mono font-bold tracking-wide transition-colors ${
+                            isAdmitted
+                              ? 'bg-emerald-500/25 text-emerald-800 dark:text-emerald-300 border-emerald-500/40 shadow-sm shadow-emerald-500/10'
+                              : 'bg-amber-500/15 text-amber-900 dark:text-amber-300 border-amber-500/30'
+                          }`}
+                        >
                           {student.usn}
                         </span>
 

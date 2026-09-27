@@ -1825,7 +1825,13 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                               )}
                             </div>
                             {s.usn && (
-                              <span className="inline-flex items-center justify-center bg-amber-500/20 text-amber-300 border border-amber-500/35 px-2 py-0.5 rounded-lg text-xs font-mono font-bold tracking-wider shadow-sm">
+                              <span
+                                className={`inline-flex items-center justify-center px-2 py-0.5 rounded-lg text-xs font-mono font-bold tracking-wider shadow-sm border transition-colors ${
+                                  isCheckedIn
+                                    ? 'bg-emerald-500/25 text-emerald-300 border-emerald-500/40 shadow-emerald-500/10'
+                                    : 'bg-amber-500/20 text-amber-300 border-amber-500/35'
+                                }`}
+                              >
                                 {s.usn.slice(-3)}
                               </span>
                             )}
