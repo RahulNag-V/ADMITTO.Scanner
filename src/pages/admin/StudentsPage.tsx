@@ -1622,8 +1622,21 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
             })()}
           </div>
 
-          {/* Categorize by Uploaded Data Dropdown Menu (Only shown when active datasets exist) */}
-          {availableDatasets.length > 0 && (
+          {/* If only 1 dataset exists, show clean non-interactive category indicator */}
+          {availableDatasets.length === 1 && (
+            <div className="h-10 px-3.5 rounded-xl bg-zinc-950/40 border border-white/10 text-xs font-semibold text-zinc-300 flex items-center gap-2 backdrop-blur-md shadow-sm">
+              <Database className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+              <span className="truncate max-w-[140px] sm:max-w-[200px]">
+                {availableDatasets[0].name}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border bg-orange-500/20 border-orange-500/40 text-orange-300">
+                {availableDatasets[0].count}
+              </span>
+            </div>
+          )}
+
+          {/* Categorize by Uploaded Data Dropdown Menu (Only shown when multiple datasets exist) */}
+          {availableDatasets.length > 1 && (
             <div className="relative w-full md:w-auto md:shrink-0 z-50" ref={datasetDropdownRef}>
               {(() => {
                 const currentDataset = availableDatasets.find(
@@ -1644,22 +1657,22 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                       onClick={() => {
                         setIsDatasetDropdownOpen(!isDatasetDropdownOpen);
                       }}
-                      className="w-full md:w-auto h-10 px-3 rounded-xl bg-zinc-950/40 hover:bg-zinc-900/60 border border-white/10 text-xs font-bold text-white flex items-center justify-between gap-1.5 transition-all cursor-pointer shadow-md select-none backdrop-blur-md"
+                      className="w-full md:w-auto h-10 px-3.5 rounded-xl bg-zinc-950/40 hover:bg-zinc-900/60 border border-white/10 text-xs font-bold text-white flex items-center justify-between gap-2 transition-all cursor-pointer shadow-md select-none backdrop-blur-md"
                       aria-haspopup="true"
                       aria-expanded={isDatasetDropdownOpen}
                       title="Categorize attendee roster based on uploaded data"
                     >
-                      <div className="flex items-center gap-1.5 truncate">
-                        <Database className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                        <span className="truncate max-w-[120px] sm:max-w-[160px]">{currentLabel}</span>
+                      <div className="flex items-center gap-2 truncate">
+                        <Database className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                        <span className="truncate max-w-[130px] sm:max-w-[170px]">{currentLabel}</span>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono border bg-indigo-500/20 border-indigo-500/40 text-indigo-300">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border bg-orange-500/20 border-orange-500/40 text-orange-300">
                           {currentCount}
                         </span>
                         <ChevronDown
                           className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-200 ${
-                            isDatasetDropdownOpen ? 'rotate-180 text-indigo-400' : ''
+                            isDatasetDropdownOpen ? 'rotate-180 text-orange-400' : ''
                           }`}
                         />
                       </div>
@@ -1667,12 +1680,14 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
                     {/* Floating Dataset Categorization Dropdown Menu */}
                     {isDatasetDropdownOpen && (
-                      <div className="absolute right-0 sm:left-0 top-full mt-2 w-64 sm:w-72 bg-[#0c1020]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-1.5 shadow-[0_30px_70px_rgba(0,0,0,0.95)] z-[100] animate-in fade-in slide-in-from-top-2 duration-150 max-w-[calc(100vw-32px)]">
-                        <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 flex items-center justify-between">
-                          <span>Categorize by Uploaded Data</span>
-                          <span className="font-mono text-indigo-400 text-[10px] font-normal lowercase">{availableDatasets.length} category</span>
+                      <div className="absolute right-0 sm:left-0 top-full mt-2 w-80 sm:w-88 bg-[#0c1020]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-2 shadow-[0_30px_70px_rgba(0,0,0,0.95)] z-[100] animate-in fade-in slide-in-from-top-2 duration-150 max-w-[calc(100vw-32px)]">
+                        <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-300 border-b border-white/10 flex items-center justify-between gap-2">
+                          <span className="truncate">Categorize by Uploaded Data</span>
+                          <span className="font-mono text-orange-400 text-[10px] font-semibold shrink-0 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-md">
+                            {availableDatasets.length} categories
+                          </span>
                         </div>
-                        <div className="p-1 space-y-1 max-h-60 overflow-y-auto">
+                        <div className="p-1 space-y-1.5 max-h-64 overflow-y-auto">
                           {/* All Uploaded Data Option */}
                           <button
                             type="button"
@@ -1680,9 +1695,9 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                               setSelectedDatasetFilter('ALL');
                               setIsDatasetDropdownOpen(false);
                             }}
-                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                               selectedDatasetFilter === 'ALL'
-                                ? 'bg-indigo-600 text-white shadow-md'
+                                ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25 ring-1 ring-orange-400/50'
                                 : 'text-slate-300 hover:text-white hover:bg-white/10'
                             }`}
                           >
@@ -1690,17 +1705,17 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                               <Users className={`w-4 h-4 shrink-0 ${selectedDatasetFilter === 'ALL' ? 'text-white' : 'text-zinc-400'}`} />
                               <span className="truncate">All Uploaded Data</span>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-2 shrink-0 pr-1">
                               <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+                                className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-bold border ${
                                   selectedDatasetFilter === 'ALL'
-                                    ? 'bg-white/20 border-white/30 text-white'
+                                    ? 'bg-black/30 border-white/30 text-white'
                                     : 'bg-zinc-800 text-zinc-300 border-zinc-700'
                                 }`}
                               >
                                 {students.length}
                               </span>
-                              {selectedDatasetFilter === 'ALL' && <Check className="w-3.5 h-3.5 text-white" />}
+                              {selectedDatasetFilter === 'ALL' && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
                             </div>
                           </button>
 
@@ -1708,34 +1723,34 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                           {availableDatasets.map((ds) => {
                             const isSelected = selectedDatasetFilter.toLowerCase() === ds.name.toLowerCase();
                             return (
-                              <div key={ds.name} className="flex items-center gap-1 group/ds">
+                              <div key={ds.name} className="flex items-center gap-1.5 group/ds">
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setSelectedDatasetFilter(ds.name);
                                     setIsDatasetDropdownOpen(false);
                                   }}
-                                  className={`flex-1 flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                                  className={`flex-1 flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                                     isSelected
-                                      ? 'bg-indigo-600 text-white shadow-md'
+                                      ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25 ring-1 ring-orange-400/50'
                                       : 'text-slate-300 hover:text-white hover:bg-white/10'
                                   }`}
                                 >
                                   <div className="flex items-center gap-2.5 truncate">
-                                    <FileSpreadsheet className={`w-4 h-4 shrink-0 ${isSelected ? 'text-white' : 'text-indigo-400'}`} />
+                                    <FileSpreadsheet className={`w-4 h-4 shrink-0 ${isSelected ? 'text-white' : 'text-orange-400'}`} />
                                     <span className="truncate" title={ds.name}>{ds.name}</span>
                                   </div>
-                                  <div className="flex items-center gap-2 shrink-0">
+                                  <div className="flex items-center gap-2 shrink-0 pr-1">
                                     <span
-                                      className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+                                      className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-bold border ${
                                         isSelected
-                                          ? 'bg-white/20 border-white/30 text-white'
-                                          : 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                                          ? 'bg-black/30 border-white/30 text-white'
+                                          : 'bg-orange-500/20 border-orange-500/40 text-orange-300'
                                       }`}
                                     >
                                       {ds.count}
                                     </span>
-                                    {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                                    {isSelected && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
                                   </div>
                                 </button>
                                 <button
@@ -1745,7 +1760,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                                     handleDeleteEntireDataset(ds.name);
                                   }}
                                   title={`Delete dataset "${ds.name}" and all ${ds.count} attendees`}
-                                  className="p-2 rounded-xl text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0 opacity-70 group-hover/ds:opacity-100"
+                                  className="p-2 rounded-xl text-zinc-400 hover:text-rose-400 hover:bg-rose-500/20 transition-colors cursor-pointer shrink-0 opacity-70 group-hover/ds:opacity-100"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
