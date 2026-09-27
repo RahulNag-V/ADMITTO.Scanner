@@ -335,6 +335,214 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [validationSummary, setValidationSummary] = useState<MultiFileValidationSummary | null>(null);
 
+  // Analyze uploaded files for duplicates across files, identical files, and records already uploaded into the roster
+  const fileDuplicateAnalysis = useMemo(() => {
+    if (!uploadedFilesValidation || uploadedFilesValidation.length === 0) {
+      return {
+        hasAnyDuplicateIssues: false,
+        exactDuplicateFiles: [] as { fileId: string; fileName: string; duplicateOf: string; count: number }[],
+        alreadyUploadedFiles: [] as { fileId: string; fileName: string; count: number; sampleKeys: string[] }[],
+        crossFileDuplicates: [] as { idVal: string; files: string[] }[],
+        totalAlreadyUploadedRecords: 0,
+        totalCrossFileDuplicates: 0,
+        fileInfoMap: new Map<string, {
+          fileId: string;
+          fileName: string;
+          isExactDuplicateOf?: string;
+          exactDuplicateCount?: number;
+          alreadyUploadedCount: number;
+          internalDuplicateCount: number;
+          crossFileDuplicateCount: number;
+          hasDuplicates: boolean;
+        }>(),
+      };
+    }
+
+    // 1. Build set of existing students in roster
+    const existingUsnSet = new Set<string>();
+    const existingEmailSet = new Set<string>();
+    const existingCompoundSet = new Set<string>();
+
+    students.forEach((s) => {
+      if (s.usn) existingUsnSet.add(s.usn.trim().toUpperCase());
+      if (s.email) existingEmailSet.add(s.email.trim().toLowerCase());
+      if (s.name && s.usn) {
+        existingCompoundSet.add(`${s.name.trim().toLowerCase()}:::${s.usn.trim().toUpperCase()}`);
+      }
+      if (s.meta) {
+        Object.entries(s.meta).forEach(([k, v]) => {
+          const valStr = String(v ?? '').trim();
+          if (valStr && (k.toLowerCase().includes('usn') || k.toLowerCase().includes('id') || k.toLowerCase().includes('roll') || k.toLowerCase().includes('ticket'))) {
+            existingUsnSet.add(valStr.toUpperCase());
+          }
+        });
+      }
+    });
+
+    const fileInfoMap = new Map<string, {
+      fileId: string;
+      fileName: string;
+      isExactDuplicateOf?: string;
+      exactDuplicateCount?: number;
+      alreadyUploadedCount: number;
+      internalDuplicateCount: number;
+      crossFileDuplicateCount: number;
+      hasDuplicates: boolean;
+    }>();
+
+    const exactDuplicateFiles: { fileId: string; fileName: string; duplicateOf: string; count: number }[] = [];
+    const alreadyUploadedFiles: { fileId: string; fileName: string; count: number; sampleKeys: string[] }[] = [];
+    let totalAlreadyUploadedRecords = 0;
+
+    // Helper to get row key / signature
+    const getRowKey = (row: Record<string, any>, headers: string[]): string => {
+      const pkHeader = headers.find((h) => isPrimaryKeyColumn(h)) ||
+        headers.find((h) => /usn|id|roll|email|ticket|reg|code/i.test(h)) ||
+        headers[0];
+      if (pkHeader && row[pkHeader] !== undefined && String(row[pkHeader]).trim() !== '') {
+        return String(row[pkHeader]).trim().toUpperCase();
+      }
+      return Object.keys(row)
+        .filter((k) => !k.startsWith('_'))
+        .sort()
+        .map((k) => String(row[k] ?? '').trim().toLowerCase())
+        .join('|');
+    };
+
+    // Pre-extract row keys for each file
+    const fileRowKeys = uploadedFilesValidation.map((f) => {
+      const keys = (f.rows || []).map((r) => getRowKey(r, f.headers)).filter(Boolean);
+      const keySet = new Set(keys);
+      return { file: f, keys, keySet };
+    });
+
+    // Cross-file key map to find overlapping records
+    const crossFileKeyMap = new Map<string, Set<string>>();
+    fileRowKeys.forEach(({ file, keys }) => {
+      keys.forEach((k) => {
+        if (k) {
+          if (!crossFileKeyMap.has(k)) crossFileKeyMap.set(k, new Set());
+          crossFileKeyMap.get(k)!.add(file.name);
+        }
+      });
+    });
+
+    const crossFileDuplicates: { idVal: string; files: string[] }[] = [];
+    let totalCrossFileDuplicates = 0;
+    crossFileKeyMap.forEach((fileNames, keyVal) => {
+      if (fileNames.size > 1) {
+        totalCrossFileDuplicates++;
+        crossFileDuplicates.push({ idVal: keyVal, files: Array.from(fileNames) });
+      }
+    });
+
+    // Check each file
+    fileRowKeys.forEach(({ file, keys, keySet }, idx) => {
+      // 1. Internal duplicates within the file
+      const internalDuplicateCount = keys.length - keySet.size;
+
+      // 2. Already uploaded in roster
+      let alreadyUploadedCount = 0;
+      const sampleKeys: string[] = [];
+
+      (file.rows || []).forEach((row) => {
+        const rowKey = getRowKey(row, file.headers);
+        const emailVal = (row['Email'] || row['email'] || row['EMAIL'] || '').toString().trim().toLowerCase();
+        const nameVal = (row['Name'] || row['name'] || '').toString().trim().toLowerCase();
+        const compoundKey = nameVal && rowKey ? `${nameVal}:::${rowKey}` : '';
+
+        const isAlreadyInRoster =
+          (rowKey && existingUsnSet.has(rowKey)) ||
+          (emailVal && existingEmailSet.has(emailVal)) ||
+          (compoundKey && existingCompoundSet.has(compoundKey));
+
+        if (isAlreadyInRoster) {
+          alreadyUploadedCount++;
+          if (sampleKeys.length < 3 && rowKey) {
+            sampleKeys.push(rowKey);
+          }
+        }
+      });
+
+      if (alreadyUploadedCount > 0) {
+        alreadyUploadedFiles.push({
+          fileId: file.id,
+          fileName: file.name,
+          count: alreadyUploadedCount,
+          sampleKeys,
+        });
+        totalAlreadyUploadedRecords += alreadyUploadedCount;
+      }
+
+      // 3. Exact duplicate of an earlier file
+      let isExactDuplicateOf: string | undefined;
+      let exactDuplicateCount = 0;
+
+      for (let prevIdx = 0; prevIdx < idx; prevIdx++) {
+        const prev = fileRowKeys[prevIdx];
+        if (file.rowCount > 0 && prev.file.rowCount > 0) {
+          let matchCount = 0;
+          keys.forEach((k) => {
+            if (prev.keySet.has(k)) matchCount++;
+          });
+
+          // If 100% or >=90% of rows match, flag as duplicate file
+          if (matchCount === file.rowCount || (matchCount >= 5 && matchCount / file.rowCount >= 0.95)) {
+            isExactDuplicateOf = prev.file.name;
+            exactDuplicateCount = matchCount;
+            exactDuplicateFiles.push({
+              fileId: file.id,
+              fileName: file.name,
+              duplicateOf: prev.file.name,
+              count: matchCount,
+            });
+            break;
+          }
+        }
+      }
+
+      // Cross file duplicate count for this file
+      let crossFileDuplicateCount = 0;
+      keySet.forEach((k) => {
+        if (crossFileKeyMap.get(k)?.size && crossFileKeyMap.get(k)!.size > 1) {
+          crossFileDuplicateCount++;
+        }
+      });
+
+      const hasDuplicates =
+        !!isExactDuplicateOf ||
+        alreadyUploadedCount > 0 ||
+        internalDuplicateCount > 0 ||
+        crossFileDuplicateCount > 0;
+
+      fileInfoMap.set(file.id, {
+        fileId: file.id,
+        fileName: file.name,
+        isExactDuplicateOf,
+        exactDuplicateCount,
+        alreadyUploadedCount,
+        internalDuplicateCount,
+        crossFileDuplicateCount,
+        hasDuplicates,
+      });
+    });
+
+    const hasAnyDuplicateIssues =
+      exactDuplicateFiles.length > 0 ||
+      alreadyUploadedFiles.length > 0 ||
+      totalCrossFileDuplicates > 0;
+
+    return {
+      hasAnyDuplicateIssues,
+      exactDuplicateFiles,
+      alreadyUploadedFiles,
+      crossFileDuplicates,
+      totalAlreadyUploadedRecords,
+      totalCrossFileDuplicates,
+      fileInfoMap,
+    };
+  }, [uploadedFilesValidation, students]);
+
   // Manual Entry Columns: Excludes QR Code fields, and enforces Primary Key and Barcode as strictly mandatory
   const manualEntryColumns = useMemo(() => {
     return columns
@@ -1174,6 +1382,44 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleRemoveAllDuplicateFiles = (fileIdsToRemove: string[]) => {
+    const updated = uploadedFilesValidation.filter((f) => !fileIdsToRemove.includes(f.id));
+    setUploadedFilesValidation(updated);
+    const summary = combineValidatedFiles(updated);
+    setValidationSummary(summary);
+    if (summary.validCount > 0) {
+      setDetectedColumns(summary.unionHeaders);
+      setRawSpreadsheetRows(summary.combinedRows);
+      setColumns(summary.detectedColumns);
+      const guessedPrimary = summary.unionHeaders.find((h) => isPrimaryKeyColumn(h)) || summary.unionHeaders[0];
+      setPrimaryKeyField(guessedPrimary);
+      const checkRes = checkDatasetUniqueness(summary.combinedRows, guessedPrimary);
+      setUniquenessResult(checkRes);
+    } else {
+      setDetectedColumns([]);
+      setRawSpreadsheetRows([]);
+      setValidationSummary(null);
+    }
+  };
+
+  const handleProceedToStep2 = () => {
+    if (fileDuplicateAnalysis.exactDuplicateFiles.length > 0) {
+      const dupNames = fileDuplicateAnalysis.exactDuplicateFiles
+        .map((d) => `• "${d.fileName}" (exact copy of "${d.duplicateOf}")`)
+        .join('\n');
+      const shouldProceed = window.confirm(
+        `⚠️ Duplicate Files Detected!\n\nThe following file(s) contain identical data to other uploaded files:\n\n${dupNames}\n\nDo you want to proceed to Step 2 with these duplicate files anyway?\n(Click Cancel to remove them first)`
+      );
+      if (!shouldProceed) return;
+    } else if (fileDuplicateAnalysis.totalAlreadyUploadedRecords > 0) {
+      const shouldProceed = window.confirm(
+        `⚠️ Previously Uploaded Data Detected!\n\n${fileDuplicateAnalysis.totalAlreadyUploadedRecords} record(s) in your uploaded file(s) are already present in this event's roster.\n\nProceeding will import or merge these records.\nDo you want to proceed to Step 2?`
+      );
+      if (!shouldProceed) return;
+    }
+    setWizardStep(2);
   };
 
   const checkDatasetUniqueness = (
@@ -3089,6 +3335,10 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                         const isValid = fileVal.isValid;
                         const isWarning = fileVal.status === 'warning';
                         const isError = fileVal.status === 'error';
+                        const dupInfo = fileDuplicateAnalysis.fileInfoMap.get(fileVal.id);
+                        const isExactDup = !!dupInfo?.isExactDuplicateOf;
+                        const isAlreadyUploaded = (dupInfo?.alreadyUploadedCount || 0) > 0;
+                        const hasInternalDup = (dupInfo?.internalDuplicateCount || 0) > 0;
 
                         return (
                           <div
@@ -3096,6 +3346,10 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                             className={`p-3.5 rounded-2xl border transition-all ${
                               isError
                                 ? 'bg-rose-500/10 border-rose-500/30'
+                                : isExactDup
+                                ? 'bg-amber-500/15 border-amber-500/40 ring-1 ring-amber-500/30'
+                                : isAlreadyUploaded
+                                ? 'bg-amber-500/10 border-amber-500/30'
                                 : isWarning
                                 ? 'bg-amber-500/10 border-amber-500/30'
                                 : 'bg-zinc-950/70 border-zinc-800 hover:border-zinc-700'
@@ -3108,7 +3362,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                                   className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
                                     isError
                                       ? 'bg-rose-500/20 border-rose-500/40 text-rose-400'
-                                      : isWarning
+                                      : isExactDup || isAlreadyUploaded || isWarning
                                       ? 'bg-amber-500/20 border-amber-500/40 text-amber-400'
                                       : 'bg-orange-500/15 border-orange-500/30 text-orange-400'
                                   }`}
@@ -3116,8 +3370,13 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                                   <FileSpreadsheet className="w-4 h-4" />
                                 </div>
                                 <div className="min-w-0">
-                                  <div className="text-xs font-bold text-white truncate max-w-[200px] sm:max-w-xs">
-                                    {fileVal.name}
+                                  <div className="text-xs font-bold text-white truncate max-w-[200px] sm:max-w-xs flex items-center gap-2">
+                                    <span className="truncate">{fileVal.name}</span>
+                                    {isExactDup && (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30 shrink-0">
+                                        Duplicate
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="text-[10px] text-zinc-400 flex items-center gap-2 mt-0.5">
                                     <span className="font-mono">{fileVal.formattedSize}</span>
@@ -3143,24 +3402,33 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
                               {/* Right: Status Pill & Delete Button */}
                               <div className="flex items-center gap-2 shrink-0">
-                                {isValid && !isWarning && (
+                                {isExactDup ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-[10px] font-bold text-amber-300 flex items-center gap-1 shadow-sm">
+                                    <AlertTriangle className="w-3 h-3 text-amber-400" />
+                                    <span>Duplicate File</span>
+                                  </span>
+                                ) : isAlreadyUploaded ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-[10px] font-bold text-amber-300 flex items-center gap-1 shadow-sm">
+                                    <Clock className="w-3 h-3 text-amber-400" />
+                                    <span>Already Uploaded ({dupInfo?.alreadyUploadedCount})</span>
+                                  </span>
+                                ) : isValid && !isWarning ? (
                                   <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-bold text-emerald-400 flex items-center gap-1 shadow-sm">
                                     <CheckCircle2 className="w-3 h-3" />
                                     <span>Valid</span>
                                   </span>
-                                )}
-                                {isWarning && (
+                                ) : isWarning ? (
                                   <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[10px] font-bold text-amber-400 flex items-center gap-1 shadow-sm">
                                     <AlertTriangle className="w-3 h-3" />
                                     <span>Warning</span>
                                   </span>
-                                )}
-                                {isError && (
+                                ) : (
                                   <span className="px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-[10px] font-bold text-rose-400 flex items-center gap-1 shadow-sm">
                                     <XCircle className="w-3 h-3" />
                                     <span>Invalid</span>
                                   </span>
                                 )}
+
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -3174,6 +3442,45 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                                 </button>
                               </div>
                             </div>
+
+                            {/* Duplicate File Details */}
+                            {isExactDup && (
+                              <div className="mt-2 pt-2 border-t border-amber-500/30 text-[11px] text-amber-300 flex items-start justify-between gap-2 bg-amber-500/10 p-2.5 rounded-xl">
+                                <div className="flex items-start gap-1.5">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                                  <span>
+                                    <strong>Duplicate File:</strong> Contains the exact same data ({dupInfo?.exactDuplicateCount} records) as <strong className="text-white">"{dupInfo?.isExactDuplicateOf}"</strong>.
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveFile(fileVal.id)}
+                                  className="text-[10px] font-bold text-rose-400 hover:text-rose-300 underline shrink-0 cursor-pointer"
+                                >
+                                  Remove Duplicate
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Pre-Existing Data Details */}
+                            {isAlreadyUploaded && !isExactDup && (
+                              <div className="mt-2 pt-2 border-t border-amber-500/30 text-[11px] text-amber-300 flex items-start gap-1.5 bg-amber-500/10 p-2.5 rounded-xl">
+                                <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                                <span>
+                                  <strong>Pre-existing Data:</strong> <strong className="text-white">{dupInfo?.alreadyUploadedCount}</strong> of {fileVal.rowCount} attendee records in this file already exist in your roster from a previous upload.
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Internal Duplicate Rows Details */}
+                            {hasInternalDup && !isExactDup && (
+                              <div className="mt-1 pt-1 text-[11px] text-amber-300 flex items-start gap-1.5 px-1">
+                                <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                                <span>
+                                  Contains <strong className="text-white">{dupInfo?.internalDuplicateCount} internal duplicate rows</strong> within this file.
+                                </span>
+                              </div>
+                            )}
 
                             {/* Error Details */}
                             {fileVal.errors.length > 0 && (
@@ -3216,6 +3523,62 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                       </div>
                     )}
 
+                    {/* Duplicate / Pre-Existing Upload Warning Banner */}
+                    {fileDuplicateAnalysis.hasAnyDuplicateIssues && (
+                      <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs space-y-3 animate-fadeIn shadow-lg">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2 font-bold text-amber-300 text-sm">
+                            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+                            <span>Duplicate or Previously Uploaded Data Warning</span>
+                          </div>
+                          {fileDuplicateAnalysis.exactDuplicateFiles.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const dupIds = fileDuplicateAnalysis.exactDuplicateFiles.map((d) => d.fileId);
+                                handleRemoveAllDuplicateFiles(dupIds);
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-amber-500/25 hover:bg-rose-500/20 hover:border-rose-500/40 hover:text-rose-300 text-amber-300 text-xs font-bold border border-amber-500/40 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Remove Duplicate Files ({fileDuplicateAnalysis.exactDuplicateFiles.length})</span>
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5 text-[11px] text-amber-200/90 leading-relaxed bg-black/20 p-3 rounded-xl border border-amber-500/20">
+                          {fileDuplicateAnalysis.exactDuplicateFiles.map((dup) => (
+                            <div key={dup.fileId} className="flex items-start gap-2">
+                              <span className="text-amber-400 font-bold">•</span>
+                              <span>
+                                <strong className="text-white">"{dup.fileName}"</strong> contains the exact same data ({dup.count} records) as <strong className="text-white">"{dup.duplicateOf}"</strong>.
+                              </span>
+                            </div>
+                          ))}
+                          {fileDuplicateAnalysis.alreadyUploadedFiles.map((up) => (
+                            <div key={up.fileId} className="flex items-start gap-2">
+                              <span className="text-amber-400 font-bold">•</span>
+                              <span>
+                                <strong className="text-white">"{up.fileName}"</strong> contains <strong className="text-white">{up.count}</strong> record(s) that were already uploaded before in this event's roster.
+                              </span>
+                            </div>
+                          ))}
+                          {fileDuplicateAnalysis.totalCrossFileDuplicates > 0 && (
+                            <div className="flex items-start gap-2">
+                              <span className="text-amber-400 font-bold">•</span>
+                              <span>
+                                Found <strong className="text-white">{fileDuplicateAnalysis.totalCrossFileDuplicates} duplicate record(s)</strong> appearing across multiple selected spreadsheet files.
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <p className="text-[10px] text-amber-300/80">
+                          Review the warnings above before proceeding to Step 2. You can remove redundant files or continue if you intentionally want to update these records.
+                        </p>
+                      </div>
+                    )}
+
                     {/* Step 1 Action Bar */}
                     <div className="pt-2 flex items-center justify-between border-t border-zinc-800">
                       <div className="text-xs text-zinc-400">
@@ -3234,10 +3597,18 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                       <button
                         type="button"
                         disabled={!validationSummary || validationSummary.validCount === 0 || isValidatingFiles}
-                        onClick={() => setWizardStep(2)}
-                        className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-orange-500/25 transition-all cursor-pointer"
+                        onClick={handleProceedToStep2}
+                        className={`px-5 py-2.5 rounded-xl text-white text-xs font-bold flex items-center gap-1.5 shadow-lg transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                          fileDuplicateAnalysis.hasAnyDuplicateIssues
+                            ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/25 ring-1 ring-amber-400/50'
+                            : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/25'
+                        }`}
                       >
-                        <span>Continue to Step 2: Primary Key</span>
+                        <span>
+                          {fileDuplicateAnalysis.hasAnyDuplicateIssues
+                            ? 'Continue to Step 2 (Duplicates Detected)'
+                            : 'Continue to Step 2: Primary Key'}
+                        </span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
