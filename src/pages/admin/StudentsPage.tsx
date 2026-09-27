@@ -1683,7 +1683,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
                     {/* Floating Dataset Categorization Dropdown Menu */}
                     {isDatasetDropdownOpen && (
-                      <div className="absolute right-0 sm:left-0 top-full mt-2 w-80 sm:w-88 bg-[#0c1020]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-2 shadow-[0_30px_70px_rgba(0,0,0,0.95)] z-[100] animate-in fade-in slide-in-from-top-2 duration-150 max-w-[calc(100vw-32px)]">
+                      <div className="absolute right-0 top-full mt-2 w-80 sm:w-[360px] max-w-[calc(100vw-32px)] bg-[#0c1020]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-2 shadow-[0_30px_70px_rgba(0,0,0,0.95)] z-[100] animate-in fade-in slide-in-from-top-2 duration-150">
                         <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-300 border-b border-white/10 flex items-center justify-between gap-2">
                           <span className="truncate">Categorize by Uploaded Data</span>
                           <span className="font-mono text-orange-400 text-[10px] font-semibold shrink-0 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-md">
