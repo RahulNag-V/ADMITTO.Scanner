@@ -15,6 +15,7 @@ import { AuthSession, EventItem } from '../../types';
 import { eventsApi } from '../../lib/api';
 import { broadcastEventDeleted } from '../../lib/realtimeSync';
 import { purgeEventOfflineData } from '../../lib/offline/idb';
+import { showAlert } from '../../components/common/PopupModal';
 
 interface AdminSettingsPageProps {
   session: AuthSession;
@@ -47,11 +48,14 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = ({
         await purgeEventOfflineData(eventId, true);
       } catch {}
 
-      alert('Event and all associated records were permanently deleted.');
+      await showAlert('Event and all associated records were permanently deleted.', {
+        type: 'success',
+        title: 'Event Purged',
+      });
       window.dispatchEvent(new CustomEvent('admitto:events-changed'));
       window.location.reload();
     } catch (err: any) {
-      alert(`Error purging event: ${err.message}`);
+      await showAlert(`Error purging event: ${err.message}`, { type: 'error' });
     } finally {
       setIsDeleting(false);
       setIsDeleteModalOpen(false);

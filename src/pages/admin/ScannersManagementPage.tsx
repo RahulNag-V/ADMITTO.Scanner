@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { showAlert, showConfirm } from '../../components/common/PopupModal';
 import {
   Smartphone,
   Plus,
@@ -156,7 +157,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         setReferralCodes([res.code, ...referralCodes]);
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to generate referral code');
+      await showAlert(err.message || 'Failed to generate referral code', { type: 'error' });
     } finally {
       setIsGeneratingCode(false);
     }
@@ -170,7 +171,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         setReferralCodes((prev) => prev.map((c) => (c.id === code.id ? res.code : c)));
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to update referral code');
+      await showAlert(err.message || 'Failed to update referral code', { type: 'error' });
     }
   };
 
@@ -208,7 +209,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         setApprovingRequest(null);
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to approve request');
+      await showAlert(err.message || 'Failed to approve request', { type: 'error' });
     } finally {
       setIsSubmittingApproval(false);
     }
@@ -234,7 +235,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         setRejectingRequest(null);
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to reject request');
+      await showAlert(err.message || 'Failed to reject request', { type: 'error' });
     } finally {
       setIsSubmittingRejection(false);
     }
@@ -242,7 +243,15 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
 
   // --- REVOKE ACCESS ---
   const handleRevokeAccess = async (req: ScannerAccessRequest) => {
-    if (!confirm(`Are you sure you want to revoke scanner access for ${req.user_name} (${req.user_email})?`)) {
+    const confirmed = await showConfirm(
+      `Are you sure you want to revoke scanner access for ${req.user_name} (${req.user_email})?`,
+      {
+        title: 'Revoke Access',
+        confirmText: 'Revoke Access',
+        isDestructive: true,
+      }
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -252,13 +261,21 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         setAccessRequests((prev) => prev.map((r) => (r.id === req.id ? res.request : r)));
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to revoke scanner access');
+      await showAlert(err.message || 'Failed to revoke scanner access', { type: 'error' });
     }
   };
 
   // --- BLOCK USER ---
   const handleBlockUser = async (req: ScannerAccessRequest) => {
-    if (!confirm(`Are you sure you want to block scanner access for ${req.user_name} (${req.user_email})? They will not be able to request access again until unblocked.`)) {
+    const confirmed = await showConfirm(
+      `Are you sure you want to block scanner access for ${req.user_name} (${req.user_email})? They will not be able to request access again until unblocked.`,
+      {
+        title: 'Block User',
+        confirmText: 'Block User',
+        isDestructive: true,
+      }
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -268,7 +285,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         setAccessRequests((prev) => prev.map((r) => (r.id === req.id ? res.request : r)));
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to block scanner user');
+      await showAlert(err.message || 'Failed to block scanner user', { type: 'error' });
     }
   };
 
@@ -280,7 +297,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         setAccessRequests((prev) => prev.map((r) => (r.id === req.id ? res.request : r)));
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to unblock scanner user');
+      await showAlert(err.message || 'Failed to unblock scanner user', { type: 'error' });
     }
   };
 
@@ -350,12 +367,18 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
     if (!operatorName.trim()) return;
 
     if (isNameDuplicate) {
-      alert(`Duplicate operator name: An operator with the name "${operatorName.trim()}" already exists. Names cannot be identical; at least one letter must be different.`);
+      await showAlert(
+        `Duplicate operator name: An operator with the name "${operatorName.trim()}" already exists. Names cannot be identical; at least one letter must be different.`,
+        { type: 'warning', title: 'Duplicate Operator' }
+      );
       return;
     }
 
     if (isEmailDuplicate) {
-      alert(`Duplicate email: An account with email "${tempEmail.trim()}" already exists. Please choose a different email.`);
+      await showAlert(
+        `Duplicate email: An account with email "${tempEmail.trim()}" already exists. Please choose a different email.`,
+        { type: 'warning', title: 'Duplicate Email' }
+      );
       return;
     }
 
@@ -399,19 +422,24 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         });
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to create scanner email account');
+      await showAlert(err.message || 'Failed to create scanner email account', { type: 'error' });
     } finally {
       setIsCreatingStation(false);
     }
   };
 
   const handleDeleteStation = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this scanner account?')) return;
+    const confirmed = await showConfirm('Are you sure you want to delete this scanner account?', {
+      title: 'Delete Scanner Account',
+      confirmText: 'Delete Account',
+      isDestructive: true,
+    });
+    if (!confirmed) return;
     try {
       await scannersApi.delete(eventId, id);
       setGateStations((prev) => prev.filter((s) => s.id !== id));
     } catch (err: any) {
-      alert(err.message || 'Failed to delete scanner account');
+      await showAlert(err.message || 'Failed to delete scanner account', { type: 'error' });
     }
   };
 
@@ -424,7 +452,7 @@ export const ScannersManagementPage: React.FC<ScannersManagementPageProps> = ({ 
         setGateStations((prev) => prev.map((s) => (s.id === station.id ? res.scanner : s)));
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to update scanner status');
+      await showAlert(err.message || 'Failed to update scanner status', { type: 'error' });
     } finally {
       setTogglingScannerId(null);
     }

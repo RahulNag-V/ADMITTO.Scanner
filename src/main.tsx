@@ -2,6 +2,7 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/common/ErrorBoundary.tsx';
+import { PopupModal } from './components/common/PopupModal.tsx';
 import './index.css';
 import { setupPWA } from './pwa';
 import { getOrCreateDeviceUuid } from './lib/offline/security';
@@ -26,6 +27,7 @@ if (rootEl) {
     <StrictMode>
       <ErrorBoundary>
         <App />
+        <PopupModal />
       </ErrorBoundary>
     </StrictMode>,
   );

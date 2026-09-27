@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import QRCode from 'qrcode';
 import * as XLSX from 'xlsx';
+import { showAlert, showConfirm } from '../../components/common/PopupModal';
 import {
   Users,
   Search,
@@ -748,11 +749,15 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
     const attendeesInDataset = students.filter(
       (s) => (s.meta?.dataset_name || uploadedDatasetName || '').toLowerCase() === datasetName.toLowerCase()
     );
-    if (
-      !window.confirm(
-        `Are you sure you want to delete dataset "${datasetName}"?\n\nThis will remove all ${attendeesInDataset.length} attendee(s) in this dataset.`
-      )
-    ) {
+    const confirmed = await showConfirm(
+      `Are you sure you want to delete dataset "${datasetName}"?\n\nThis will remove all ${attendeesInDataset.length} attendee(s) in this dataset.`,
+      {
+        title: 'Delete Dataset',
+        confirmText: 'Delete Dataset',
+        isDestructive: true,
+      }
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -775,7 +780,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
       }
     } catch (err: any) {
       console.error('Failed to delete dataset:', err);
-      alert('Failed to delete dataset: ' + (err.message || 'Unknown error'));
+      await showAlert('Failed to delete dataset: ' + (err.message || 'Unknown error'), { type: 'error' });
     }
   };
 
@@ -862,7 +867,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
       setIsBulkDeleteModalOpen(false);
     } catch (err: any) {
       console.error('Failed to bulk delete attendees:', err);
-      alert(err.message || 'Failed to delete some attendees.');
+      await showAlert(err.message || 'Failed to delete some attendees.', { type: 'error' });
     } finally {
       setIsBulkDeleting(false);
     }
@@ -1022,7 +1027,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
   const handleRemoveColumnFromEditing = (id: string) => {
     if (editingColumns.length <= 1) {
-      alert('You must retain at least one column.');
+      showAlert('You must retain at least one column.', { type: 'warning' });
       return;
     }
     setEditingColumns((prev) => prev.filter((c) => c.id !== id));
@@ -1136,7 +1141,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
     if (!validation.isValid) {
       setFormErrors(validation.errors);
       const firstErr = Object.values(validation.errors)[0];
-      alert(`Validation error: ${firstErr}`);
+      await showAlert(`Validation error: ${firstErr}`, { type: 'warning' });
       return;
     }
     setFormErrors({});
@@ -1191,7 +1196,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         }
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to add record');
+      await showAlert(err.message || 'Failed to add record', { type: 'error' });
     } finally {
       setIsAdding(false);
     }
@@ -1216,13 +1221,18 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         );
       }
     } catch (err: any) {
-      alert(err.message || 'Check-in state update failed');
+      await showAlert(err.message || 'Check-in state update failed', { type: 'error' });
     }
   };
 
   const handleDeleteStudent = async (student: Student) => {
     const confirmMsg = `Are you sure you want to delete attendee "${student.name}" (USN: ${student.usn})?\n\nThis will remove their generated pass and any attendance records.`;
-    if (!window.confirm(confirmMsg)) return;
+    const confirmed = await showConfirm(confirmMsg, {
+      title: 'Delete Attendee',
+      confirmText: 'Delete Attendee',
+      isDestructive: true,
+    });
+    if (!confirmed) return;
 
     setDeletingStudentId(student.id);
     try {
@@ -1241,7 +1251,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         await studentsApi.delete(student.id);
         setStudents((prev) => prev.filter((s) => s.id !== student.id));
       } catch (fallbackErr: any) {
-        alert(fallbackErr.message || err.message || 'Failed to delete attendee record.');
+        await showAlert(fallbackErr.message || err.message || 'Failed to delete attendee record.', { type: 'error' });
       }
     } finally {
       setDeletingStudentId(null);
@@ -1341,7 +1351,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
       }
     } catch (err: any) {
       console.error('Failed to validate spreadsheet files:', err);
-      alert('Error validating spreadsheet files: ' + (err.message || 'Invalid format'));
+      await showAlert('Error validating spreadsheet files: ' + (err.message || 'Invalid format'), { type: 'error' });
     } finally {
       setIsValidatingFiles(false);
       if (fileInputRef.current) {
@@ -1404,18 +1414,30 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
     }
   };
 
-  const handleProceedToStep2 = () => {
+  const handleProceedToStep2 = async () => {
     if (fileDuplicateAnalysis.exactDuplicateFiles.length > 0) {
       const dupNames = fileDuplicateAnalysis.exactDuplicateFiles
         .map((d) => `• "${d.fileName}" (exact copy of "${d.duplicateOf}")`)
         .join('\n');
-      const shouldProceed = window.confirm(
-        `⚠️ Duplicate Files Detected!\n\nThe following file(s) contain identical data to other uploaded files:\n\n${dupNames}\n\nDo you want to proceed to Step 2 with these duplicate files anyway?\n(Click Cancel to remove them first)`
+      const shouldProceed = await showConfirm(
+        `Duplicate Files Detected!\n\nThe following file(s) contain identical data to other uploaded files:\n\n${dupNames}\n\nDo you want to proceed to Step 2 with these duplicate files anyway?`,
+        {
+          title: 'Duplicate Files Warning',
+          type: 'warning',
+          confirmText: 'Proceed Anyway',
+          cancelText: 'Cancel & Review',
+        }
       );
       if (!shouldProceed) return;
     } else if (fileDuplicateAnalysis.totalAlreadyUploadedRecords > 0) {
-      const shouldProceed = window.confirm(
-        `⚠️ Previously Uploaded Data Detected!\n\n${fileDuplicateAnalysis.totalAlreadyUploadedRecords} record(s) in your uploaded file(s) are already present in this event's roster.\n\nProceeding will import or merge these records.\nDo you want to proceed to Step 2?`
+      const shouldProceed = await showConfirm(
+        `Previously Uploaded Data Detected!\n\n${fileDuplicateAnalysis.totalAlreadyUploadedRecords} record(s) in your uploaded file(s) are already present in this event's roster.\n\nProceeding will import or merge these records.\nDo you want to proceed to Step 2?`,
+        {
+          title: 'Existing Data Warning',
+          type: 'warning',
+          confirmText: 'Proceed to Step 2',
+          cancelText: 'Cancel & Review',
+        }
       );
       if (!shouldProceed) return;
     }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { showAlert } from '../../components/common/PopupModal';
 import {
   Calendar,
   MapPin,
@@ -362,7 +363,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
       const jsonData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
       if (!jsonData || jsonData.length === 0) {
-        alert('The uploaded spreadsheet file is empty.');
+        await showAlert('The uploaded spreadsheet file is empty.', { type: 'warning' });
         return;
       }
 
@@ -371,7 +372,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
         .filter((h: string) => h.length > 0);
 
       if (rawHeaders.length === 0) {
-        alert('Could not find valid column headers in the first row.');
+        await showAlert('Could not find valid column headers in the first row.', { type: 'warning' });
         return;
       }
 
@@ -416,7 +417,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
       setTimeout(() => setBarcodeConfigSavedMessage(null), 4000);
     } catch (err: any) {
       console.error('Failed to parse spreadsheet headers:', err);
-      alert('Failed to read spreadsheet file: ' + (err.message || 'Invalid format'));
+      await showAlert('Failed to read spreadsheet file: ' + (err.message || 'Invalid format'), { type: 'error' });
     } finally {
       setIsRefreshingColumns(false);
       if (e.target) e.target.value = '';
@@ -553,7 +554,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
         }
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to delete event');
+      await showAlert(err.message || 'Failed to delete event', { type: 'error' });
     } finally {
       setIsDeletingEvent(false);
     }
@@ -592,7 +593,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
       }
     } catch (err: any) {
       console.error('Failed to save banner:', err);
-      alert(`Failed to save banner: ${err.message || 'Network error'}`);
+      await showAlert(`Failed to save banner: ${err.message || 'Network error'}`, { type: 'error' });
     } finally {
       setIsSavingBanner(false);
     }
@@ -603,7 +604,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('Image file size must be less than 10MB');
+      await showAlert('Image file size must be less than 10MB', { type: 'warning' });
       return;
     }
 
@@ -679,7 +680,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
       }
     } catch (err: any) {
       console.error('Failed to update event organizer in DB:', err);
-      alert(err.message || 'Failed to update event organizer in database');
+      await showAlert(err.message || 'Failed to update event organizer in database', { type: 'error' });
     } finally {
       setIsSavingOrg(false);
     }
@@ -707,7 +708,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
       }
     } catch (err: any) {
       console.error('Failed to remove event organizer in DB:', err);
-      alert(err.message || 'Failed to remove event organizer');
+      await showAlert(err.message || 'Failed to remove event organizer', { type: 'error' });
     } finally {
       setIsSavingOrg(false);
     }
@@ -784,7 +785,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
         setTimeout(() => setSuccessMsg(null), 3500);
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to save event details');
+      await showAlert(err.message || 'Failed to save event details', { type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -830,7 +831,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
         setTimeout(() => setBarcodeConfigSavedMessage(null), 3500);
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to save barcode configuration');
+      await showAlert(err.message || 'Failed to save barcode configuration', { type: 'error' });
     } finally {
       setSavingBarcodeConfig(false);
     }

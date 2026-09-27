@@ -107,12 +107,10 @@ if (typeof window !== 'undefined' && typeof window.alert === 'function') {
   };
 }
 
-let hasLoggedMissingConfig = false;
+import { showAlert } from '../components/common/PopupModal';
 
 export function safeAlert(message: string): void {
-  if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-    window.alert(message);
-  }
+  showAlert(message, { type: 'error' });
 }
 
 export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

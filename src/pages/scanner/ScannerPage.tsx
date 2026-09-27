@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Html5Qrcode } from 'html5-qrcode';
+import { showAlert, showConfirm } from '../../components/common/PopupModal';
 import {
   Camera,
   QrCode,
@@ -298,7 +299,10 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
           setStudents([]);
           setLogs([]);
           setStats(null);
-          alert('This event has been deleted by the administrator. Please enter a referral code to connect to an active event.');
+          await showAlert('This event has been deleted by the administrator. Please enter a referral code to connect to an active event.', {
+            type: 'warning',
+            title: 'Event Deleted',
+          });
           handleSafeLogout();
           return;
         }
@@ -313,7 +317,10 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
           setStudents([]);
           setLogs([]);
           setStats(null);
-          alert('This event is no longer active or was deleted by the administrator.');
+          await showAlert('This event is no longer active or was deleted by the administrator.', {
+            type: 'warning',
+            title: 'Event Inactive',
+          });
           handleSafeLogout();
           return;
         }
@@ -516,7 +523,10 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
           setStudents([]);
           setLogs([]);
           setStats(null);
-          alert('This event has been deleted by the administrator. All associated data has been purged.');
+          await showAlert('This event has been deleted by the administrator. All associated data has been purged.', {
+            type: 'warning',
+            title: 'Event Deleted',
+          });
           handleSafeLogout();
         }
       },
@@ -544,7 +554,10 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
           setStudents([]);
           setLogs([]);
           setStats(null);
-          alert('This event has been deleted by the administrator. All associated data has been purged.');
+          await showAlert('This event has been deleted by the administrator. All associated data has been purged.', {
+            type: 'warning',
+            title: 'Event Deleted',
+          });
           handleSafeLogout();
         }
       };
@@ -572,7 +585,10 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
       try {
         const res = await eventsApi.get(eventId);
         if (!res.event || res.event.status === 'DELETED') {
-          alert('This event has been deleted by the administrator. Returning to referral code section.');
+          await showAlert('This event has been deleted by the administrator. Returning to referral code section.', {
+            type: 'warning',
+            title: 'Event Deleted',
+          });
           handleSafeLogout();
         } else if (res.event) {
           // Keep banner and event details synced even across network interruptions
@@ -591,7 +607,10 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
       } catch (err: any) {
         const errMsg = (err.message || '').toLowerCase();
         if (errMsg.includes('not found') || errMsg.includes('deleted') || errMsg.includes('forbidden') || errMsg.includes('unauthorized')) {
-          alert('This event has been deleted by the administrator. Returning to referral code section.');
+          await showAlert('This event has been deleted by the administrator. Returning to referral code section.', {
+            type: 'warning',
+            title: 'Event Inactive',
+          });
           handleSafeLogout();
         }
       }
@@ -655,7 +674,10 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
     });
 
     const unsubscribeRevocation = syncEngine.onRevocation(async () => {
-      alert('Your scanner access has been revoked or expired by the administrator.');
+      await showAlert('Your scanner access has been revoked or expired by the administrator.', {
+        type: 'warning',
+        title: 'Access Revoked',
+      });
       handleSafeLogout();
     });
 
@@ -1104,7 +1126,7 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
         playFeedbackSound('error');
       }
     } catch (err: any) {
-      alert(err.message || 'Secondary verification failed');
+      await showAlert(err.message || 'Secondary verification failed', { type: 'error' });
     } finally {
       setIsVerifyingSecondary(false);
     }
@@ -1176,10 +1198,17 @@ export const ScannerPage: React.FC<ScannerPageProps> = ({
           }
         }
 
-        const confirmProceed = window.confirm(
+        const confirmProceed = await showConfirm(
           `CAUTION: You have ${status.pending} offline scan(s) that have not yet synced with the cloud.\n\n` +
           `Logging out will prevent automatic reconciliation from this browser.\n\n` +
-          `Do you want to log out anyway?`
+          `Do you want to log out anyway?`,
+          {
+            title: 'Unsynced Offline Scans',
+            type: 'warning',
+            confirmText: 'Log Out Anyway',
+            cancelText: 'Stay & Sync',
+            isDestructive: true,
+          }
         );
         if (!confirmProceed) return;
       }

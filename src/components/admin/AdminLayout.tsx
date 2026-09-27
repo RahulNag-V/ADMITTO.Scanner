@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { showAlert, showConfirm } from '../common/PopupModal';
 import {
   QrCode,
   LayoutDashboard,
@@ -245,7 +246,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   };
 
   const handleDeleteEventFromDropdown = async (ev: EventItem) => {
-    const confirmed = window.confirm(`Are you sure you want to permanently delete event "${ev.title}"? All attendee rosters and scanner codes will be removed.`);
+    const confirmed = await showConfirm(
+      `Are you sure you want to permanently delete event "${ev.title}"? All attendee rosters and scanner codes will be removed.`,
+      {
+        title: 'Delete Event',
+        confirmText: 'Delete Event',
+        isDestructive: true,
+      }
+    );
     if (!confirmed) return;
     try {
       await eventsApi.delete(ev.id, true);
@@ -262,7 +270,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       window.dispatchEvent(new CustomEvent('admitto:events-changed'));
       await loadEvents();
     } catch (err: any) {
-      alert(err.message || 'Failed to delete event');
+      await showAlert(err.message || 'Failed to delete event', { type: 'error' });
     }
   };
 
