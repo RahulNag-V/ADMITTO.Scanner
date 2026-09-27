@@ -152,6 +152,53 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'CHECKED_IN' | 'PENDING'>('ALL');
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const statusTriggerBtnRef = useRef<HTMLButtonElement>(null);
+  const statusPortalMenuRef = useRef<HTMLDivElement>(null);
+  const [statusDropdownStyle, setStatusDropdownStyle] = useState<{ top: number; left: number; width: number }>({
+    top: 0,
+    left: 0,
+    width: 240,
+  });
+
+  const updateStatusDropdownPosition = useCallback(() => {
+    if (!statusTriggerBtnRef.current) return;
+    const rect = statusTriggerBtnRef.current.getBoundingClientRect();
+    const dropdownWidth = Math.min(240, window.innerWidth - 32);
+    const top = rect.bottom + 8;
+    let left: number;
+
+    if (window.innerWidth < 640) {
+      // Center horizontally on mobile
+      left = (window.innerWidth - dropdownWidth) / 2;
+    } else {
+      left = rect.left;
+      left = Math.max(16, Math.min(left, window.innerWidth - dropdownWidth - 16));
+    }
+
+    setStatusDropdownStyle({
+      top,
+      left,
+      width: dropdownWidth,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isStatusDropdownOpen) return;
+
+    updateStatusDropdownPosition();
+
+    const handleScrollOrResize = () => {
+      updateStatusDropdownPosition();
+    };
+
+    window.addEventListener('resize', handleScrollOrResize);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+
+    return () => {
+      window.removeEventListener('resize', handleScrollOrResize);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+    };
+  }, [isStatusDropdownOpen, updateStatusDropdownPosition]);
 
   // Categorize by Uploaded Dataset State
   const [selectedDatasetFilter, setSelectedDatasetFilter] = useState<'ALL' | string>('ALL');
@@ -170,8 +217,16 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
     const rect = datasetTriggerBtnRef.current.getBoundingClientRect();
     const dropdownWidth = Math.min(360, window.innerWidth - 32);
     const top = rect.bottom + 8;
-    let left = rect.right - dropdownWidth;
-    left = Math.max(16, Math.min(left, window.innerWidth - dropdownWidth - 16));
+    let left: number;
+
+    if (window.innerWidth < 640) {
+      // Center horizontally on mobile
+      left = (window.innerWidth - dropdownWidth) / 2;
+    } else {
+      left = rect.right - dropdownWidth;
+      left = Math.max(16, Math.min(left, window.innerWidth - dropdownWidth - 16));
+    }
+
     setDatasetDropdownStyle({
       top,
       left,
@@ -199,14 +254,17 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      const isClickOnStatusTrigger = statusTriggerBtnRef.current && statusTriggerBtnRef.current.contains(target);
+      const isClickInsideStatusPortal = statusPortalMenuRef.current && statusPortalMenuRef.current.contains(target);
+      if (!isClickOnStatusTrigger && !isClickInsideStatusPortal) {
         setIsStatusDropdownOpen(false);
       }
-      const target = event.target as Node;
-      const isClickOnTrigger = datasetTriggerBtnRef.current && datasetTriggerBtnRef.current.contains(target);
-      const isClickInsidePortal = datasetPortalMenuRef.current && datasetPortalMenuRef.current.contains(target);
 
-      if (!isClickOnTrigger && !isClickInsidePortal) {
+      const isClickOnDatasetTrigger = datasetTriggerBtnRef.current && datasetTriggerBtnRef.current.contains(target);
+      const isClickInsideDatasetPortal = datasetPortalMenuRef.current && datasetPortalMenuRef.current.contains(target);
+      if (!isClickOnDatasetTrigger && !isClickInsideDatasetPortal) {
         setIsDatasetDropdownOpen(false);
       }
     };
@@ -1540,9 +1598,9 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
       )}
 
       {/* Filters & Search Toolbar */}
-      <div className="bg-[#242b4d]/45 border border-white/20 backdrop-blur-2xl rounded-3xl p-3.5 sm:p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative z-30 overflow-visible shadow-xl">
+      <div className="bg-[#242b4d]/45 border border-white/20 backdrop-blur-2xl rounded-3xl p-3.5 sm:p-4 flex flex-col md:flex-row items-stretch md:items-center justify-start gap-3 relative z-30 overflow-visible shadow-xl">
         {/* Search */}
-        <div className="relative w-full md:w-80">
+        <div className="relative w-full md:w-80 shrink-0">
           <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             id="attendee-search-input"
@@ -1554,7 +1612,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
           />
         </div>
 
-        {/* Status and Branch Filters - Grid 2-col on mobile, flex row on desktop */}
+        {/* Status and Branch Filters - Grid 2-col on mobile, flex row on desktop beside search bar */}
         <div className="grid grid-cols-2 gap-2.5 w-full md:w-auto md:flex md:items-center">
           {/* Status Dropdown Menu */}
           <div className="relative w-full md:w-auto md:shrink-0 z-50" ref={statusDropdownRef}>
@@ -1596,9 +1654,10 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
               return (
                 <>
                   <button
+                    ref={statusTriggerBtnRef}
                     type="button"
                     onClick={() => {
-                      setIsStatusDropdownOpen(!isStatusDropdownOpen);
+                      setIsStatusDropdownOpen((prev) => !prev);
                     }}
                     className="w-full md:w-auto h-10 px-3 rounded-xl bg-zinc-950/40 hover:bg-zinc-900/60 border border-white/10 text-xs font-bold text-white flex items-center justify-between gap-1.5 transition-all cursor-pointer shadow-md select-none backdrop-blur-md"
                     aria-haspopup="true"
@@ -1613,56 +1672,71 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                         {currentOption.count}
                       </span>
                       <ChevronDown
-                        className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-200 ${isStatusDropdownOpen ? 'rotate-180 text-indigo-400' : ''
-                          }`}
+                        className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-200 ${
+                          isStatusDropdownOpen ? 'rotate-180 text-indigo-400' : ''
+                        }`}
                       />
                     </div>
                   </button>
 
-                  {/* Floating Status Dropdown Menu */}
-                  {isStatusDropdownOpen && (
-                    <div className="absolute left-0 top-full mt-2 w-56 sm:w-60 bg-[#0c1020]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-1.5 shadow-[0_30px_70px_rgba(0,0,0,0.95)] z-[100] animate-in fade-in slide-in-from-top-2 duration-150 max-w-[calc(100vw-32px)]">
-                      <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10">
-                        Filter by Admission Status
-                      </div>
-                      <div className="p-1 space-y-1">
-                        {statusOptions.map((opt) => {
-                          const OptIcon = opt.icon;
-                          const isSelected = statusFilter === opt.id;
-                          return (
-                            <button
-                              key={opt.id}
-                              type="button"
-                              onClick={() => {
-                                setStatusFilter(opt.id);
-                                setIsStatusDropdownOpen(false);
-                              }}
-                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${isSelected
-                                ? 'bg-indigo-600 text-white shadow-md'
-                                : 'text-slate-300 hover:text-white hover:bg-white/10'
+                  {/* Floating Status Dropdown Menu (Rendered via Portal) */}
+                  {isStatusDropdownOpen &&
+                    createPortal(
+                      <div
+                        ref={statusPortalMenuRef}
+                        style={{
+                          position: 'fixed',
+                          top: `${statusDropdownStyle.top}px`,
+                          left: `${statusDropdownStyle.left}px`,
+                          width: `${statusDropdownStyle.width}px`,
+                          maxWidth: 'calc(100vw - 32px)',
+                          zIndex: 1000,
+                          boxSizing: 'border-box',
+                        }}
+                        className="bg-[#0c1020]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-1.5 shadow-[0_30px_70px_rgba(0,0,0,0.95)] animate-in fade-in slide-in-from-top-2 duration-150"
+                      >
+                        <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10">
+                          Filter by Admission Status
+                        </div>
+                        <div className="p-1 space-y-1">
+                          {statusOptions.map((opt) => {
+                            const OptIcon = opt.icon;
+                            const isSelected = statusFilter === opt.id;
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => {
+                                  setStatusFilter(opt.id);
+                                  setIsStatusDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-indigo-600 text-white shadow-md'
+                                    : 'text-slate-300 hover:text-white hover:bg-white/10'
                                 }`}
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <OptIcon className={`w-4 h-4 ${isSelected ? 'text-white' : opt.color}`} />
-                                <span>{opt.label}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${isSelected
-                                    ? 'bg-white/20 border-white/30 text-white'
-                                    : opt.badgeBg
+                              >
+                                <div className="flex items-center gap-2.5 truncate">
+                                  <OptIcon className={`w-4 h-4 ${isSelected ? 'text-white' : opt.color} shrink-0`} />
+                                  <span className="truncate">{opt.label}</span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+                                      isSelected ? 'bg-white/20 border-white/30 text-white' : opt.badgeBg
                                     }`}
-                                >
-                                  {opt.count}
-                                </span>
-                                {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                                  >
+                                    {opt.count}
+                                  </span>
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-white shrink-0" />}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>,
+                      document.body
+                    )}
                 </>
               );
             })()}
