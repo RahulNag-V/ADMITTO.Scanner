@@ -83,6 +83,13 @@ import {
   isPrimaryKeyColumn,
   isBarcodeColumn,
 } from '../../lib/attendeeSchema';
+import {
+  validateSpreadsheetFile,
+  combineValidatedFiles,
+  UploadedFileValidation,
+  MultiFileValidationSummary,
+  formatFileSize,
+} from '../../lib/fileValidation';
 import { studentsApi, scanApi, eventsApi } from '../../lib/api';
 import { getAttendeeLabels } from '../../lib/attendeeTypes';
 import { DigitalEventPassModal } from '../../components/common/DigitalEventPassModal';
@@ -215,6 +222,12 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   });
   const [isBarcodeWarningOpen, setIsBarcodeWarningOpen] = useState(false);
   const [barcodeColumnError, setBarcodeColumnError] = useState<string | null>(null);
+
+  // Multi-File Upload & Validation State
+  const [uploadedFilesValidation, setUploadedFilesValidation] = useState<UploadedFileValidation[]>([]);
+  const [isValidatingFiles, setIsValidatingFiles] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [validationSummary, setValidationSummary] = useState<MultiFileValidationSummary | null>(null);
 
   // Manual Entry Columns: Excludes QR Code fields, and enforces Primary Key and Barcode as strictly mandatory
   const manualEntryColumns = useMemo(() => {
@@ -868,12 +881,149 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
     }
   };
 
-  // Spreadsheet & CSV File Processing (Supports .xlsx, .xls, .csv)
+  // Spreadsheet & CSV File Processing with Multi-Select and Validation (Supports .xlsx, .xls, .csv)
+  const handleFilesSelect = async (files: FileList | File[] | null) => {
+    if (!files || files.length === 0) return;
+    const fileArr = Array.from(files);
+    setIsValidatingFiles(true);
+
+    try {
+      const newValidations: UploadedFileValidation[] = [];
+      for (const f of fileArr) {
+        const valResult = await validateSpreadsheetFile(f);
+        newValidations.push(valResult);
+      }
+
+      // Combine with existing files (prevent duplicate entries by name and size)
+      const combined = [...uploadedFilesValidation];
+      for (const nv of newValidations) {
+        const existingIdx = combined.findIndex((item) => item.name === nv.name && item.size === nv.size);
+        if (existingIdx !== -1) {
+          combined[existingIdx] = nv;
+        } else {
+          combined.push(nv);
+        }
+      }
+
+      setUploadedFilesValidation(combined);
+      const summary = combineValidatedFiles(combined);
+      setValidationSummary(summary);
+
+      if (summary.validCount > 0) {
+        setDetectedColumns(summary.unionHeaders);
+        setRawSpreadsheetRows(summary.combinedRows);
+        setColumns(summary.detectedColumns);
+
+        const primaryName = summary.files.find((f) => f.isValid)?.name || 'Uploaded Dataset';
+        const dsTag = summary.validCount === 1 ? primaryName : `${summary.validCount} Datasets (${summary.totalRecords} attendees)`;
+        setUploadedDatasetName(dsTag);
+        saveLocalSchema(eventId, summary.detectedColumns, dsTag);
+
+        // Persist raw headers in localStorage for instant access across tabs
+        try {
+          localStorage.setItem(`admitto_raw_headers_${eventId}`, JSON.stringify(summary.unionHeaders));
+          localStorage.setItem('admitto_latest_dataset_columns', JSON.stringify(summary.unionHeaders));
+        } catch {}
+
+        // Best default key guess across union headers
+        const guessedPrimary =
+          summary.unionHeaders.find((h) => isPrimaryKeyColumn(h)) ||
+          summary.unionHeaders.find((h) => {
+            const l = h.toLowerCase();
+            return (
+              l.includes('primary') ||
+              l.includes('usn') ||
+              l.includes('id') ||
+              l.includes('employee') ||
+              l.includes('ticket') ||
+              l.includes('roll') ||
+              l.includes('reg')
+            );
+          }) || summary.unionHeaders[0];
+
+        setPrimaryKeyField(guessedPrimary);
+        setSecondaryKeyField('');
+
+        // Compute uniqueness across combined rows
+        const checkRes = checkDatasetUniqueness(summary.combinedRows, guessedPrimary);
+        setUniquenessResult(checkRes);
+
+        // Notify listeners that new columns and dataset are ready
+        window.dispatchEvent(
+          new CustomEvent('admitto:schema-changed', {
+            detail: { eventId, columns: summary.unionHeaders, datasetName: dsTag, primaryKey: guessedPrimary },
+          })
+        );
+        try {
+          const bc = new BroadcastChannel('admitto_sync');
+          bc.postMessage({ type: 'SCHEMA_UPDATED', eventId, columns: summary.unionHeaders, datasetName: dsTag, primaryKey: guessedPrimary });
+          bc.close();
+        } catch {}
+
+        // Pre-sync scan config with server
+        eventsApi
+          .updateScanConfig(eventId, {
+            primary_scan_field: guessedPrimary || 'usn',
+            qr_mode: qrMode || 'SECURE_TOKEN',
+            barcode_field: barcodeField || guessedPrimary || 'usn',
+            available_fields: summary.unionHeaders,
+            column_configs: summary.detectedColumns,
+            dataset_name: dsTag,
+          })
+          .catch(console.warn);
+
+        // Save each valid dataset individually into multi-dataset catalog
+        summary.files.filter((f) => f.isValid).forEach((f) => {
+          saveUploadedDataset(eventId, {
+            name: f.name,
+            columns: detectSchemaFromRows(f.headers, f.rows),
+            primaryKey: guessedPrimary,
+          });
+        });
+      }
+    } catch (err: any) {
+      console.error('Failed to validate spreadsheet files:', err);
+      alert('Error validating spreadsheet files: ' + (err.message || 'Invalid format'));
+    } finally {
+      setIsValidatingFiles(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setCsvFile(file);
-    parseSpreadsheet(file);
+    handleFilesSelect(e.target.files);
+  };
+
+  const handleRemoveFile = (fileId: string) => {
+    const updated = uploadedFilesValidation.filter((f) => f.id !== fileId);
+    setUploadedFilesValidation(updated);
+    const summary = combineValidatedFiles(updated);
+    setValidationSummary(summary);
+    if (summary.validCount > 0) {
+      setDetectedColumns(summary.unionHeaders);
+      setRawSpreadsheetRows(summary.combinedRows);
+      setColumns(summary.detectedColumns);
+      const guessedPrimary = summary.unionHeaders.find((h) => isPrimaryKeyColumn(h)) || summary.unionHeaders[0];
+      setPrimaryKeyField(guessedPrimary);
+      const checkRes = checkDatasetUniqueness(summary.combinedRows, guessedPrimary);
+      setUniquenessResult(checkRes);
+    } else {
+      setDetectedColumns([]);
+      setRawSpreadsheetRows([]);
+      setValidationSummary(null);
+    }
+  };
+
+  const handleClearAllFiles = () => {
+    setUploadedFilesValidation([]);
+    setValidationSummary(null);
+    setDetectedColumns([]);
+    setRawSpreadsheetRows([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const checkDatasetUniqueness = (
@@ -979,116 +1129,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   };
 
   const parseSpreadsheet = async (file: File) => {
-    try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
-      const firstSheetName = workbook.SheetNames[0];
-      if (!firstSheetName) {
-        alert('The uploaded file contains no spreadsheet sheets.');
-        return;
-      }
-
-      const worksheet = workbook.Sheets[firstSheetName];
-      const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
-      if (rawData.length <= 1) {
-        alert('The uploaded spreadsheet contains no data rows.');
-        return;
-      }
-
-      // Extract original column headers exactly as in the file
-      const rawHeaders: string[] = rawData[0]
-        .map((h: any) => String(h || '').trim())
-        .filter((h: string) => h.length > 0);
-
-      if (rawHeaders.length === 0) {
-        alert('Could not detect column headers in the first row.');
-        return;
-      }
-
-      const rows: Record<string, any>[] = [];
-      for (let i = 1; i < rawData.length; i++) {
-        const rowArr = rawData[i];
-        if (!rowArr || rowArr.every((c: any) => String(c ?? '').trim() === '')) continue;
-        const rowObj: Record<string, any> = {};
-        for (let j = 0; j < rawHeaders.length; j++) {
-          rowObj[rawHeaders[j]] = rowArr[j] !== undefined && rowArr[j] !== null ? String(rowArr[j]).trim() : '';
-        }
-        rows.push(rowObj);
-      }
-
-      if (rows.length === 0) {
-        alert('The spreadsheet contains no non-empty attendee data rows.');
-        return;
-      }
-
-      setDetectedColumns(rawHeaders);
-      setRawSpreadsheetRows(rows);
-
-      const detected = detectSchemaFromRows(rawHeaders, rows);
-      setColumns(detected);
-      const dsName = file.name;
-      setUploadedDatasetName(dsName);
-      saveLocalSchema(eventId, detected, dsName);
-
-      // Persist raw headers in localStorage for instant access across tabs
-      try {
-        localStorage.setItem(`admitto_raw_headers_${eventId}`, JSON.stringify(rawHeaders));
-        localStorage.setItem('admitto_latest_dataset_columns', JSON.stringify(rawHeaders));
-      } catch {}
-
-      // Best default key guess
-      const guessedPrimary =
-        rawHeaders.find((h) => isPrimaryKeyColumn(h)) ||
-        rawHeaders.find((h) => {
-          const l = h.toLowerCase();
-          return (
-            l.includes('primary') ||
-            l.includes('usn') ||
-            l.includes('id') ||
-            l.includes('employee') ||
-            l.includes('ticket') ||
-            l.includes('roll') ||
-            l.includes('reg')
-          );
-        }) || rawHeaders[0];
-
-      // Immediately notify Event Settings and other listeners that new columns are available
-      window.dispatchEvent(
-        new CustomEvent('admitto:schema-changed', {
-          detail: { eventId, columns: rawHeaders, datasetName: dsName, primaryKey: guessedPrimary },
-        })
-      );
-      try {
-        const bc = new BroadcastChannel('admitto_sync');
-        bc.postMessage({ type: 'SCHEMA_UPDATED', eventId, columns: rawHeaders, datasetName: dsName, primaryKey: guessedPrimary });
-        bc.close();
-      } catch {}
-
-      // Pre-sync scan config with detected columns to server
-      eventsApi
-        .updateScanConfig(eventId, {
-          primary_scan_field: guessedPrimary || 'usn',
-          qr_mode: qrMode || 'SECURE_TOKEN',
-          barcode_field: barcodeField || guessedPrimary || 'usn',
-          available_fields: rawHeaders,
-          column_configs: detected,
-          dataset_name: dsName,
-        })
-        .catch(console.warn);
-
-      setPrimaryKeyField(guessedPrimary);
-      setSecondaryKeyField('');
-
-      // Auto compute initial uniqueness
-      const checkRes = checkDatasetUniqueness(rows, guessedPrimary);
-      setUniquenessResult(checkRes);
-
-      // Advance to Step 2: Choose Primary Key
-      setWizardStep(2);
-    } catch (err: any) {
-      console.error('Failed to parse spreadsheet file:', err);
-      alert('Failed to parse spreadsheet file: ' + (err.message || 'Invalid format'));
-    }
+    await handleFilesSelect([file]);
   };
 
   const handleCommitImport = async () => {
@@ -2672,6 +2713,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                   setIsImportModalOpen(false);
                   setWizardStep(1);
                   setCsvFile(null);
+                  setUploadedFilesValidation([]);
+                  setValidationSummary(null);
                   setRawSpreadsheetRows([]);
                   setImportSummary(null);
                   setBarcodeDataFormat({
@@ -2714,34 +2757,269 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
             )}
 
             {/* ======================================================== */}
-            {/* STEP 1: UPLOAD ATTENDEE FILE (CSV / XLSX / XLS) */}
+            {/* STEP 1: UPLOAD ATTENDEE FILES (CSV / XLSX / XLS) */}
             {/* ======================================================== */}
             {wizardStep === 1 && !importSummary && (
               <div className="space-y-4">
+                {/* Drag and Drop Zone */}
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-zinc-700 hover:border-orange-500 rounded-3xl p-8 text-center cursor-pointer space-y-3 bg-zinc-950/40 hover:bg-orange-500/5 transition-all group"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingOver(true);
+                  }}
+                  onDragEnter={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingOver(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingOver(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingOver(false);
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                      handleFilesSelect(e.dataTransfer.files);
+                    }
+                  }}
+                  className={`border-2 border-dashed rounded-3xl p-6 sm:p-8 text-center cursor-pointer transition-all group ${
+                    isDraggingOver
+                      ? 'border-orange-500 bg-orange-500/10 scale-[1.01] shadow-lg shadow-orange-500/20'
+                      : 'border-zinc-700 hover:border-orange-500 rounded-3xl bg-zinc-950/40 hover:bg-orange-500/5'
+                  }`}
                 >
                   <div className="w-14 h-14 rounded-2xl bg-orange-500/10 text-orange-400 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
-                    <Upload className="w-7 h-7" />
+                    {isValidatingFiles ? (
+                      <Loader2 className="w-7 h-7 animate-spin text-orange-400" />
+                    ) : (
+                      <Upload className="w-7 h-7" />
+                    )}
                   </div>
                   <div className="space-y-1">
-                    <div className="text-sm font-bold text-white">Click or drag & drop CSV or Excel file here</div>
+                    <div className="text-sm font-bold text-white">
+                      {isValidatingFiles
+                        ? 'Validating spreadsheet files...'
+                        : 'Click or drag & drop CSV or Excel files here'}
+                    </div>
                     <div className="text-xs text-zinc-400">
-                      Supports <span className="text-orange-400 font-mono">.csv</span>, <span className="text-orange-400 font-mono">.xlsx</span>, and <span className="text-orange-400 font-mono">.xls</span> spreadsheet files
+                      Supports multiple <span className="text-orange-400 font-mono">.csv</span>,{' '}
+                      <span className="text-orange-400 font-mono">.xlsx</span>, and{' '}
+                      <span className="text-orange-400 font-mono">.xls</span> spreadsheet files simultaneously
                     </div>
                   </div>
                   <p className="text-[11px] text-zinc-500 max-w-md mx-auto">
-                    Columns are detected automatically from your file headers (e.g. USN, Employee ID, Name, Email, Role, Department).
+                    Multi-select is supported! Select one or multiple files. Every file is checked for format, header structure, and data rows automatically.
                   </p>
                   <input
                     ref={fileInputRef}
                     type="file"
+                    multiple
                     accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                     onChange={handleFileUpload}
                     className="hidden"
                   />
                 </div>
+
+                {/* Validated Files Display List */}
+                {uploadedFilesValidation.length > 0 && (
+                  <div className="space-y-3 pt-1 animate-fadeIn">
+                    <div className="flex items-center justify-between text-xs px-1 flex-wrap gap-2">
+                      <div className="font-bold text-zinc-300 flex items-center gap-2 flex-wrap">
+                        <span>Selected & Validated Files</span>
+                        <span className="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 font-mono text-[11px]">
+                          {uploadedFilesValidation.length} file{uploadedFilesValidation.length === 1 ? '' : 's'}
+                        </span>
+                        {validationSummary && validationSummary.validCount > 0 && (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono text-[11px]">
+                            {validationSummary.totalRecords} total records ready
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-orange-400 hover:text-orange-300 text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer border border-white/10"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Add More Files</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleClearAllFiles}
+                          className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-rose-500/10 text-zinc-400 hover:text-rose-400 text-xs font-medium transition-all cursor-pointer"
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Individual File Cards */}
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                      {uploadedFilesValidation.map((fileVal) => {
+                        const isValid = fileVal.isValid;
+                        const isWarning = fileVal.status === 'warning';
+                        const isError = fileVal.status === 'error';
+
+                        return (
+                          <div
+                            key={fileVal.id}
+                            className={`p-3.5 rounded-2xl border transition-all ${
+                              isError
+                                ? 'bg-rose-500/10 border-rose-500/30'
+                                : isWarning
+                                ? 'bg-amber-500/10 border-amber-500/30'
+                                : 'bg-zinc-950/70 border-zinc-800 hover:border-zinc-700'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              {/* Left: Icon and Name */}
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div
+                                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                                    isError
+                                      ? 'bg-rose-500/20 border-rose-500/40 text-rose-400'
+                                      : isWarning
+                                      ? 'bg-amber-500/20 border-amber-500/40 text-amber-400'
+                                      : 'bg-orange-500/15 border-orange-500/30 text-orange-400'
+                                  }`}
+                                >
+                                  <FileSpreadsheet className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-xs font-bold text-white truncate max-w-[200px] sm:max-w-xs">
+                                    {fileVal.name}
+                                  </div>
+                                  <div className="text-[10px] text-zinc-400 flex items-center gap-2 mt-0.5">
+                                    <span className="font-mono">{fileVal.formattedSize}</span>
+                                    <span>•</span>
+                                    <span className="uppercase font-mono text-zinc-500">
+                                      {fileVal.extension.replace('.', '')}
+                                    </span>
+                                    {isValid && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="text-zinc-300 font-medium">
+                                          {fileVal.rowCount} row{fileVal.rowCount === 1 ? '' : 's'}
+                                        </span>
+                                        <span>•</span>
+                                        <span className="text-zinc-400">
+                                          {fileVal.headers.length} col{fileVal.headers.length === 1 ? '' : 's'}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Right: Status Pill & Delete Button */}
+                              <div className="flex items-center gap-2 shrink-0">
+                                {isValid && !isWarning && (
+                                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-bold text-emerald-400 flex items-center gap-1 shadow-sm">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Valid</span>
+                                  </span>
+                                )}
+                                {isWarning && (
+                                  <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[10px] font-bold text-amber-400 flex items-center gap-1 shadow-sm">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    <span>Warning</span>
+                                  </span>
+                                )}
+                                {isError && (
+                                  <span className="px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-[10px] font-bold text-rose-400 flex items-center gap-1 shadow-sm">
+                                    <XCircle className="w-3 h-3" />
+                                    <span>Invalid</span>
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveFile(fileVal.id);
+                                  }}
+                                  className="text-zinc-500 hover:text-rose-400 p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                                  title="Remove file"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Error Details */}
+                            {fileVal.errors.length > 0 && (
+                              <div className="mt-2 pt-2 border-t border-rose-500/20 text-[11px] text-rose-300 space-y-0.5">
+                                {fileVal.errors.map((err, i) => (
+                                  <p key={i} className="flex items-center gap-1.5">
+                                    <AlertCircle className="w-3 h-3 shrink-0 text-rose-400" />
+                                    <span>{err}</span>
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Warning Details */}
+                            {fileVal.warnings.length > 0 && (
+                              <div className="mt-2 pt-2 border-t border-amber-500/20 text-[11px] text-amber-300 space-y-0.5">
+                                {fileVal.warnings.map((warn, i) => (
+                                  <p key={i} className="flex items-center gap-1.5">
+                                    <AlertTriangle className="w-3 h-3 shrink-0 text-amber-400" />
+                                    <span>{warn}</span>
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Multi-File Cross-Schema Notice */}
+                    {validationSummary && validationSummary.hasSchemaVariation && (
+                      <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2 animate-fadeIn">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                        <div className="space-y-1">
+                          <div className="font-bold">Schema Consistency Note:</div>
+                          <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                            Selected files contain slight column differences. ADMITTO will combine them into a unified schema ({validationSummary.detectedColumns.length} total columns). Missing values in specific files will default to empty.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Step 1 Action Bar */}
+                    <div className="pt-2 flex items-center justify-between border-t border-zinc-800">
+                      <div className="text-xs text-zinc-400">
+                        {validationSummary && validationSummary.validCount > 0 ? (
+                          <span>
+                            Ready with <strong className="text-white">{validationSummary.totalRecords} records</strong> across{' '}
+                            <strong className="text-white">{validationSummary.validCount} valid file{validationSummary.validCount === 1 ? '' : 's'}</strong>
+                          </span>
+                        ) : (
+                          <span className="text-rose-400 font-semibold">
+                            Please provide at least one valid spreadsheet file to continue.
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={!validationSummary || validationSummary.validCount === 0 || isValidatingFiles}
+                        onClick={() => setWizardStep(2)}
+                        className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-orange-500/25 transition-all cursor-pointer"
+                      >
+                        <span>Continue to Step 2: Primary Key</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
