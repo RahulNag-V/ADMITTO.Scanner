@@ -37,7 +37,10 @@ import {
   Phone,
   Mail,
   ShieldCheck,
+  Upload,
+  FileSpreadsheet,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { EventItem, QrMode, EventScanConfig, AttendeeType, BarcodeMatchingMode, BarcodeConfig } from '../../types';
 import { eventsApi, studentsApi, getStoredSession } from '../../lib/api';
 import { ATTENDEE_TYPE_PRESETS, getPresetByType } from '../../lib/attendeeTypes';
@@ -45,7 +48,8 @@ import { TabSkeletonView } from '../../components/common/Skeleton';
 import { CreateEventModal } from '../../components/admin/CreateEventModal';
 import { compressImageFile } from '../../lib/imageCompression';
 import { broadcastEventUpdated, broadcastEventDeleted } from '../../lib/realtimeSync';
-import { purgeEventOfflineData } from '../../lib/offline/idb';
+import { purgeEventOfflineData, getAdmittoDB } from '../../lib/offline/idb';
+import { loadLocalSchema } from '../../lib/attendeeSchema';
 
 interface EventSettingsPageProps {
   eventId: string;
@@ -155,6 +159,8 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
   const [barcodeMaxLength, setBarcodeMaxLength] = useState<string>('');
   const [savingBarcodeConfig, setSavingBarcodeConfig] = useState(false);
   const [barcodeConfigSavedMessage, setBarcodeConfigSavedMessage] = useState<string | null>(null);
+  const [isRefreshingColumns, setIsRefreshingColumns] = useState(false);
+  const spreadsheetInputRef = useRef<HTMLInputElement>(null);
 
   // Custom Banner & Background Customization
   const [customBannerText, setCustomBannerText] = useState('');
@@ -192,11 +198,267 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
     }
   };
 
+  const resolveAvailableColumns = async (targetEventId: string, eventObj?: EventItem | null): Promise<string[]> => {
+    const colSet = new Set<string>();
+
+    // 1. Scan Config from Event Object (handling both object and JSON string)
+    let scanCfg = eventObj?.scan_config;
+    if (typeof scanCfg === 'string') {
+      try {
+        scanCfg = JSON.parse(scanCfg);
+      } catch {
+        scanCfg = undefined;
+      }
+    }
+
+    if (scanCfg) {
+      if (Array.isArray(scanCfg.available_fields)) {
+        scanCfg.available_fields.forEach((f: string) => f && colSet.add(String(f).trim()));
+      }
+      if (Array.isArray(scanCfg.column_configs)) {
+        scanCfg.column_configs.forEach((c: any) => c?.name && colSet.add(String(c.name).trim()));
+      }
+    }
+
+    // 2. Local Schema saved during spreadsheet upload
+    try {
+      const localSchema = loadLocalSchema(targetEventId);
+      if (localSchema?.columns && Array.isArray(localSchema.columns)) {
+        localSchema.columns.forEach((c) => c?.name && colSet.add(String(c.name).trim()));
+      }
+    } catch {}
+
+    // 3. Raw Headers stored in localStorage for target event
+    try {
+      const rawStored = localStorage.getItem(`admitto_raw_headers_${targetEventId}`);
+      if (rawStored) {
+        const parsed = JSON.parse(rawStored);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((h: string) => h && colSet.add(String(h).trim()));
+        }
+      }
+    } catch {}
+
+    // 4. Universal dataset columns across tabs & events
+    try {
+      const universalCols = localStorage.getItem('admitto_latest_dataset_columns');
+      if (universalCols) {
+        const parsed = JSON.parse(universalCols);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((h: string) => h && colSet.add(String(h).trim()));
+        }
+      }
+    } catch {}
+
+    // 5. Scan all stored schemas in localStorage as additional fallback
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('admitto_schema_') || k.startsWith('admitto_raw_headers_'))) {
+          const val = localStorage.getItem(k);
+          if (val) {
+            try {
+              const parsed = JSON.parse(val);
+              if (Array.isArray(parsed)) {
+                parsed.forEach((h: any) => typeof h === 'string' && h && colSet.add(h.trim()));
+              } else if (parsed && Array.isArray(parsed.columns)) {
+                parsed.columns.forEach((c: any) => c?.name && colSet.add(String(c.name).trim()));
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch {}
+
+    // 6. Inspect Live Attendees from API (supporting nested & stringified meta)
+    try {
+      const stdRes = await studentsApi.list(targetEventId);
+      if (stdRes.students && stdRes.students.length > 0) {
+        stdRes.students.slice(0, 50).forEach((st) => {
+          if (st.usn) colSet.add('usn');
+          if (st.name) colSet.add('name');
+          if (st.email) colSet.add('email');
+          if (st.phone_number) colSet.add('phone_number');
+          if (st.branch) colSet.add('branch');
+          if (st.department) colSet.add('department');
+          if (st.year) colSet.add('year');
+          if (st.section) colSet.add('section');
+          if (st.barcode) colSet.add('barcode');
+
+          let meta = st.meta;
+          if (typeof meta === 'string') {
+            try {
+              meta = JSON.parse(meta);
+            } catch {
+              meta = null;
+            }
+          }
+          if (meta && typeof meta === 'object') {
+            Object.keys(meta).forEach((k) => k && colSet.add(k.trim()));
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Could not inspect API attendees for columns:', err);
+    }
+
+    // 7. Inspect Offline Attendees from IndexedDB
+    try {
+      const db = await getAdmittoDB();
+      const offlineAtts = await db.getAllFromIndex('cached_attendees', 'by_event_id', targetEventId);
+      if (offlineAtts && offlineAtts.length > 0) {
+        offlineAtts.slice(0, 50).forEach((st) => {
+          if (st.usn) colSet.add('usn');
+          if (st.name) colSet.add('name');
+          if (st.email) colSet.add('email');
+          if (st.phone_number) colSet.add('phone_number');
+          if (st.branch) colSet.add('branch');
+          if (st.department) colSet.add('department');
+          if (st.barcode) colSet.add('barcode');
+
+          let meta = st.meta;
+          if (typeof meta === 'string') {
+            try {
+              meta = JSON.parse(meta);
+            } catch {
+              meta = null;
+            }
+          }
+          if (meta && typeof meta === 'object') {
+            Object.keys(meta).forEach((k) => k && colSet.add(k.trim()));
+          }
+        });
+      }
+    } catch {}
+
+    return Array.from(colSet);
+  };
+
+  const handleManualSyncColumns = async () => {
+    if (!eventId) return;
+    setIsRefreshingColumns(true);
+    try {
+      const cols = await resolveAvailableColumns(eventId, event);
+      setAvailableColumns(cols);
+      setBarcodeConfigSavedMessage(`Refreshed ${cols.length} column(s) from attendee dataset.`);
+      setTimeout(() => setBarcodeConfigSavedMessage(null), 3500);
+    } catch (err: any) {
+      console.warn('Manual sync columns error:', err);
+    } finally {
+      setTimeout(() => setIsRefreshingColumns(false), 500);
+    }
+  };
+
+  const handleQuickSpreadsheetUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !eventId) return;
+
+    try {
+      setIsRefreshingColumns(true);
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      if (!jsonData || jsonData.length === 0) {
+        alert('The uploaded spreadsheet file is empty.');
+        return;
+      }
+
+      const rawHeaders = (jsonData[0] || [])
+        .map((h: any) => String(h || '').trim())
+        .filter((h: string) => h.length > 0);
+
+      if (rawHeaders.length === 0) {
+        alert('Could not find valid column headers in the first row.');
+        return;
+      }
+
+      // Persist raw headers in localStorage
+      try {
+        localStorage.setItem(`admitto_raw_headers_${eventId}`, JSON.stringify(rawHeaders));
+        localStorage.setItem('admitto_latest_dataset_columns', JSON.stringify(rawHeaders));
+      } catch {}
+
+      // Update state
+      setAvailableColumns((prev) => Array.from(new Set([...prev, ...rawHeaders])));
+
+      // Best guess for barcode identification
+      const guessed =
+        rawHeaders.find((h) => {
+          const l = h.toLowerCase();
+          return l.includes('usn') || l.includes('barcode') || l.includes('ticket') || l.includes('id') || l.includes('roll');
+        }) || rawHeaders[0];
+
+      if (guessed) {
+        setBarcodeField(guessed);
+      }
+
+      // Sync scan config to server
+      eventsApi
+        .updateScanConfig(eventId, {
+          primary_scan_field: primaryScanField || 'usn',
+          qr_mode: qrMode || 'SECURE_TOKEN',
+          barcode_field: guessed || barcodeField || 'usn',
+          available_fields: rawHeaders,
+          dataset_name: file.name,
+        })
+        .catch(console.warn);
+
+      window.dispatchEvent(
+        new CustomEvent('admitto:schema-changed', {
+          detail: { eventId, columns: rawHeaders, datasetName: file.name },
+        })
+      );
+
+      setBarcodeConfigSavedMessage(`Loaded ${rawHeaders.length} column(s) from "${file.name}"!`);
+      setTimeout(() => setBarcodeConfigSavedMessage(null), 4000);
+    } catch (err: any) {
+      console.error('Failed to parse spreadsheet headers:', err);
+      alert('Failed to read spreadsheet file: ' + (err.message || 'Invalid format'));
+    } finally {
+      setIsRefreshingColumns(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
   useEffect(() => {
     if (eventId) {
       loadEvent();
     }
   }, [eventId]);
+
+  useEffect(() => {
+    const handleSchemaChange = async () => {
+      if (eventId) {
+        const cols = await resolveAvailableColumns(eventId, event);
+        setAvailableColumns(cols);
+      }
+    };
+    window.addEventListener('admitto:schema-changed', handleSchemaChange);
+    window.addEventListener('storage', handleSchemaChange);
+    window.addEventListener('focus', handleSchemaChange);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('admitto_sync');
+      bc.onmessage = (ev) => {
+        if (ev.data?.type === 'SCHEMA_UPDATED' || ev.data?.type === 'EVENT_UPDATED') {
+          if (!ev.data.eventId || ev.data.eventId === eventId) {
+            handleSchemaChange();
+          }
+        }
+      };
+    } catch {}
+
+    return () => {
+      window.removeEventListener('admitto:schema-changed', handleSchemaChange);
+      window.removeEventListener('storage', handleSchemaChange);
+      window.removeEventListener('focus', handleSchemaChange);
+      if (bc) bc.close();
+    };
+  }, [eventId, event]);
 
   const loadEvent = async () => {
     try {
@@ -226,39 +488,8 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
       setBarcodeField(initialBarcodeCol);
       setBarcodeIdentifierField(initialBarcodeCol);
 
-      // Extract detected columns from scan_config and uploaded attendee list
-      const scanFields = res.event.scan_config?.available_fields || [];
-      const colConfigs = res.event.scan_config?.column_configs || [];
-      let detectedCols: string[] = [];
-      if (Array.isArray(scanFields) && scanFields.length > 0) {
-        detectedCols = [...scanFields];
-      } else if (Array.isArray(colConfigs) && colConfigs.length > 0) {
-        detectedCols = colConfigs.map((c: any) => c.name);
-      }
-
-      try {
-        const stdRes = await studentsApi.list(res.event.id);
-        if (stdRes.students && stdRes.students.length > 0) {
-          const colSet = new Set<string>(detectedCols);
-          stdRes.students.slice(0, 30).forEach((st) => {
-            if (st.usn) colSet.add('usn');
-            if (st.name) colSet.add('name');
-            if (st.email) colSet.add('email');
-            if (st.phone_number) colSet.add('phone_number');
-            if (st.branch) colSet.add('branch');
-            if (st.department) colSet.add('department');
-            if (st.year) colSet.add('year');
-            if (st.section) colSet.add('section');
-            if (st.barcode) colSet.add('barcode');
-            if (st.meta && typeof st.meta === 'object') {
-              Object.keys(st.meta).forEach((k) => colSet.add(k));
-            }
-          });
-          detectedCols = Array.from(colSet);
-        }
-      } catch (err) {
-        console.warn('Could not inspect students for column keys:', err);
-      }
+      // Extract detected columns from scan_config, local schema, raw headers, API, and IndexedDB
+      const detectedCols = await resolveAvailableColumns(res.event.id, res.event);
       setAvailableColumns(detectedCols);
 
       const bc = res.event.barcode_config || res.event.scan_config?.barcode_config;
@@ -1708,12 +1939,53 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
 
               {/* Column Selection Dropdown */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-[#ECEEF0] flex items-center justify-between">
-                  <span>Choose Barcode Identification Column</span>
-                  <span className="text-[11px] text-[#FFE3A6] font-mono">
-                    {availableColumns.length > 0 ? `${availableColumns.length} Columns Available` : 'Standard Fields'}
-                  </span>
-                </label>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                  <label className="text-xs font-medium text-[#ECEEF0] flex items-center gap-2">
+                    <span>Choose Barcode Identification Column</span>
+                  </label>
+
+                  <div className="flex items-center gap-2">
+                    {availableColumns.length > 0 ? (
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-mono font-semibold flex items-center gap-1.5">
+                        <Sparkles className="w-3 h-3 text-emerald-400" />
+                        <span>{availableColumns.length} Uploaded Columns</span>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-[#8A9BA8] font-mono">
+                        Standard Fields
+                      </span>
+                    )}
+
+                    {/* Quick Sync & Load Buttons */}
+                    <button
+                      type="button"
+                      onClick={handleManualSyncColumns}
+                      disabled={isRefreshingColumns}
+                      title="Re-sync columns from attendee roster & uploads"
+                      className="p-1.5 rounded-lg bg-[#1B303A] hover:bg-[#253f4d] active:scale-95 text-[#FFE3A6] border border-[#314A56] text-xs transition-all cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingColumns ? 'animate-spin' : ''}`} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => spreadsheetInputRef.current?.click()}
+                      title="Load columns directly from a spreadsheet (.csv, .xlsx, .xls)"
+                      className="px-2.5 py-1 rounded-lg bg-[#1B303A] hover:bg-[#253f4d] active:scale-95 text-[#FFE3A6] border border-[#314A56] text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Upload className="w-3 h-3 text-[#FFE3A6]" />
+                      <span>Load File</span>
+                    </button>
+
+                    <input
+                      ref={spreadsheetInputRef}
+                      type="file"
+                      accept=".csv, .xlsx, .xls"
+                      onChange={handleQuickSpreadsheetUpload}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
 
                 <div className="relative">
                   <select
@@ -1737,7 +2009,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                     {availableColumns.length > 0 && (
                       <optgroup label="Uploaded Dataset Columns" className="bg-[#10232D] text-[#8A9BA8] font-bold">
                         {availableColumns
-                          .filter((col) => col !== (primaryScanField || 'usn') && col !== secondaryScanField)
+                          .filter((col) => col.toLowerCase() !== (primaryScanField || 'usn').toLowerCase() && col.toLowerCase() !== (secondaryScanField || '').toLowerCase())
                           .map((col) => (
                             <option key={col} value={col} className="bg-[#0C1B23] text-[#ECEEF0] py-2 font-normal">
                               Column: {col}
@@ -1749,7 +2021,7 @@ export const EventSettingsPage: React.FC<EventSettingsPageProps> = ({ eventId, o
                     {/* Standard Attendee Attributes */}
                     <optgroup label="Standard Attendee Attributes" className="bg-[#10232D] text-[#8A9BA8] font-bold">
                       {['usn', 'roll_number', 'registration_id', 'employee_id', 'barcode', 'email', 'phone_number', 'name', 'branch', 'section']
-                        .filter((f) => !availableColumns.includes(f) && f !== (primaryScanField || 'usn') && f !== secondaryScanField)
+                        .filter((f) => !availableColumns.some((ac) => ac.toLowerCase() === f.toLowerCase()) && f.toLowerCase() !== (primaryScanField || 'usn').toLowerCase() && f.toLowerCase() !== (secondaryScanField || '').toLowerCase())
                         .map((f) => (
                           <option key={f} value={f} className="bg-[#0C1B23] text-[#ECEEF0] py-2 font-normal">
                             Standard: {f}

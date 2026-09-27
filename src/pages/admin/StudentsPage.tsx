@@ -668,6 +668,16 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
     setColumns(trimmed);
     setIsCustomizeColumnsOpen(false);
     saveLocalSchema(eventId, trimmed, uploadedDatasetName || undefined);
+    try {
+      localStorage.setItem(`admitto_raw_headers_${eventId}`, JSON.stringify(trimmed.map((c) => c.name)));
+      localStorage.setItem('admitto_latest_dataset_columns', JSON.stringify(trimmed.map((c) => c.name)));
+    } catch {}
+    window.dispatchEvent(new CustomEvent('admitto:schema-changed', { detail: { eventId, columns: trimmed.map((c) => c.name), datasetName: uploadedDatasetName } }));
+    try {
+      const bc = new BroadcastChannel('admitto_sync');
+      bc.postMessage({ type: 'SCHEMA_UPDATED', eventId, columns: trimmed.map((c) => c.name), datasetName: uploadedDatasetName });
+      bc.close();
+    } catch {}
 
     try {
       await eventsApi.updateScanConfig(eventId, {
@@ -950,6 +960,12 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
       setUploadedDatasetName(dsName);
       saveLocalSchema(eventId, detected, dsName);
 
+      // Persist raw headers in localStorage for instant access across tabs
+      try {
+        localStorage.setItem(`admitto_raw_headers_${eventId}`, JSON.stringify(rawHeaders));
+        localStorage.setItem('admitto_latest_dataset_columns', JSON.stringify(rawHeaders));
+      } catch {}
+
       // Best default key guess
       const guessedPrimary =
         rawHeaders.find((h) => {
@@ -963,6 +979,30 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
             l.includes('reg')
           );
         }) || rawHeaders[0];
+
+      // Immediately notify Event Settings and other listeners that new columns are available
+      window.dispatchEvent(
+        new CustomEvent('admitto:schema-changed', {
+          detail: { eventId, columns: rawHeaders, datasetName: dsName, primaryKey: guessedPrimary },
+        })
+      );
+      try {
+        const bc = new BroadcastChannel('admitto_sync');
+        bc.postMessage({ type: 'SCHEMA_UPDATED', eventId, columns: rawHeaders, datasetName: dsName, primaryKey: guessedPrimary });
+        bc.close();
+      } catch {}
+
+      // Pre-sync scan config with detected columns to server
+      eventsApi
+        .updateScanConfig(eventId, {
+          primary_scan_field: guessedPrimary || 'usn',
+          qr_mode: qrMode || 'SECURE_TOKEN',
+          barcode_field: barcodeField || guessedPrimary || 'usn',
+          available_fields: rawHeaders,
+          column_configs: detected,
+          dataset_name: dsName,
+        })
+        .catch(console.warn);
 
       setPrimaryKeyField(guessedPrimary);
       setSecondaryKeyField('');
@@ -1093,6 +1133,20 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
       setImportSummary({ imported: totalImported, duplicates: totalDuplicates, errors: allErrors });
       saveLocalSchema(eventId, columns, scanConfig.dataset_name);
+      try {
+        localStorage.setItem(`admitto_raw_headers_${eventId}`, JSON.stringify(columns.map((c) => c.name)));
+        localStorage.setItem('admitto_latest_dataset_columns', JSON.stringify(columns.map((c) => c.name)));
+      } catch {}
+      window.dispatchEvent(
+        new CustomEvent('admitto:schema-changed', {
+          detail: { eventId, columns: columns.map((c) => c.name), datasetName: scanConfig.dataset_name },
+        })
+      );
+      try {
+        const bc = new BroadcastChannel('admitto_sync');
+        bc.postMessage({ type: 'SCHEMA_UPDATED', eventId, columns: columns.map((c) => c.name), datasetName: scanConfig.dataset_name });
+        bc.close();
+      } catch {}
       await loadStudents();
     } catch (err: any) {
       console.error('Import failed:', err);
