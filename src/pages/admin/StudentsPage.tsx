@@ -971,9 +971,9 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         setColumns(summary.detectedColumns);
 
         const primaryName = summary.files.find((f) => f.isValid)?.name || 'Uploaded Dataset';
-        const dsTag = summary.validCount === 1 ? primaryName : `${summary.validCount} Datasets (${summary.totalRecords} attendees)`;
-        setUploadedDatasetName(dsTag);
-        saveLocalSchema(eventId, summary.detectedColumns, dsTag);
+        // Always use the first valid file's name as the primary dataset label (not a summary string)
+        setUploadedDatasetName(primaryName);
+        saveLocalSchema(eventId, summary.detectedColumns, primaryName);
 
         // Persist raw headers in localStorage for instant access across tabs
         try {
@@ -1007,12 +1007,12 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         // Notify listeners that new columns and dataset are ready
         window.dispatchEvent(
           new CustomEvent('admitto:schema-changed', {
-            detail: { eventId, columns: summary.unionHeaders, datasetName: dsTag, primaryKey: guessedPrimary },
+            detail: { eventId, columns: summary.unionHeaders, datasetName: primaryName, primaryKey: guessedPrimary },
           })
         );
         try {
           const bc = new BroadcastChannel('admitto_sync');
-          bc.postMessage({ type: 'SCHEMA_UPDATED', eventId, columns: summary.unionHeaders, datasetName: dsTag, primaryKey: guessedPrimary });
+          bc.postMessage({ type: 'SCHEMA_UPDATED', eventId, columns: summary.unionHeaders, datasetName: primaryName, primaryKey: guessedPrimary });
           bc.close();
         } catch {}
 
@@ -1024,7 +1024,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
             barcode_field: barcodeField || guessedPrimary || 'usn',
             available_fields: summary.unionHeaders,
             column_configs: summary.detectedColumns,
-            dataset_name: dsTag,
+            dataset_name: primaryName,
           })
           .catch(console.warn);
       }
@@ -1199,7 +1199,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         return fallback;
       };
 
-      const datasetTag = csvFile?.name || uploadedDatasetName || 'Uploaded Dataset';
+      const datasetTagFallback = uploadedDatasetName || 'Uploaded Dataset';
       const preparedAttendees: Partial<Student>[] = transformedUploadData.rows.map((row) => {
         const r = row.raw;
         const usnVal = (r[primaryKeyField] || r.usn || row.originalId).toString().trim();
@@ -1209,6 +1209,9 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         const branchVal = getColVal(r, ['branch', 'dept', 'department', 'course', 'role'], row.department || 'General');
         const yearVal = getColVal(r, ['year', 'class', 'batch'], 'General');
         const sectionVal = getColVal(r, ['section', 'sec', 'division'], 'A');
+
+        // Use the source file name stamped during validation; fallback to generic tag
+        const rowDatasetName = r._source_file || r.dataset_name || datasetTagFallback;
 
         return {
           usn: usnVal,
@@ -1222,7 +1225,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
           barcode: row.generatedBarcode,
           meta: {
             ...r,
-            dataset_name: datasetTag,
+            dataset_name: rowDatasetName,
           },
         };
       });
@@ -1236,7 +1239,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
           : 'FULL_DATA',
         available_fields: columns.map((c) => c.name),
         column_configs: columns,
-        dataset_name: datasetTag,
+        dataset_name: datasetTagFallback,
         is_uniqueness_verified: true,
       };
 
@@ -1308,7 +1311,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         });
       } else {
         saveUploadedDataset(eventId, {
-          name: datasetTag,
+          name: datasetTagFallback,
           columns,
           primaryKey: primaryKeyField,
         });
