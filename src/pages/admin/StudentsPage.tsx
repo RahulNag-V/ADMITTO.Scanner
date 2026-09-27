@@ -76,6 +76,9 @@ import {
   formatCellValue,
   saveLocalSchema,
   loadLocalSchema,
+  saveUploadedDataset,
+  loadAllUploadedDatasets,
+  UploadedDatasetRecord,
 } from '../../lib/attendeeSchema';
 import { studentsApi, scanApi, eventsApi } from '../../lib/api';
 import { getAttendeeLabels } from '../../lib/attendeeTypes';
@@ -137,10 +140,18 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Categorize by Uploaded Dataset State
+  const [selectedDatasetFilter, setSelectedDatasetFilter] = useState<'ALL' | string>('ALL');
+  const [isDatasetDropdownOpen, setIsDatasetDropdownOpen] = useState(false);
+  const datasetDropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
         setIsStatusDropdownOpen(false);
+      }
+      if (datasetDropdownRef.current && !datasetDropdownRef.current.contains(event.target as Node)) {
+        setIsDatasetDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -172,6 +183,11 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const [batchAddedCount, setBatchAddedCount] = useState(0);
   const [lastAddedAttendee, setLastAddedAttendee] = useState<{ name: string; usn: string } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+
+  // Target Uploaded Dataset Selection for Manual Entry
+  const [targetDatasetName, setTargetDatasetName] = useState<string>('');
+  const [isCreatingNewDataset, setIsCreatingNewDataset] = useState(false);
+  const [newDatasetInputName, setNewDatasetInputName] = useState('');
 
   // 5-Step Attendee Identification & QR Configuration Wizard State
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -328,6 +344,79 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+  // Distinct datasets computed from registry, active state, and attendee records
+  const availableDatasets = useMemo(() => {
+    const registry = loadAllUploadedDatasets(eventId);
+    const map = new Map<string, { name: string; count: number; columns: ColumnConfig[] }>();
+
+    // 1. From saved multi-dataset registry
+    registry.forEach((d) => {
+      if (d.name) {
+        map.set(d.name.toLowerCase(), {
+          name: d.name,
+          count: 0,
+          columns: d.columns && d.columns.length > 0 ? d.columns : columns,
+        });
+      }
+    });
+
+    // 2. From current active uploaded dataset if known
+    if (uploadedDatasetName && !map.has(uploadedDatasetName.toLowerCase())) {
+      map.set(uploadedDatasetName.toLowerCase(), {
+        name: uploadedDatasetName,
+        count: 0,
+        columns: columns,
+      });
+    }
+
+    // 3. From attendee metadata
+    students.forEach((s) => {
+      const dsName = (s.meta?.dataset_name as string) || (uploadedDatasetName ? uploadedDatasetName : 'General Dataset');
+      const key = dsName.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, {
+          name: dsName,
+          count: 0,
+          columns: columns,
+        });
+      }
+      const item = map.get(key)!;
+      item.count += 1;
+    });
+
+    return Array.from(map.values());
+  }, [eventId, students, uploadedDatasetName, columns]);
+
+  const handleSelectTargetDataset = (dsName: string) => {
+    if (dsName === '__NEW__') {
+      setIsCreatingNewDataset(true);
+      return;
+    }
+    setIsCreatingNewDataset(false);
+    setTargetDatasetName(dsName);
+    const found = availableDatasets.find((d) => d.name.toLowerCase() === dsName.toLowerCase());
+    if (found && found.columns && found.columns.length > 0) {
+      setColumns(found.columns);
+    }
+  };
+
+  const openAddModal = () => {
+    setFormValues({});
+    setFormErrors({});
+    const initialTarget = selectedDatasetFilter !== 'ALL'
+      ? selectedDatasetFilter
+      : (uploadedDatasetName || (availableDatasets[0]?.name ?? 'General Dataset'));
+    setTargetDatasetName(initialTarget);
+    setIsCreatingNewDataset(false);
+    setNewDatasetInputName('');
+
+    const found = availableDatasets.find((d) => d.name.toLowerCase() === initialTarget.toLowerCase());
+    if (found && found.columns && found.columns.length > 0) {
+      setColumns(found.columns);
+    }
+    setIsAddModalOpen(true);
+  };
 
   useEffect(() => {
     if (eventId) {
@@ -623,6 +712,10 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const handleCreateStudent = async (e?: React.FormEvent, continueAdding = false) => {
     if (e) e.preventDefault();
 
+    const activeDataset = isCreatingNewDataset && newDatasetInputName.trim()
+      ? newDatasetInputName.trim()
+      : (targetDatasetName || uploadedDatasetName || 'General Dataset');
+
     const validation = validateRecordAgainstSchema(formValues, columns);
     if (!validation.isValid) {
       setFormErrors(validation.errors);
@@ -635,15 +728,27 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
     try {
       const studentPayload = mapFormToStudent(formValues, columns, students.length, eventId);
+      // Tag student record with the selected dataset / category
+      studentPayload.meta = {
+        ...(studentPayload.meta || {}),
+        dataset_name: activeDataset,
+      };
+
       const res = await studentsApi.create(studentPayload);
 
       if (res.student) {
         setStudents((prev) => [res.student, ...prev]);
 
+        // Register dataset into multi-dataset registry
+        saveUploadedDataset(eventId, {
+          name: activeDataset,
+          columns,
+          primaryKey: primaryKeyField,
+        });
+
         if (!uploadedDatasetName) {
-          const dsName = 'Custom Records';
-          setUploadedDatasetName(dsName);
-          saveLocalSchema(eventId, columns, dsName);
+          setUploadedDatasetName(activeDataset);
+          saveLocalSchema(eventId, columns, activeDataset);
           eventsApi
             .updateScanConfig(eventId, {
               primary_scan_field: primaryKeyField || 'usn',
@@ -651,7 +756,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
               barcode_field: barcodeField || 'usn',
               available_fields: columns.map((c) => c.name),
               column_configs: columns,
-              dataset_name: dsName,
+              dataset_name: activeDataset,
             })
             .catch(console.warn);
         }
@@ -665,6 +770,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
           setBatchAddedCount(0);
           setLastAddedAttendee(null);
           setFormValues({});
+          setIsCreatingNewDataset(false);
+          setNewDatasetInputName('');
         }
       }
     } catch (err: any) {
@@ -966,6 +1073,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         return fallback;
       };
 
+      const datasetTag = csvFile?.name || uploadedDatasetName || 'Uploaded Dataset';
       const preparedAttendees: Partial<Student>[] = transformedUploadData.rows.map((row) => {
         const r = row.raw;
         const usnVal = (r[primaryKeyField] || r.usn || row.originalId).toString().trim();
@@ -986,7 +1094,10 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
           year: yearVal,
           section: sectionVal,
           barcode: row.generatedBarcode,
-          meta: r,
+          meta: {
+            ...r,
+            dataset_name: datasetTag,
+          },
         };
       });
 
@@ -999,7 +1110,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
           : 'FULL_DATA',
         available_fields: columns.map((c) => c.name),
         column_configs: columns,
-        dataset_name: csvFile?.name || 'Uploaded Dataset',
+        dataset_name: datasetTag,
         is_uniqueness_verified: true,
       };
 
@@ -1061,6 +1172,11 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
       setImportSummary({ imported: totalImported, duplicates: totalDuplicates, errors: allErrors });
       saveLocalSchema(eventId, columns, scanConfig.dataset_name);
+      saveUploadedDataset(eventId, {
+        name: datasetTag,
+        columns,
+        primaryKey: primaryKeyField,
+      });
       try {
         localStorage.setItem(`admitto_raw_headers_${eventId}`, JSON.stringify(columns.map((c) => c.name)));
         localStorage.setItem('admitto_latest_dataset_columns', JSON.stringify(columns.map((c) => c.name)));
@@ -1092,7 +1208,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
       s.usn.toLowerCase().includes(search.toLowerCase()) ||
       (s.email && s.email.toLowerCase().includes(search.toLowerCase())) ||
       (s.phone_number && s.phone_number.includes(search)) ||
-      (s.branch && s.branch.toLowerCase().includes(search.toLowerCase()));
+      (s.branch && s.branch.toLowerCase().includes(search.toLowerCase())) ||
+      (s.meta?.dataset_name && String(s.meta.dataset_name).toLowerCase().includes(search.toLowerCase()));
 
     const matchesStatus =
       statusFilter === 'ALL'
@@ -1101,7 +1218,13 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
           ? (s.checked_in || s.is_checked_in)
           : !(s.checked_in || s.is_checked_in);
 
-    return matchesSearch && matchesStatus;
+    const studentDataset = (s.meta?.dataset_name as string) || (uploadedDatasetName ? uploadedDatasetName : 'General Dataset');
+    const matchesDataset =
+      selectedDatasetFilter === 'ALL'
+        ? true
+        : studentDataset.toLowerCase() === selectedDatasetFilter.toLowerCase();
+
+    return matchesSearch && matchesStatus && matchesDataset;
   });
 
   const allExpanded = filteredStudents.length > 0 && expandedStudentIds.size === filteredStudents.length;
@@ -1170,11 +1293,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
           {/* Bottom Row: Add New Data Primary Button */}
           <button
-            onClick={() => {
-              setFormValues({});
-              setFormErrors({});
-              setIsAddModalOpen(true);
-            }}
+            onClick={openAddModal}
             className="w-full px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white flex items-center justify-center gap-1.5 shadow-lg shadow-orange-500/25 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -1228,11 +1347,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
             <button
               type="button"
-              onClick={() => {
-                setFormValues({});
-                setFormErrors({});
-                setIsAddModalOpen(true);
-              }}
+              onClick={openAddModal}
               className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-xs font-bold text-white flex items-center gap-1.5 shadow-md shadow-orange-500/25 transition-all cursor-pointer whitespace-nowrap"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -1357,6 +1472,131 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                                     }`}
                                 >
                                   {opt.count}
+                                </span>
+                                {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+
+          {/* Categorize by Uploaded Data Dropdown Menu */}
+          <div className="relative w-full md:w-auto md:shrink-0 z-50" ref={datasetDropdownRef}>
+            {(() => {
+              const currentDataset = availableDatasets.find(
+                (d) => d.name.toLowerCase() === selectedDatasetFilter.toLowerCase()
+              );
+              const currentLabel = selectedDatasetFilter === 'ALL'
+                ? 'All Uploaded Data'
+                : (currentDataset?.name || selectedDatasetFilter);
+              const currentCount = selectedDatasetFilter === 'ALL'
+                ? students.length
+                : (currentDataset?.count ?? students.filter(s => (s.meta?.dataset_name || '').toLowerCase() === selectedDatasetFilter.toLowerCase()).length);
+
+              return (
+                <>
+                  <button
+                    id="categorize-dataset-dropdown-btn"
+                    type="button"
+                    onClick={() => {
+                      setIsDatasetDropdownOpen(!isDatasetDropdownOpen);
+                    }}
+                    className="w-full md:w-auto h-10 px-3 rounded-xl bg-zinc-950/40 hover:bg-zinc-900/60 border border-white/10 text-xs font-bold text-white flex items-center justify-between gap-1.5 transition-all cursor-pointer shadow-md select-none backdrop-blur-md"
+                    aria-haspopup="true"
+                    aria-expanded={isDatasetDropdownOpen}
+                    title="Categorize attendee roster based on uploaded data"
+                  >
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Database className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <span className="truncate max-w-[120px] sm:max-w-[160px]">{currentLabel}</span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono border bg-indigo-500/20 border-indigo-500/40 text-indigo-300">
+                        {currentCount}
+                      </span>
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-200 ${
+                          isDatasetDropdownOpen ? 'rotate-180 text-indigo-400' : ''
+                        }`}
+                      />
+                    </div>
+                  </button>
+
+                  {/* Floating Dataset Categorization Dropdown Menu */}
+                  {isDatasetDropdownOpen && (
+                    <div className="absolute right-0 sm:left-0 top-full mt-2 w-64 sm:w-72 bg-[#0c1020]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-1.5 shadow-[0_30px_70px_rgba(0,0,0,0.95)] z-[100] animate-in fade-in slide-in-from-top-2 duration-150 max-w-[calc(100vw-32px)]">
+                      <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 flex items-center justify-between">
+                        <span>Categorize by Uploaded Data</span>
+                        <span className="font-mono text-indigo-400 text-[10px] font-normal lowercase">{availableDatasets.length} category</span>
+                      </div>
+                      <div className="p-1 space-y-1 max-h-60 overflow-y-auto">
+                        {/* All Uploaded Data Option */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDatasetFilter('ALL');
+                            setIsDatasetDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                            selectedDatasetFilter === 'ALL'
+                              ? 'bg-indigo-600 text-white shadow-md'
+                              : 'text-slate-300 hover:text-white hover:bg-white/10'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 truncate">
+                            <Users className={`w-4 h-4 shrink-0 ${selectedDatasetFilter === 'ALL' ? 'text-white' : 'text-zinc-400'}`} />
+                            <span className="truncate">All Uploaded Data</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+                                selectedDatasetFilter === 'ALL'
+                                  ? 'bg-white/20 border-white/30 text-white'
+                                  : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+                              }`}
+                            >
+                              {students.length}
+                            </span>
+                            {selectedDatasetFilter === 'ALL' && <Check className="w-3.5 h-3.5 text-white" />}
+                          </div>
+                        </button>
+
+                        {/* Individual Uploaded Datasets */}
+                        {availableDatasets.map((ds) => {
+                          const isSelected = selectedDatasetFilter.toLowerCase() === ds.name.toLowerCase();
+                          return (
+                            <button
+                              key={ds.name}
+                              type="button"
+                              onClick={() => {
+                                setSelectedDatasetFilter(ds.name);
+                                setIsDatasetDropdownOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-indigo-600 text-white shadow-md'
+                                  : 'text-slate-300 hover:text-white hover:bg-white/10'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 truncate">
+                                <FileSpreadsheet className={`w-4 h-4 shrink-0 ${isSelected ? 'text-white' : 'text-indigo-400'}`} />
+                                <span className="truncate" title={ds.name}>{ds.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${
+                                    isSelected
+                                      ? 'bg-white/20 border-white/30 text-white'
+                                      : 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                                  }`}
+                                >
+                                  {ds.count}
                                 </span>
                                 {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
                               </div>
@@ -1504,11 +1744,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
                           <button
                             type="button"
-                            onClick={() => {
-                              setFormValues({});
-                              setFormErrors({});
-                              setIsAddModalOpen(true);
-                            }}
+                            onClick={openAddModal}
                             className="w-full sm:flex-1 px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-bold text-white inline-flex items-center justify-center gap-1.5 shadow-lg shadow-orange-500/25 transition-all cursor-pointer whitespace-nowrap"
                           >
                             <Plus className="w-4 h-4" />
@@ -1574,12 +1810,20 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                           </button>
                         </td>
 
-                        {/* Name & Last 3 Digits of USN Stacked Consistently */}
+                        {/* Name & Last 3 Digits of USN Stacked Consistently with Dataset Tag */}
                         <td className="py-3.5 px-4 align-middle">
                           <div className="flex flex-col items-start gap-1">
-                            <span className="font-bold text-white text-sm sm:text-base tracking-tight leading-tight">
-                              {s.name}
-                            </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-white text-sm sm:text-base tracking-tight leading-tight">
+                                {s.name}
+                              </span>
+                              {(s.meta?.dataset_name || (uploadedDatasetName && availableDatasets.length > 1)) && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/15 border border-indigo-500/30 text-[10px] font-medium text-indigo-300">
+                                  <FileSpreadsheet className="w-2.5 h-2.5 text-indigo-400 shrink-0" />
+                                  <span className="truncate max-w-[130px]">{String(s.meta?.dataset_name || uploadedDatasetName)}</span>
+                                </span>
+                              )}
+                            </div>
                             {s.usn && (
                               <span className="inline-flex items-center justify-center bg-amber-500/20 text-amber-300 border border-amber-500/35 px-2 py-0.5 rounded-lg text-xs font-mono font-bold tracking-wider shadow-sm">
                                 {s.usn.slice(-3)}
@@ -1616,12 +1860,21 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                             <div className="bg-[#1c2340]/65 border border-white/20 backdrop-blur-2xl rounded-2xl p-4 sm:p-5 space-y-4 shadow-xl">
                               {/* Header Banner inside Dropdown */}
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/15 text-xs">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-mono font-bold text-orange-400 bg-orange-500/15 px-2 py-0.5 rounded-lg border border-orange-500/30">
                                     DETAILS: {s.name} ({s.usn})
                                   </span>
                                   <span className="text-zinc-500">•</span>
                                   <span className="text-zinc-300">Roster Serial #{s.sl_no || idx + 1}</span>
+                                  {(s.meta?.dataset_name || uploadedDatasetName) && (
+                                    <>
+                                      <span className="text-zinc-500">•</span>
+                                      <span className="inline-flex items-center gap-1 text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 px-2 py-0.5 rounded-md text-[10px] font-mono">
+                                        <FileSpreadsheet className="w-2.5 h-2.5" />
+                                        {String(s.meta?.dataset_name || uploadedDatasetName)}
+                                      </span>
+                                    </>
+                                  )}
                                 </div>
 
                                 <div className="flex items-center gap-2">
@@ -1880,9 +2133,11 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                     )}
                   </div>
                   <p className="text-xs text-zinc-400 mt-0.5">
-                    {uploadedDatasetName
-                      ? `Schema derived from: ${uploadedDatasetName} (${columns.length} columns)`
-                      : `Configured Schema (${columns.length} columns)`}
+                    {`Schema derived from: ${
+                      isCreatingNewDataset && newDatasetInputName.trim()
+                        ? newDatasetInputName.trim()
+                        : (targetDatasetName || uploadedDatasetName || 'Configured Schema')
+                    } (${columns.length} columns)`}
                   </p>
                 </div>
               </div>
@@ -1894,6 +2149,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                   setLastAddedAttendee(null);
                   setFormValues({});
                   setFormErrors({});
+                  setIsCreatingNewDataset(false);
+                  setNewDatasetInputName('');
                 }}
                 className="text-zinc-400 hover:text-white p-1 rounded-xl hover:bg-white/10 transition-colors cursor-pointer shrink-0"
                 title="Close"
@@ -1924,6 +2181,82 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
             {/* Form Scrollable Body */}
             <form onSubmit={(e) => handleCreateStudent(e, false)} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+                {/* Target Uploaded Dataset / Category Selector */}
+                <div className="p-3.5 rounded-2xl bg-zinc-950/80 border border-orange-500/25 space-y-2.5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-orange-300 flex items-center gap-1.5">
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-orange-400" />
+                      <span>Target Uploaded Dataset / Category</span>
+                      <span className="text-orange-400 font-bold">*</span>
+                    </label>
+                    <span className="text-[10px] font-mono text-zinc-400">
+                      {columns.length} columns active
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    Select which uploaded dataset or category to add this manual record to:
+                  </p>
+
+                  <div className="space-y-2">
+                    <select
+                      id="target-dataset-select"
+                      value={isCreatingNewDataset ? '__NEW__' : (targetDatasetName || availableDatasets[0]?.name || '')}
+                      onChange={(e) => handleSelectTargetDataset(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-700 hover:border-orange-500/50 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-all font-medium cursor-pointer"
+                    >
+                      {availableDatasets.map((ds) => (
+                        <option key={ds.name} value={ds.name} className="bg-zinc-900 text-white py-1">
+                          {ds.name} ({ds.count} attendee{ds.count === 1 ? '' : 's'})
+                        </option>
+                      ))}
+                      {availableDatasets.length === 0 && (
+                        <option value="General Dataset" className="bg-zinc-900 text-white py-1">
+                          General Dataset (0 attendees)
+                        </option>
+                      )}
+                      <option value="__NEW__" className="bg-zinc-900 text-orange-400 font-bold py-1">
+                        + Add to New Data Category / Dataset...
+                      </option>
+                    </select>
+
+                    {isCreatingNewDataset && (
+                      <div className="flex items-center gap-2 pt-1 animate-fadeIn">
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="Enter new dataset name (e.g. On-Spot Registrations, VIPs)..."
+                          value={newDatasetInputName}
+                          onChange={(e) => setNewDatasetInputName(e.target.value)}
+                          className="flex-1 bg-zinc-900 border border-orange-500/60 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (newDatasetInputName.trim()) {
+                              setTargetDatasetName(newDatasetInputName.trim());
+                              setIsCreatingNewDataset(false);
+                            } else {
+                              setIsCreatingNewDataset(false);
+                            }
+                          }}
+                          className="px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shrink-0 cursor-pointer"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCreatingNewDataset(false);
+                            setNewDatasetInputName('');
+                          }}
+                          className="px-2.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 text-xs shrink-0 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 {columns.map((col) => {
                   const val = formValues[col.name] ?? '';
                   const err = formErrors[col.name];

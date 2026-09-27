@@ -44,6 +44,7 @@ export const ScannerRosterTab: React.FC<ScannerRosterTabProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMode, setFilterMode] = useState<'ALL' | 'CHECKED_IN' | 'PENDING'>('ALL');
   const [selectedBranch, setSelectedBranch] = useState<string>('ALL');
+  const [selectedDataset, setSelectedDataset] = useState<string>('ALL');
 
   // Expanded student dropdown set
   const [expandedStudentIds, setExpandedStudentIds] = useState<Set<string>>(new Set());
@@ -53,6 +54,11 @@ export const ScannerRosterTab: React.FC<ScannerRosterTabProps> = ({
   // Unique branches for filter
   const branches = Array.from(
     new Set(students.map((s) => s.branch || 'General'))
+  ).sort();
+
+  // Unique uploaded datasets for filter
+  const datasets = Array.from(
+    new Set(students.map((s) => (s.meta?.dataset_name as string)).filter(Boolean))
   ).sort();
 
   // Filtered students
@@ -76,7 +82,10 @@ export const ScannerRosterTab: React.FC<ScannerRosterTabProps> = ({
     const matchesBranch =
       selectedBranch === 'ALL' || (s.branch || 'General') === selectedBranch;
 
-    return matchesSearch && matchesStatus && matchesBranch;
+    const matchesDataset =
+      selectedDataset === 'ALL' || (s.meta?.dataset_name as string) === selectedDataset;
+
+    return matchesSearch && matchesStatus && matchesBranch && matchesDataset;
   });
 
   const checkedInCount = students.filter(
@@ -194,6 +203,27 @@ export const ScannerRosterTab: React.FC<ScannerRosterTabProps> = ({
               </button>
             )}
           </div>
+
+          {/* Uploaded Dataset Filter Selector */}
+          {datasets.length > 0 && (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <select
+                id="roster-dataset-filter"
+                value={selectedDataset}
+                onChange={(e) => setSelectedDataset(e.target.value)}
+                className="rounded-2xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-white/10 cursor-pointer focus:ring-2 focus:ring-indigo-500/40"
+              >
+                <option value="ALL" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                  All Uploaded Data ({datasets.length})
+                </option>
+                {datasets.map((d) => (
+                  <option key={d} value={d} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Branch Filter Selector */}
           {branches.length > 1 && (
@@ -375,6 +405,11 @@ export const ScannerRosterTab: React.FC<ScannerRosterTabProps> = ({
                         <span className="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 font-mono">
                           #{student.sl_no || idx + 1}
                         </span>
+                        {student.meta?.dataset_name && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 font-mono">
+                            {String(student.meta.dataset_name)}
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">

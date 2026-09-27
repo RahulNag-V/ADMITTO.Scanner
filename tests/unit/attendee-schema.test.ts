@@ -7,6 +7,8 @@ import {
   mapFormToStudent,
   formatCellValue,
   ColumnConfig,
+  saveUploadedDataset,
+  loadAllUploadedDatasets,
 } from '../../src/lib/attendeeSchema';
 
 describe('Dynamic Attendee Schema Engine', () => {
@@ -253,6 +255,82 @@ describe('Dynamic Attendee Schema Engine', () => {
 
       const newMapped = mapFormToStudent(newForm, updatedSchema);
       expect(newMapped.meta['T-Shirt Size']).toBe('L');
+    });
+  });
+
+  describe('6. Multi-Dataset Registry & Categorization', () => {
+    const testEventId = 'test-event-multidataset';
+
+    it('persists and loads multiple uploaded datasets with their respective column schemas', () => {
+      const dataset1 = {
+        name: 'attendees_main_list.xlsx',
+        columns: [
+          { id: 'c1', name: 'Name', type: 'text' as const, required: true },
+          { id: 'c2', name: 'USN', type: 'text' as const, required: true },
+          { id: 'c3', name: 'Department', type: 'text' as const, required: false },
+        ],
+      };
+
+      const dataset2 = {
+        name: 'vip_guests.csv',
+        columns: [
+          { id: 'c4', name: 'Name', type: 'text' as const, required: true },
+          { id: 'c5', name: 'VIP Pass Tier', type: 'dropdown' as const, options: ['Platinum', 'Gold'], required: true },
+          { id: 'c6', name: 'Organization', type: 'text' as const, required: false },
+          { id: 'c7', name: 'Dietary Preferences', type: 'text' as const, required: false },
+        ],
+      };
+
+      const dataset3 = {
+        name: 'volunteers_and_staff.xlsx',
+        columns: [
+          { id: 'c8', name: 'Name', type: 'text' as const, required: true },
+          { id: 'c9', name: 'Duty Station', type: 'text' as const, required: true },
+          { id: 'c10', name: 'Shift Time', type: 'text' as const, required: false },
+        ],
+      };
+
+      // Save 3 types of uploaded data
+      saveUploadedDataset(testEventId, dataset1);
+      saveUploadedDataset(testEventId, dataset2);
+      saveUploadedDataset(testEventId, dataset3);
+
+      const allLoaded = loadAllUploadedDatasets(testEventId);
+      expect(allLoaded.length).toBe(3);
+
+      const names = allLoaded.map((d) => d.name);
+      expect(names).toContain('attendees_main_list.xlsx');
+      expect(names).toContain('vip_guests.csv');
+      expect(names).toContain('volunteers_and_staff.xlsx');
+
+      const vipLoaded = allLoaded.find((d) => d.name === 'vip_guests.csv');
+      expect(vipLoaded?.columns.length).toBe(4);
+      expect(vipLoaded?.columns.map((c) => c.name)).toEqual(['Name', 'VIP Pass Tier', 'Organization', 'Dietary Preferences']);
+    });
+
+    it('tags manual entries with target dataset category and preserves metadata', () => {
+      const vipDatasetColumns: ColumnConfig[] = [
+        { id: 'c4', name: 'Name', type: 'text', required: true },
+        { id: 'c5', name: 'VIP Pass Tier', type: 'dropdown', options: ['Platinum', 'Gold'], required: true },
+        { id: 'c6', name: 'Organization', type: 'text', required: false },
+      ];
+
+      const formValues = {
+        Name: 'Dr. Sarah Connor',
+        'VIP Pass Tier': 'Platinum',
+        Organization: 'Cyberdyne Systems',
+      };
+
+      const mapped = mapFormToStudent(formValues, vipDatasetColumns, 0, testEventId);
+      mapped.meta = {
+        ...(mapped.meta || {}),
+        dataset_name: 'vip_guests.csv',
+      };
+
+      expect(mapped.name).toBe('Dr. Sarah Connor');
+      expect(mapped.meta.dataset_name).toBe('vip_guests.csv');
+      expect(mapped.meta['VIP Pass Tier']).toBe('Platinum');
+      expect(mapped.meta['Organization']).toBe('Cyberdyne Systems');
     });
   });
 });

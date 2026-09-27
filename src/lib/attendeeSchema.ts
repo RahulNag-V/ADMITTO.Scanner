@@ -286,13 +286,71 @@ export function formatCellValue(value: any): string {
 /**
  * Local schema persistence helpers
  */
+export interface UploadedDatasetRecord {
+  name: string;
+  columns: ColumnConfig[];
+  primaryKey?: string;
+  updatedAt?: string;
+}
+
+const memoryStorageFallback: Record<string, string> = {};
+
+function getSafeStorage(): { getItem: (k: string) => string | null; setItem: (k: string, v: string) => void } {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+    if (typeof localStorage !== 'undefined' && localStorage.getItem) return localStorage;
+    if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage?.getItem) {
+      return (globalThis as any).localStorage;
+    }
+  } catch {}
+  return {
+    getItem: (k: string) => memoryStorageFallback[k] ?? null,
+    setItem: (k: string, v: string) => {
+      memoryStorageFallback[k] = v;
+    },
+  };
+}
+
+export function saveUploadedDataset(eventId: string, dataset: UploadedDatasetRecord): void {
+  try {
+    if (dataset.name) {
+      const storage = getSafeStorage();
+      const existing = loadAllUploadedDatasets(eventId);
+      const filtered = existing.filter((d) => d.name.toLowerCase() !== dataset.name.toLowerCase());
+      const updated = [
+        ...filtered,
+        { ...dataset, updatedAt: new Date().toISOString() },
+      ];
+      storage.setItem(`admitto_datasets_${eventId}`, JSON.stringify(updated));
+    }
+  } catch (e) {
+    console.warn('Failed to save uploaded dataset:', e);
+  }
+}
+
+export function loadAllUploadedDatasets(eventId: string): UploadedDatasetRecord[] {
+  try {
+    const storage = getSafeStorage();
+    const raw = storage.getItem(`admitto_datasets_${eventId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.warn('Failed to load uploaded datasets:', e);
+  }
+  return [];
+}
+
 export function saveLocalSchema(eventId: string, columns: ColumnConfig[], datasetName?: string): void {
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(
-        `admitto_schema_${eventId}`,
-        JSON.stringify({ columns, datasetName, updatedAt: new Date().toISOString() })
-      );
+    const storage = getSafeStorage();
+    storage.setItem(
+      `admitto_schema_${eventId}`,
+      JSON.stringify({ columns, datasetName, updatedAt: new Date().toISOString() })
+    );
+    if (datasetName) {
+      saveUploadedDataset(eventId, { name: datasetName, columns });
     }
   } catch (e) {
     console.warn('Failed to save local schema:', e);
@@ -301,11 +359,10 @@ export function saveLocalSchema(eventId: string, columns: ColumnConfig[], datase
 
 export function loadLocalSchema(eventId: string): { columns: ColumnConfig[]; datasetName?: string } | null {
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const raw = window.localStorage.getItem(`admitto_schema_${eventId}`);
-      if (raw) {
-        return JSON.parse(raw);
-      }
+    const storage = getSafeStorage();
+    const raw = storage.getItem(`admitto_schema_${eventId}`);
+    if (raw) {
+      return JSON.parse(raw);
     }
   } catch (e) {
     console.warn('Failed to load local schema:', e);
