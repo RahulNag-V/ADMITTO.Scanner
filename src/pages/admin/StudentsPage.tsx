@@ -79,6 +79,9 @@ import {
   saveUploadedDataset,
   loadAllUploadedDatasets,
   UploadedDatasetRecord,
+  isQrCodeColumn,
+  isPrimaryKeyColumn,
+  isBarcodeColumn,
 } from '../../lib/attendeeSchema';
 import { studentsApi, scanApi, eventsApi } from '../../lib/api';
 import { getAttendeeLabels } from '../../lib/attendeeTypes';
@@ -212,6 +215,20 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   });
   const [isBarcodeWarningOpen, setIsBarcodeWarningOpen] = useState(false);
   const [barcodeColumnError, setBarcodeColumnError] = useState<string | null>(null);
+
+  // Manual Entry Columns: Excludes QR Code fields, and enforces Primary Key and Barcode as strictly mandatory
+  const manualEntryColumns = useMemo(() => {
+    return columns
+      .filter((col) => !isQrCodeColumn(col.name))
+      .map((col) => {
+        const isPk = isPrimaryKeyColumn(col.name, primaryKeyField);
+        const isBc = isBarcodeColumn(col.name, barcodeField);
+        if (isPk || isBc) {
+          return { ...col, required: true };
+        }
+        return col;
+      });
+  }, [columns, primaryKeyField, barcodeField]);
 
   // Synchronize barcodeDataFormat.selectedColumn with detectedColumns dynamically
   useEffect(() => {
@@ -498,23 +515,31 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
             setUploadedDatasetName('Uploaded Dataset');
           }
         } else if (scanCfg?.available_fields && scanCfg.available_fields.length > 0) {
-          const derived: ColumnConfig[] = scanCfg.available_fields.map((field, idx) => ({
-            id: `col_loaded_${idx}`,
-            name: field,
-            type: field.toLowerCase().includes('email')
-              ? 'email'
-              : field.toLowerCase().includes('date')
-              ? 'date'
-              : field.toLowerCase().includes('age')
-              ? 'number'
-              : 'text',
-            required: idx === 0 || field.toLowerCase().includes('name') || field.toLowerCase().includes('usn'),
-          }));
+          const derived: ColumnConfig[] = scanCfg.available_fields
+            .filter((field) => !isQrCodeColumn(field))
+            .map((field, idx) => ({
+              id: `col_loaded_${idx}`,
+              name: field,
+              type: field.toLowerCase().includes('email')
+                ? 'email'
+                : field.toLowerCase().includes('date')
+                ? 'date'
+                : field.toLowerCase().includes('age')
+                ? 'number'
+                : 'text',
+              required: idx === 0 || field.toLowerCase().includes('name') || isPrimaryKeyColumn(field) || isBarcodeColumn(field),
+            }));
           setColumns(derived);
           if (scanCfg.dataset_name) setUploadedDatasetName(scanCfg.dataset_name);
           else if (res.students.length > 0) setUploadedDatasetName('Uploaded Dataset');
         } else if (localCached?.columns && localCached.columns.length > 0) {
-          setColumns(localCached.columns);
+          const filtered = localCached.columns
+            .filter((c) => !isQrCodeColumn(c.name))
+            .map((c) => ({
+              ...c,
+              required: c.required || isPrimaryKeyColumn(c.name) || isBarcodeColumn(c.name),
+            }));
+          setColumns(filtered);
           if (localCached.datasetName) setUploadedDatasetName(localCached.datasetName);
           else if (res.students.length > 0) setUploadedDatasetName('Uploaded Dataset');
         } else if (res.students.length > 0) {
@@ -532,18 +557,20 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
             if (first.section && first.section !== 'A') detectedNames.push('Section');
           }
           if (detectedNames.length > 0) {
-            const derived: ColumnConfig[] = detectedNames.map((name, idx) => ({
-              id: `col_st_${idx}`,
-              name,
-              type: name.toLowerCase().includes('email')
-                ? 'email'
-                : name.toLowerCase().includes('date')
-                ? 'date'
-                : name.toLowerCase().includes('age')
-                ? 'number'
-                : 'text',
-              required: idx === 0 || name.toLowerCase().includes('name') || name.toLowerCase().includes('usn'),
-            }));
+            const derived: ColumnConfig[] = detectedNames
+              .filter((name) => !isQrCodeColumn(name))
+              .map((name, idx) => ({
+                id: `col_st_${idx}`,
+                name,
+                type: name.toLowerCase().includes('email')
+                  ? 'email'
+                  : name.toLowerCase().includes('date')
+                  ? 'date'
+                  : name.toLowerCase().includes('age')
+                  ? 'number'
+                  : 'text',
+                required: idx === 0 || name.toLowerCase().includes('name') || isPrimaryKeyColumn(name) || isBarcodeColumn(name),
+              }));
             setColumns(derived);
             setUploadedDatasetName('Uploaded Dataset');
           } else {
@@ -681,17 +708,26 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
       }
     }
 
-    setColumns(trimmed);
+    const filtered = trimmed
+      .filter((c) => !isQrCodeColumn(c.name))
+      .map((c) => {
+        if (isPrimaryKeyColumn(c.name, primaryKeyField) || isBarcodeColumn(c.name, barcodeField)) {
+          return { ...c, required: true };
+        }
+        return c;
+      });
+
+    setColumns(filtered);
     setIsCustomizeColumnsOpen(false);
-    saveLocalSchema(eventId, trimmed, uploadedDatasetName || undefined);
+    saveLocalSchema(eventId, filtered, uploadedDatasetName || undefined);
     try {
-      localStorage.setItem(`admitto_raw_headers_${eventId}`, JSON.stringify(trimmed.map((c) => c.name)));
-      localStorage.setItem('admitto_latest_dataset_columns', JSON.stringify(trimmed.map((c) => c.name)));
+      localStorage.setItem(`admitto_raw_headers_${eventId}`, JSON.stringify(filtered.map((c) => c.name)));
+      localStorage.setItem('admitto_latest_dataset_columns', JSON.stringify(filtered.map((c) => c.name)));
     } catch {}
-    window.dispatchEvent(new CustomEvent('admitto:schema-changed', { detail: { eventId, columns: trimmed.map((c) => c.name), datasetName: uploadedDatasetName } }));
+    window.dispatchEvent(new CustomEvent('admitto:schema-changed', { detail: { eventId, columns: filtered.map((c) => c.name), datasetName: uploadedDatasetName } }));
     try {
       const bc = new BroadcastChannel('admitto_sync');
-      bc.postMessage({ type: 'SCHEMA_UPDATED', eventId, columns: trimmed.map((c) => c.name), datasetName: uploadedDatasetName });
+      bc.postMessage({ type: 'SCHEMA_UPDATED', eventId, columns: filtered.map((c) => c.name), datasetName: uploadedDatasetName });
       bc.close();
     } catch {}
 
@@ -700,8 +736,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         primary_scan_field: primaryKeyField || 'usn',
         qr_mode: qrMode || 'SECURE_TOKEN',
         barcode_field: barcodeField || 'usn',
-        available_fields: trimmed.map((c) => c.name),
-        column_configs: trimmed,
+        available_fields: filtered.map((c) => c.name),
+        column_configs: filtered,
         dataset_name: uploadedDatasetName || undefined,
       });
     } catch (e) {
@@ -716,7 +752,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
       ? newDatasetInputName.trim()
       : (targetDatasetName || uploadedDatasetName || 'General Dataset');
 
-    const validation = validateRecordAgainstSchema(formValues, columns);
+    const validation = validateRecordAgainstSchema(formValues, manualEntryColumns);
     if (!validation.isValid) {
       setFormErrors(validation.errors);
       const firstErr = Object.values(validation.errors)[0];
@@ -727,7 +763,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
     setIsAdding(true);
 
     try {
-      const studentPayload = mapFormToStudent(formValues, columns, students.length, eventId);
+      const studentPayload = mapFormToStudent(formValues, manualEntryColumns, students.length, eventId);
       // Tag student record with the selected dataset / category
       studentPayload.meta = {
         ...(studentPayload.meta || {}),
@@ -1002,9 +1038,11 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
       // Best default key guess
       const guessedPrimary =
+        rawHeaders.find((h) => isPrimaryKeyColumn(h)) ||
         rawHeaders.find((h) => {
           const l = h.toLowerCase();
           return (
+            l.includes('primary') ||
             l.includes('usn') ||
             l.includes('id') ||
             l.includes('employee') ||
@@ -2143,7 +2181,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                       isCreatingNewDataset && newDatasetInputName.trim()
                         ? newDatasetInputName.trim()
                         : (targetDatasetName || uploadedDatasetName || 'Configured Schema')
-                    } (${columns.length} columns)`}
+                    } (${manualEntryColumns.length} columns)`}
                   </p>
                 </div>
               </div>
@@ -2196,7 +2234,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                       <span className="text-orange-400 font-bold">*</span>
                     </label>
                     <span className="text-[10px] font-mono text-zinc-400">
-                      {columns.length} columns active
+                      {manualEntryColumns.length} columns active
                     </span>
                   </div>
                   <p className="text-[11px] text-zinc-400 leading-relaxed">
@@ -2263,7 +2301,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                     )}
                   </div>
                 </div>
-                {columns.map((col) => {
+                {manualEntryColumns.map((col) => {
                   const val = formValues[col.name] ?? '';
                   const err = formErrors[col.name];
 

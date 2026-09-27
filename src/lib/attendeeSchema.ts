@@ -67,6 +67,82 @@ export function inferColumnType(columnName: string, sampleValues: any[] = []): C
 }
 
 /**
+ * Helper to determine if a column name represents a QR code / token field.
+ * In ADMITTO, QR codes are cryptographic system-managed tokens generated automatically
+ * upon digital event pass creation, so they must never appear as manual text inputs.
+ */
+export function isQrCodeColumn(name: string): boolean {
+  if (!name) return false;
+  const lower = name.trim().toLowerCase();
+  const normalized = lower.replace(/[^a-z0-9]/g, '');
+  return (
+    normalized === 'qr' ||
+    normalized === 'qrcode' ||
+    normalized === 'qrtoken' ||
+    normalized === 'token' ||
+    normalized === 'passqr' ||
+    normalized === 'digitalpassqr' ||
+    lower.startsWith('qr code') ||
+    lower.startsWith('qr_code') ||
+    lower.includes('qr code') ||
+    lower === 'qr' ||
+    lower === 'qrcode' ||
+    lower === 'qr_code'
+  );
+}
+
+/**
+ * Helper to determine if a column name represents a Primary Key field
+ * (e.g. Primary Key, USN, ID, Student ID, Identifier, Roll No, Ticket, Serial, etc.)
+ */
+export function isPrimaryKeyColumn(name: string, configuredPrimaryKey?: string): boolean {
+  if (!name) return false;
+  const lower = name.trim().toLowerCase();
+  const normalized = lower.replace(/[^a-z0-9]/g, '');
+  if (configuredPrimaryKey) {
+    const pkLower = configuredPrimaryKey.trim().toLowerCase();
+    const pkNormalized = pkLower.replace(/[^a-z0-9]/g, '');
+    if (lower === pkLower || normalized === pkNormalized) return true;
+  }
+  return (
+    normalized.includes('primarykey') ||
+    normalized === 'primary' ||
+    lower.includes('primary key') ||
+    lower.includes('primary_key') ||
+    normalized.includes('usn') ||
+    normalized === 'id' ||
+    lower.endsWith(' id') ||
+    lower.startsWith('id ') ||
+    lower.includes('identifier') ||
+    lower.includes('roll no') ||
+    lower.includes('roll number') ||
+    lower.includes('roll_no') ||
+    normalized.includes('rollnum') ||
+    lower.includes('ticket') ||
+    lower.includes('serial')
+  );
+}
+
+/**
+ * Helper to determine if a column name represents a Barcode field.
+ */
+export function isBarcodeColumn(name: string, configuredBarcodeField?: string): boolean {
+  if (!name) return false;
+  const lower = name.trim().toLowerCase();
+  const normalized = lower.replace(/[^a-z0-9]/g, '');
+  if (configuredBarcodeField) {
+    const bcLower = configuredBarcodeField.trim().toLowerCase();
+    const bcNormalized = bcLower.replace(/[^a-z0-9]/g, '');
+    if (lower === bcLower || normalized === bcNormalized) return true;
+  }
+  return (
+    normalized.includes('barcode') ||
+    lower.includes('bar code') ||
+    lower.includes('bar_code')
+  );
+}
+
+/**
  * Detect column schema definitions from spreadsheet headers and rows
  */
 export function detectSchemaFromRows(
@@ -103,6 +179,11 @@ export function detectSchemaFromRows(
       cleanName = `Column ${idx + 1}`;
     }
 
+    // Skip QR Code columns from schema detection so they never appear in dynamic schemas or manual forms
+    if (isQrCodeColumn(cleanName)) {
+      return;
+    }
+
     // Ensure uniqueness if duplicate headers exist
     let uniqueName = cleanName;
     let duplicateCounter = 1;
@@ -130,10 +211,8 @@ export function detectSchemaFromRows(
     const lower = uniqueName.toLowerCase();
     const isRequired =
       lower.includes('name') ||
-      lower.includes('usn') ||
-      lower.includes('id') ||
-      lower.includes('identifier') ||
-      lower.includes('roll');
+      isPrimaryKeyColumn(uniqueName) ||
+      isBarcodeColumn(uniqueName);
 
     columns.push({
       id: `col_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
@@ -222,12 +301,49 @@ export function mapFormToStudent(
     meta[col.name] = val !== undefined && val !== null ? String(val).trim() : '';
   }
 
-  // Primary identifier (USN / ID)
-  let usnVal = getFieldVal(['usn', 'id', 'identifier', 'roll no', 'roll number', 'student id', 'ticket', 'code', 'serial']);
+  // Primary identifier (USN / ID / Primary Key)
+  let usnVal = getFieldVal([
+    'primary key',
+    'primary_key',
+    'primarykey',
+    'primary',
+    'usn',
+    'id',
+    'identifier',
+    'roll no',
+    'roll number',
+    'roll_no',
+    'student id',
+    'ticket',
+    'code',
+    'serial',
+  ]);
+  if (!usnVal) {
+    for (const col of columns) {
+      if (isPrimaryKeyColumn(col.name) && formValues[col.name]?.trim()) {
+        usnVal = formValues[col.name].trim();
+        break;
+      }
+    }
+  }
   if (!usnVal) {
     // Generate clean, deterministic identifier if no ID column in schema
     const padded = String(existingStudentsCount + 1).padStart(4, '0');
     usnVal = `ADM-${padded}`;
+  }
+
+  // Barcode value
+  let barcodeVal = getFieldVal(['barcode', 'bar code', 'bar_code', 'barcode_id', 'barcode id']);
+  if (!barcodeVal) {
+    for (const col of columns) {
+      if (isBarcodeColumn(col.name) && formValues[col.name]?.trim()) {
+        barcodeVal = formValues[col.name].trim();
+        break;
+      }
+    }
+  }
+  if (!barcodeVal) {
+    barcodeVal = formValues['barcode'] || formValues['Barcode'] || formValues['BARCODE'] || '';
   }
 
   // Name
@@ -263,6 +379,7 @@ export function mapFormToStudent(
     branch: branchVal,
     year: yearVal,
     section: sectionVal,
+    barcode: barcodeVal ? barcodeVal.trim() : undefined,
     meta,
   };
 }

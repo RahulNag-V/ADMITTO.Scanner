@@ -9,6 +9,9 @@ import {
   ColumnConfig,
   saveUploadedDataset,
   loadAllUploadedDatasets,
+  isQrCodeColumn,
+  isPrimaryKeyColumn,
+  isBarcodeColumn,
 } from '../../src/lib/attendeeSchema';
 
 describe('Dynamic Attendee Schema Engine', () => {
@@ -331,6 +334,140 @@ describe('Dynamic Attendee Schema Engine', () => {
       expect(mapped.meta.dataset_name).toBe('vip_guests.csv');
       expect(mapped.meta['VIP Pass Tier']).toBe('Platinum');
       expect(mapped.meta['Organization']).toBe('Cyberdyne Systems');
+    });
+  });
+
+  describe('7. QR Code Exclusion & Mandatory Primary Key and Barcode', () => {
+    it('accurately identifies QR Code columns for exclusion', () => {
+      expect(isQrCodeColumn('QR Code')).toBe(true);
+      expect(isQrCodeColumn('qr code')).toBe(true);
+      expect(isQrCodeColumn('qr_code')).toBe(true);
+      expect(isQrCodeColumn('qrcode')).toBe(true);
+      expect(isQrCodeColumn('QR')).toBe(true);
+      expect(isQrCodeColumn('Token')).toBe(true);
+      expect(isQrCodeColumn('qrtoken')).toBe(true);
+      expect(isQrCodeColumn('Name')).toBe(false);
+      expect(isQrCodeColumn('Primary Key')).toBe(false);
+      expect(isQrCodeColumn('Barcode')).toBe(false);
+    });
+
+    it('accurately identifies Primary Key columns as mandatory candidates', () => {
+      expect(isPrimaryKeyColumn('Primary Key')).toBe(true);
+      expect(isPrimaryKeyColumn('primary key')).toBe(true);
+      expect(isPrimaryKeyColumn('primary_key')).toBe(true);
+      expect(isPrimaryKeyColumn('USN')).toBe(true);
+      expect(isPrimaryKeyColumn('ID')).toBe(true);
+      expect(isPrimaryKeyColumn('Student ID')).toBe(true);
+      expect(isPrimaryKeyColumn('Roll No')).toBe(true);
+      expect(isPrimaryKeyColumn('Ticket')).toBe(true);
+      expect(isPrimaryKeyColumn('custom_col', 'custom_col')).toBe(true);
+      expect(isPrimaryKeyColumn('Barcode')).toBe(false);
+      expect(isPrimaryKeyColumn('Email')).toBe(false);
+    });
+
+    it('accurately identifies Barcode columns as mandatory candidates', () => {
+      expect(isBarcodeColumn('Barcode')).toBe(true);
+      expect(isBarcodeColumn('barcode')).toBe(true);
+      expect(isBarcodeColumn('Bar Code')).toBe(true);
+      expect(isBarcodeColumn('bar_code')).toBe(true);
+      expect(isBarcodeColumn('my_custom_code', 'my_custom_code')).toBe(true);
+      expect(isBarcodeColumn('Primary Key')).toBe(false);
+      expect(isBarcodeColumn('QR Code')).toBe(false);
+    });
+
+    it('automatically excludes QR Code and makes Primary Key and Barcode required during schema detection', () => {
+      const sampleSpreadsheetRows = [
+        {
+          Name: 'Rahul Nag',
+          'Primary Key': 'ADM-2026-001',
+          Email: 'rahul@example.com',
+          'Phone Number': '+91-9876543210',
+          Role: 'Developer',
+          'QR Code': 'SECURE-TOKEN-12345',
+          Barcode: 'BARCODE-998877',
+        },
+      ];
+
+      const detected = detectSchemaFromRows(sampleSpreadsheetRows);
+      const names = detected.map((c) => c.name);
+
+      // QR Code must be completely removed from detected schema
+      expect(names).not.toContain('QR Code');
+      expect(names).toContain('Name');
+      expect(names).toContain('Primary Key');
+      expect(names).toContain('Barcode');
+
+      // Primary Key and Barcode must be marked as required (mandatory)
+      const primaryKeyCol = detected.find((c) => c.name === 'Primary Key');
+      expect(primaryKeyCol).toBeDefined();
+      expect(primaryKeyCol?.required).toBe(true);
+
+      const barcodeCol = detected.find((c) => c.name === 'Barcode');
+      expect(barcodeCol).toBeDefined();
+      expect(barcodeCol?.required).toBe(true);
+
+      const nameCol = detected.find((c) => c.name === 'Name');
+      expect(nameCol?.required).toBe(true);
+    });
+
+    it('enforces validation failure when Primary Key or Barcode is missing in manual entry', () => {
+      const testSchema: ColumnConfig[] = [
+        { id: '1', name: 'Name', type: 'text', required: true },
+        { id: '2', name: 'Primary Key', type: 'text', required: true },
+        { id: '3', name: 'Barcode', type: 'text', required: true },
+      ];
+
+      // Missing Primary Key
+      const missingPk = {
+        Name: 'Test Attendee',
+        'Primary Key': '',
+        Barcode: 'BC-12345',
+      };
+      const pkResult = validateRecordAgainstSchema(missingPk, testSchema);
+      expect(pkResult.isValid).toBe(false);
+      expect(pkResult.errors['Primary Key']).toContain('required');
+
+      // Missing Barcode
+      const missingBarcode = {
+        Name: 'Test Attendee',
+        'Primary Key': 'PK-999',
+        Barcode: '   ',
+      };
+      const bcResult = validateRecordAgainstSchema(missingBarcode, testSchema);
+      expect(bcResult.isValid).toBe(false);
+      expect(bcResult.errors['Barcode']).toContain('required');
+
+      // Valid entry with both Primary Key and Barcode
+      const validEntry = {
+        Name: 'Test Attendee',
+        'Primary Key': 'PK-999',
+        Barcode: 'BC-12345',
+      };
+      const validResult = validateRecordAgainstSchema(validEntry, testSchema);
+      expect(validResult.isValid).toBe(true);
+    });
+
+    it('maps Primary Key to USN and Barcode to student.barcode correctly in mapFormToStudent', () => {
+      const testSchema: ColumnConfig[] = [
+        { id: '1', name: 'Name', type: 'text', required: true },
+        { id: '2', name: 'Primary Key', type: 'text', required: true },
+        { id: '3', name: 'Barcode', type: 'text', required: true },
+        { id: '4', name: 'Role', type: 'text', required: false },
+      ];
+
+      const formValues = {
+        Name: 'Kavya Reddy',
+        'Primary Key': 'BLR-042',
+        Barcode: 'BC-999888',
+        Role: 'Speaker',
+      };
+
+      const mapped = mapFormToStudent(formValues, testSchema, 0, 'event-1');
+      expect(mapped.usn).toBe('BLR-042');
+      expect(mapped.barcode).toBe('BC-999888');
+      expect(mapped.name).toBe('Kavya Reddy');
+      expect(mapped.meta?.['Primary Key']).toBe('BLR-042');
+      expect(mapped.meta?.['Barcode']).toBe('BC-999888');
     });
   });
 });
