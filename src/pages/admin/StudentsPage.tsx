@@ -167,9 +167,10 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
     const top = rect.bottom + 8;
     let left: number;
 
-    if (window.innerWidth < 640) {
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
       // Center horizontally on mobile
-      left = (window.innerWidth - dropdownWidth) / 2;
+      left = Math.max(16, (window.innerWidth - dropdownWidth) / 2);
     } else {
       left = rect.left;
       left = Math.max(16, Math.min(left, window.innerWidth - dropdownWidth - 16));
@@ -219,9 +220,10 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
     const top = rect.bottom + 8;
     let left: number;
 
-    if (window.innerWidth < 640) {
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
       // Center horizontally on mobile
-      left = (window.innerWidth - dropdownWidth) / 2;
+      left = Math.max(16, (window.innerWidth - dropdownWidth) / 2);
     } else {
       left = rect.right - dropdownWidth;
       left = Math.max(16, Math.min(left, window.innerWidth - dropdownWidth - 16));
