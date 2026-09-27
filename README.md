@@ -18,23 +18,14 @@
 
 ## 🌟 Key Highlights & Capabilities
 
-### 1. ⚙️ Smart Attendee Ingestion & Barcode Extraction Engine
+### 1. ⚙️ Smart Attendee Ingestion & QR Engine
 - **5-Step Import Wizard**:
   1. **Upload**: Ingest CSV or Excel (`.xlsx`, `.xls`) files with automatic column and encoding detection.
   2. **Primary Key Mapping**: Dynamically select the unique attendee identifier (e.g., USN, Registration ID, Roll Number, or Email).
-  3. **Schema Validation**: Automated sanitization, missing field detection, and format verification.
-  4. **QR Code & Barcode Setup**:
+  3. **Uniqueness Verification**: Automated verification ensuring 100% unique primary keys across the entire uploaded roster with zero duplicates.
+  4. **QR Code Setup**:
      - **QR Payload Mode**: Switch between *Privacy-Safe Cryptographic Token* (database-backed) and *Full Attendee Data* (offline JSON embed).
-     - **Barcode Data Target**: Select primary scanning key or any arbitrary column.
-     - **Barcode Extraction Configuration**:
-       - Extract from **Front** (Beginning) or **End** (Trailing characters).
-       - Configurable extraction character length with live bounds enforcement.
-       - Optional **Fixed Prefix** and **Fixed Suffix** formatting (e.g. `EVENT-`, `-2026`).
-       - Full ID mode fallback.
-     - **Strict Section 16 Error Surfacing**: Detects empty or undersized records with zero silent truncation.
-     - **Real-Time Collision Prevention**: Instant warning and progression lock if multiple attendees map to the same barcode.
-     - **Live Visual Preview**: Real-time transformation preview with uploaded sample data.
-  5. **Review & Commit**: Summary statistics and preview table before committing directly to the database and offline stores.
+  5. **Review & Commit**: Roster preview table and configuration summary before committing directly to the database and offline stores.
 
 ### 2. ⚡ Dual-Engine Scanning & Verification
 - **High-Speed QR Scanner**: Instant camera visual decoding via native `BarcodeDetector` API and ZXing fallback.
