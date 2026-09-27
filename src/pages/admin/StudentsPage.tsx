@@ -184,6 +184,41 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
   const [qrMode, setQrMode] = useState<QrMode>('SECURE_TOKEN');
   const [barcodeField, setBarcodeField] = useState<string>('primary_key');
 
+  // Barcode Data Format State (Maintained independently from QR Code Data Format)
+  const [barcodeDataFormat, setBarcodeDataFormat] = useState<{
+    mode: 'secure-token' | 'full-data';
+    selectedColumn: string | null;
+    warningConfirmed: boolean;
+  }>({
+    mode: 'secure-token',
+    selectedColumn: null,
+    warningConfirmed: false,
+  });
+  const [isBarcodeWarningOpen, setIsBarcodeWarningOpen] = useState(false);
+  const [barcodeColumnError, setBarcodeColumnError] = useState<string | null>(null);
+
+  // Synchronize barcodeDataFormat.selectedColumn with detectedColumns dynamically
+  useEffect(() => {
+    if (detectedColumns.length > 0) {
+      setBarcodeDataFormat((prev) => {
+        if (prev.selectedColumn && detectedColumns.includes(prev.selectedColumn)) {
+          return prev;
+        }
+        return {
+          ...prev,
+          selectedColumn: primaryKeyField && detectedColumns.includes(primaryKeyField)
+            ? primaryKeyField
+            : detectedColumns[0] || null,
+        };
+      });
+    } else {
+      setBarcodeDataFormat((prev) => ({
+        ...prev,
+        selectedColumn: null,
+      }));
+    }
+  }, [detectedColumns, primaryKeyField]);
+
   // Rows prepared from spreadsheet for import and preview
   const transformedUploadData = useMemo(() => {
     if (!rawSpreadsheetRows || rawSpreadsheetRows.length === 0) {
@@ -222,7 +257,22 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
 
       const nameVal = String(r.name || r.attendee || r.student || r['Full Name'] || r['full name'] || 'Attendee').trim();
       const deptVal = String(r.branch || r.department || r.dept || r.course || 'General').trim();
-      const barcodeVal = String(r.barcode || r.Barcode || rawVal).trim();
+
+      let barcodeVal = '';
+      if (barcodeDataFormat.mode === 'secure-token') {
+        const targetCol = barcodeDataFormat.selectedColumn || primaryKeyField;
+        const colVal = r[targetCol] !== undefined && r[targetCol] !== null ? String(r[targetCol]).trim() : '';
+        barcodeVal = colVal || rawVal || `ATT-${i + 1}`;
+      } else {
+        // Full Attendee Data Mode: Encodes complete attendee information into barcode
+        const fullPayload: Record<string, any> = {
+          id: rawVal,
+          name: nameVal,
+          department: deptVal,
+          ...r,
+        };
+        barcodeVal = JSON.stringify(fullPayload);
+      }
 
       if (!rawVal && !nameVal) {
         errorRecords.push({
@@ -253,7 +303,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
       conflicts: [],
       isReady: true,
     };
-  }, [rawSpreadsheetRows, primaryKeyField]);
+  }, [rawSpreadsheetRows, primaryKeyField, barcodeDataFormat]);
 
   // Backward-compatible alias for barcode uniqueness check
   const barcodeUniquenessCheck = {
@@ -944,7 +994,9 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
         primary_scan_field: primaryKeyField,
         secondary_scan_field: secondaryKeyField || null,
         qr_mode: qrMode,
-        barcode_field: primaryKeyField,
+        barcode_field: barcodeDataFormat.mode === 'secure-token'
+          ? (barcodeDataFormat.selectedColumn || primaryKeyField)
+          : 'FULL_DATA',
         available_fields: columns.map((c) => c.name),
         column_configs: columns,
         dataset_name: csvFile?.name || 'Uploaded Dataset',
@@ -2245,6 +2297,12 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                   setCsvFile(null);
                   setRawSpreadsheetRows([]);
                   setImportSummary(null);
+                  setBarcodeDataFormat({
+                    mode: 'secure-token',
+                    selectedColumn: null,
+                    warningConfirmed: false,
+                  });
+                  setBarcodeColumnError(null);
                 }}
                 className="text-zinc-400 hover:text-white cursor-pointer p-1.5 rounded-xl hover:bg-zinc-800 transition-colors"
               >
@@ -2509,7 +2567,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                         : 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50'
                     }`}
                   >
-                    <span>Continue to QR Setup</span>
+                    <span>Continue to QR & Barcode Setup</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -2581,6 +2639,160 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                   </div>
                 </div>
 
+                {/* Barcode Data Format Section */}
+                <div className="space-y-3 pt-2">
+                  <div className="space-y-1">
+                    <div className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Barcode className="w-4 h-4 text-orange-400" />
+                      <span>Barcode Data Format</span>
+                    </div>
+                    <p className="text-xs text-zinc-400">
+                      Choose what information should be encoded into the attendee's barcode.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {/* Option 1: Secure Attendee Token (Recommended) */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Secure Attendee Token (Recommended)"
+                      onClick={() => {
+                        setBarcodeDataFormat((prev) => ({
+                          ...prev,
+                          mode: 'secure-token',
+                        }));
+                        setBarcodeColumnError(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setBarcodeDataFormat((prev) => ({ ...prev, mode: 'secure-token' }));
+                          setBarcodeColumnError(null);
+                        }
+                      }}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-3 ${
+                        barcodeDataFormat.mode === 'secure-token'
+                          ? 'bg-orange-500/15 border-orange-500 ring-1 ring-orange-500/40 shadow-md'
+                          : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 font-bold text-xs text-white">
+                          <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Secure Attendee Token (Recommended)</span>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          Privacy Safe
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-zinc-400 leading-relaxed">
+                        Encodes a secure attendee token instead of exposing the attendee's personal information. This is the recommended and safer option.
+                      </p>
+
+                      {/* Select Data Column Dropdown (Shown when Secure Attendee Token is selected) */}
+                      {barcodeDataFormat.mode === 'secure-token' && (
+                        <div
+                          className="pt-2 border-t border-zinc-800/80 space-y-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <label
+                            htmlFor="barcode-data-column-select"
+                            className="block text-[11px] font-bold text-zinc-300 uppercase tracking-wider"
+                          >
+                            Select Data Column
+                          </label>
+                          <div className="relative">
+                            <select
+                              id="barcode-data-column-select"
+                              value={barcodeDataFormat.selectedColumn || ''}
+                              onChange={(e) => {
+                                const val = e.target.value || null;
+                                setBarcodeDataFormat((prev) => ({
+                                  ...prev,
+                                  selectedColumn: val,
+                                }));
+                                if (val) {
+                                  setBarcodeColumnError(null);
+                                }
+                              }}
+                              disabled={detectedColumns.length === 0}
+                              className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border text-xs text-zinc-100 transition-colors focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer ${
+                                barcodeColumnError
+                                  ? 'border-rose-500/80 ring-1 ring-rose-500/40'
+                                  : 'border-zinc-700/80 focus:border-orange-500'
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                              <option value="" disabled className="bg-zinc-900 text-zinc-400">
+                                {detectedColumns.length === 0
+                                  ? 'No attendee file uploaded'
+                                  : 'Select an uploaded column'}
+                              </option>
+                              {detectedColumns.map((col) => (
+                                <option key={col} value={col} className="bg-zinc-900 text-zinc-100 py-1.5">
+                                  {col} {rawSpreadsheetRows[0]?.[col] ? `(e.g. ${String(rawSpreadsheetRows[0][col]).slice(0, 20)})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {barcodeColumnError ? (
+                            <p className="text-[11px] font-medium text-rose-400 flex items-center gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                              <span>{barcodeColumnError}</span>
+                            </p>
+                          ) : (
+                            <p className="text-[11px] text-zinc-400 leading-relaxed">
+                              The selected column will be used to generate the secure attendee barcode token.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Option 2: Full Attendee Data */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Full Attendee Data"
+                      onClick={() => {
+                        setIsBarcodeWarningOpen(true);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setIsBarcodeWarningOpen(true);
+                        }
+                      }}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-2 ${
+                        barcodeDataFormat.mode === 'full-data'
+                          ? 'bg-amber-500/15 border-amber-500 ring-1 ring-amber-500/40 shadow-md'
+                          : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 font-bold text-xs text-white">
+                          <Eye className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Full Attendee Data</span>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          Data Embedded
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-zinc-400 leading-relaxed">
+                        Encodes the attendee's complete available information into the barcode.
+                      </p>
+
+                      {barcodeDataFormat.mode === 'full-data' && barcodeDataFormat.warningConfirmed && (
+                        <div className="pt-2 border-t border-amber-500/20 text-[11px] text-amber-300/90 flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span>Security Warning Confirmed — Full attendee payload will be encoded into the barcode.</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between pt-4 border-t border-zinc-800">
                   <button
                     type="button"
@@ -2592,7 +2804,16 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setWizardStep(5)}
+                    onClick={() => {
+                      if (barcodeDataFormat.mode === 'secure-token') {
+                        if (!barcodeDataFormat.selectedColumn) {
+                          setBarcodeColumnError('Please select an uploaded data column.');
+                          return;
+                        }
+                      }
+                      setBarcodeColumnError(null);
+                      setWizardStep(5);
+                    }}
                     className="px-6 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg flex items-center gap-1.5 transition-all bg-orange-500 hover:bg-orange-600 shadow-orange-500/25 cursor-pointer"
                   >
                     <span>Continue to Review & Import</span>
@@ -2695,7 +2916,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                         <div className="space-y-1">
                           <div className="text-zinc-500 text-[10px] uppercase font-mono">Primary Scanning Key</div>
                           <div className="font-bold text-orange-400 font-mono">{primaryKeyField}</div>
@@ -2708,6 +2929,14 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                           <div className="text-zinc-500 text-[10px] uppercase font-mono">QR Code Mode</div>
                           <div className="font-bold text-white font-mono">
                             {qrMode === 'SECURE_TOKEN' ? 'Secure Attendee Token' : 'Full Attendee Data (Embedded)'}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-zinc-500 text-[10px] uppercase font-mono">Barcode Data Format</div>
+                          <div className="font-bold text-amber-400 font-mono">
+                            {barcodeDataFormat.mode === 'secure-token'
+                              ? `Secure Token (${barcodeDataFormat.selectedColumn || primaryKeyField})`
+                              : 'Full Attendee Data'}
                           </div>
                         </div>
                       </div>
@@ -2802,6 +3031,12 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                     setCsvFile(null);
                     setRawSpreadsheetRows([]);
                     setImportSummary(null);
+                    setBarcodeDataFormat({
+                      mode: 'secure-token',
+                      selectedColumn: null,
+                      warningConfirmed: false,
+                    });
+                    setBarcodeColumnError(null);
                   }}
                   className="px-8 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs cursor-pointer shadow-lg shadow-emerald-500/25 transition-all"
                 >
@@ -2854,6 +3089,59 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ eventId, event }) =>
                 className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 text-xs font-bold shadow-lg shadow-amber-500/25 cursor-pointer"
               >
                 I Understand — Continue
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Barcode Security & Privacy Warning Modal */}
+      {isBarcodeWarningOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100001] bg-black/85 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-[#151822] border border-amber-500/40 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-5 shadow-2xl animate-scale-in">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-white font-['Space_Grotesk']">
+                Security & Privacy Warning
+              </h3>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Full Attendee Data may expose sensitive attendee information when the barcode is scanned. Anyone with access to the barcode may be able to retrieve the encoded information. Use this option only when you understand the privacy and security implications.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBarcodeWarningOpen(false);
+                  setBarcodeDataFormat((prev) => ({
+                    ...prev,
+                    mode: 'secure-token',
+                    warningConfirmed: false,
+                  }));
+                }}
+                className="px-4 py-2.5 rounded-xl bg-zinc-800 text-xs font-bold text-zinc-300 hover:text-white cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBarcodeWarningOpen(false);
+                  setBarcodeDataFormat((prev) => ({
+                    ...prev,
+                    mode: 'full-data',
+                    warningConfirmed: true,
+                  }));
+                  setBarcodeColumnError(null);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 text-xs font-bold shadow-lg shadow-amber-500/25 cursor-pointer transition-colors"
+              >
+                Continue
               </button>
             </div>
           </div>
