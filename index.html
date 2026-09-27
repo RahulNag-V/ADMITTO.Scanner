@@ -41,6 +41,28 @@
   <body class="mesh-bg text-[#ECEEF0] font-sans antialiased selection:bg-[#FFE3A6] selection:text-[#10232D] min-h-screen w-full overflow-x-hidden m-0 p-0">
     <div id="root" class="min-h-screen w-full flex flex-col"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Self-healing: If the app hasn't mounted after 3 seconds (often due to missing chunk / stale SW cache),
+      // clear service workers and reload.
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          var root = document.getElementById('root');
+          if (root && root.innerHTML.trim() === '') {
+            console.warn('[Self-Healing] Root is empty after 3 seconds. Clearing service workers and reloading...');
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                  registration.unregister();
+                }
+                window.location.reload(true);
+              });
+            } else {
+              window.location.reload(true);
+            }
+          }
+        }, 3000);
+      });
+    </script>
   </body>
 </html>
 
